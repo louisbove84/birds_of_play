@@ -21,7 +21,7 @@ jobs:
         build_type: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install dependencies
       run: |
@@ -51,7 +51,7 @@ jobs:
         ctest --output-on-failure
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
         path: motion_detection/build/ 
