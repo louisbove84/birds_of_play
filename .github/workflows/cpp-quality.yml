@@ -1,0 +1,63 @@
+name: C++ Code Quality
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'motion_detection/**'
+      - '.github/workflows/cpp-quality.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'motion_detection/**'
+      - '.github/workflows/cpp-quality.yml'
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy cppcheck valgrind
+
+    - name: Run clang-tidy
+      run: |
+        cd motion_detection
+        find . -name "*.cpp" -o -name "*.hpp" | xargs clang-tidy -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type
+
+    - name: Run cppcheck
+      run: |
+        cd motion_detection
+        cppcheck --enable=all --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 .
+
+    - name: Run Valgrind
+      run: |
+        cd motion_detection
+        mkdir build && cd build
+        cmake ..
+        make
+        valgrind --leak-check=full --error-exitcode=1 ./BirdsOfPlay
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'Birds of Play'
+        path: '.'
+        format: 'HTML'
+        out: 'reports'
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: cpp
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2 

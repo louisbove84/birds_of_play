@@ -1,0 +1,57 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'motion_detection/**'
+      - '.github/workflows/build-test.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'motion_detection/**'
+      - '.github/workflows/build-test.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libopencv-dev libgtest-dev
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+        fi
+
+    - name: Configure CMake
+      run: |
+        cd motion_detection
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+              -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
+              -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic" \
+              ..
+
+    - name: Build
+      run: |
+        cd motion_detection/build
+        make -j$(nproc)
+
+    - name: Run tests
+      run: |
+        cd motion_detection/build
+        ctest --output-on-failure
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+        path: motion_detection/build/ 
