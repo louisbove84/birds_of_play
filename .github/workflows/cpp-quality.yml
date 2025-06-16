@@ -23,10 +23,20 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y clang-tidy cppcheck valgrind libopencv-dev
 
+    - name: Debug directory structure
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Listing motion_detection directory:"
+        ls -la motion_detection/
+        echo "Listing motion_detection/include directory:"
+        ls -la motion_detection/include/
+        echo "Listing motion_detection/src directory:"
+        ls -la motion_detection/src/
+
     - name: Run clang-tidy
       run: |
         cd motion_detection
-        find . -name "*.cpp" -o -name "*.hpp" | xargs clang-tidy -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type -- -I/usr/include/opencv4
+        clang-tidy include/motion_tracker.hpp src/motion_tracker.cpp src/main.cpp -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type -- -I/usr/include/opencv4
 
     - name: Run cppcheck
       run: |
