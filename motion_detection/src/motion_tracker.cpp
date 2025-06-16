@@ -1,6 +1,26 @@
-#include "../include/motion_tracker.hpp"
+#include "motion_tracker.hpp"
 
-MotionTracker::MotionTracker() : isFirstFrame(true) {}
+MotionTracker::MotionTracker() : isRunning(false), isFirstFrame(true) {}
+
+MotionTracker::~MotionTracker() {
+    stop();
+}
+
+bool MotionTracker::initialize(const std::string& videoSource) {
+    cap.open(videoSource);
+    if (!cap.isOpened()) {
+        return false;
+    }
+    isRunning = true;
+    return true;
+}
+
+void MotionTracker::stop() {
+    isRunning = false;
+    if (cap.isOpened()) {
+        cap.release();
+    }
+}
 
 MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     MotionResult result;
@@ -10,36 +30,35 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     cv::Mat grayFrame;
     cv::cvtColor(frame, grayFrame, cv::COLOR_BGR2GRAY);
     
-    // If this is the first frame, store it and return
     if (isFirstFrame) {
-        previousFrame = grayFrame.clone();
+        prevFrame = grayFrame.clone();
         isFirstFrame = false;
         return result;
     }
     
     // Calculate absolute difference between frames
     cv::Mat frameDiff;
-    cv::absdiff(previousFrame, grayFrame, frameDiff);
+    cv::absdiff(prevFrame, grayFrame, frameDiff);
     
-    // Apply threshold to get binary image
+    // Apply threshold
     cv::Mat thresh;
-    cv::threshold(frameDiff, thresh, MOTION_THRESHOLD, 255, cv::THRESH_BINARY);
+    cv::threshold(frameDiff, thresh, MOTION_THRESHOLD, MAX_THRESHOLD, cv::THRESH_BINARY);
     
-    // Find contours of motion
+    // Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
-    // Filter and store motion regions
+    // Process contours
     for (const auto& contour : contours) {
-        double area = cv::contourArea(contour);
+        const double area = cv::contourArea(contour);
         if (area > MIN_MOTION_AREA) {
-            result.motionRegions.push_back(cv::boundingRect(contour));
             result.hasMotion = true;
+            result.motionRegions.push_back(cv::boundingRect(contour));
         }
     }
     
     // Update previous frame
-    previousFrame = grayFrame.clone();
+    prevFrame = grayFrame.clone();
     
     return result;
 } 

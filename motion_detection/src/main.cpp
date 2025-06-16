@@ -1,28 +1,24 @@
-#include "../include/motion_tracker.hpp"
+#include "motion_tracker.hpp"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
 int main() {
-    // Create motion tracker
     MotionTracker tracker;
     
-    // Open default camera
-    cv::VideoCapture cap(0);
-    if (!cap.isOpened()) {
-        std::cerr << "Error: Could not open camera." << std::endl;
+    if (!tracker.initialize()) {
+        std::cerr << "Error: Could not open video source" << std::endl;
         return -1;
     }
     
     cv::Mat frame;
     while (true) {
-        cap >> frame;
-        if (frame.empty()) {
-            std::cerr << "Error: Empty frame." << std::endl;
+        // Get frame from video source
+        if (!tracker.cap.read(frame)) {
             break;
         }
         
         // Process frame
-        auto result = tracker.processFrame(frame);
+        MotionResult result = tracker.processFrame(frame);
         
         // Draw motion regions
         if (result.hasMotion) {
@@ -31,16 +27,18 @@ int main() {
             }
         }
         
-        // Display result
+        // Display frame
         cv::imshow("Motion Detection", frame);
         
-        // Break loop on 'ESC' key
-        if (cv::waitKey(1) == 27) {
+        // Check for exit key
+        if (cv::waitKey(1) == tracker.ESC_KEY) {
             break;
         }
     }
     
-    cap.release();
+    // Cleanup
     cv::destroyAllWindows();
+    tracker.stop();
+    
     return 0;
 } 

@@ -3,9 +3,13 @@
 
 // System includes
 #include <string>
+#include <vector>
 
 // Third-party includes
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
 
 // Project includes
 // (none for now)
@@ -23,7 +27,6 @@ public:
     bool initialize(const std::string& videoSource = "0");
     void processFrame();
     void stop();
-
     MotionResult processFrame(const cv::Mat& frame);
 
 private:
@@ -31,11 +34,14 @@ private:
     cv::Mat prevFrame;
     cv::Mat currentFrame;
     bool isRunning;
+    bool isFirstFrame;
     std::vector<cv::Rect> detectedObjects;
     
     // Motion detection parameters
     const double MOTION_THRESHOLD = 25.0;
     const int MIN_MOTION_AREA = 500;
+    const int MAX_THRESHOLD = 255;
+    const int ESC_KEY = 27;
 };
 
 #endif // MOTION_TRACKER_HPP 
