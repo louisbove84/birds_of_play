@@ -33,4 +33,30 @@ jobs:
           ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:latest
           ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:${{ github.sha }}
         cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:buildcache
-        cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:buildcache,mode=max 
+        cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:buildcache,mode=max
+
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to Ubuntu laptop
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.UBUNTU_HOST }}
+        username: ${{ secrets.UBUNTU_USERNAME }}
+        key: ${{ secrets.UBUNTU_SSH_KEY }}
+        script: |
+          # Pull the latest image
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:latest
+          
+          # Stop and remove the old container if it exists
+          docker stop birds-of-play || true
+          docker rm birds-of-play || true
+          
+          # Run the new container
+          docker run -d \
+            --name birds-of-play \
+            --restart unless-stopped \
+            --device=/dev/video0 \
+            -e TZ=America/New_York \
+            ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:latest 
