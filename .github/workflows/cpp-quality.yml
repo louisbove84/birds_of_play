@@ -32,7 +32,13 @@ jobs:
     - name: Run cppcheck
       run: |
         cd motion_detection
-        cppcheck --enable=all --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 .
+        cppcheck --enable=all \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --error-exitcode=1 \
+          -I include \
+          -I /usr/include/opencv4 \
+          src/ tests/
 
     - name: Run Valgrind
       run: |
