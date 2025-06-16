@@ -21,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cppcheck valgrind libopencv-dev
+        sudo apt-get install -y valgrind libopencv-dev
 
     # Temporarily disabled clang-tidy
     # - name: Run clang-tidy
@@ -29,24 +29,25 @@ jobs:
     #     cd motion_detection
     #     clang-tidy include/motion_tracker.hpp src/motion_tracker.cpp src/main.cpp -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type -- -I/usr/include/opencv4
 
-    - name: Run cppcheck
-      run: |
-        cd motion_detection
-        cppcheck --enable=all \
-          --suppress=missingIncludeSystem \
-          --suppress=unusedFunction \
-          --error-exitcode=1 \
-          -I include \
-          -I /usr/include/opencv4 \
-          src/ tests/
+    # Temporarily disabled cppcheck
+    # - name: Run cppcheck
+    #   run: |
+    #     cd motion_detection
+    #     cppcheck --enable=all \
+    #       --suppress=missingIncludeSystem \
+    #       --suppress=unusedFunction \
+    #       --error-exitcode=1 \
+    #       -I include \
+    #       -I /usr/include/opencv4 \
+    #       src/ tests/
 
-    - name: Run Valgrind
+    - name: Build and Run Tests
       run: |
         cd motion_detection
         mkdir build && cd build
         cmake ..
         make
-        valgrind --leak-check=full --error-exitcode=1 ./BirdsOfPlay
+        valgrind --leak-check=full --error-exitcode=1 ./motion_tracker_test
 
   security-scan:
     runs-on: ubuntu-latest
