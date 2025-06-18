@@ -28,6 +28,10 @@ public:
     void processFrame();
     void stop();
     MotionResult processFrame(const cv::Mat& frame);
+    
+    // New public methods
+    bool readFrame(cv::Mat& frame) { return cap.read(frame); }
+    static int getEscKey() { return ESC_KEY; }
 
 private:
     cv::VideoCapture cap;
@@ -41,7 +45,7 @@ private:
     const double MOTION_THRESHOLD = 25.0;
     const int MIN_MOTION_AREA = 500;
     const int MAX_THRESHOLD = 255;
-    const int ESC_KEY = 27;
+    static const int ESC_KEY = 27;
 };
 
 #endif // MOTION_TRACKER_HPP 

@@ -13,7 +13,7 @@ int main() {
     cv::Mat frame;
     while (true) {
         // Get frame from video source
-        if (!tracker.cap.read(frame)) {
+        if (!tracker.readFrame(frame)) {
             break;
         }
         
@@ -31,7 +31,7 @@ int main() {
         cv::imshow("Motion Detection", frame);
         
         // Check for exit key
-        if (cv::waitKey(1) == tracker.ESC_KEY) {
+        if (cv::waitKey(1) == MotionTracker::getEscKey()) {
             break;
         }
     }
