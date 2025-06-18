@@ -56,7 +56,6 @@ jobs:
           --errors-for-leak-kinds=definite \
           --error-exitcode=1 \
           --gen-suppressions=all \
-          --suppressions=/usr/lib/valgrind/default.supp \
           ./motion_tracker_test
 
   security-scan:
