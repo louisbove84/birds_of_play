@@ -25,6 +25,7 @@ jobs:
           valgrind \
           libopencv-dev \
           libgtest-dev \
+          libyaml-cpp-dev \
           cmake
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt

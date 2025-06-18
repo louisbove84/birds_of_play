@@ -30,7 +30,8 @@ jobs:
           build-essential \
           cmake \
           libopencv-dev \
-          libgtest-dev
+          libgtest-dev \
+          libyaml-cpp-dev
         if [ "${{ matrix.compiler }}" = "clang" ]; then
           sudo apt-get install -y clang
         fi
