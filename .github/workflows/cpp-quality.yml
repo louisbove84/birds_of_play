@@ -71,7 +71,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libopencv-dev cmake libgtest-dev
+        sudo apt-get install -y \
+          libopencv-dev \
+          libgtest-dev \
+          libyaml-cpp-dev \
+          cmake
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make
