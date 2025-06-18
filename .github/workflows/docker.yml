@@ -59,4 +59,10 @@ jobs:
             --restart unless-stopped \
             --device=/dev/video0 \
             -e TZ=America/New_York \
-            ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:latest 
+            ${{ secrets.DOCKERHUB_USERNAME }}/birds-of-play:latest
+
+          # Install necessary packages
+          sudo apt-get install -y \
+            <package1> \
+            <package2> \
+            ... 

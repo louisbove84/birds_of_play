@@ -21,7 +21,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y valgrind libopencv-dev libgtest-dev cmake
+        sudo apt-get install -y \
+          valgrind \
+          libopencv-dev \
+          libgtest-dev \
+          cmake
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make

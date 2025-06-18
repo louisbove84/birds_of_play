@@ -47,6 +47,7 @@ target_link_libraries(motion_tracker_test
     ${GTEST_MAIN_LIBRARIES}
     stdc++
     pthread
+    m
 )
 
 # Enable testing
