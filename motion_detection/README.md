@@ -6,6 +6,7 @@ A C++ application for real-time motion tracking, designed for bird detection and
 
 - CMake (version 3.10 or higher)
 - OpenCV (version 4.x recommended)
+- yaml-cpp (install with `brew install yaml-cpp` on macOS or `sudo apt-get install libyaml-cpp-dev` on Ubuntu)
 - C++17 compatible compiler
 
 ## Building the Project

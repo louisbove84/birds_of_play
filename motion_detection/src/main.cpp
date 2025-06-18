@@ -3,9 +3,9 @@
 #include <iostream>
 
 int main() {
-    MotionTracker tracker;
+    MotionTracker tracker("../config.yaml");
     
-    if (!tracker.initialize()) {
+    if (!tracker.initialize(0)) {
         std::cerr << "Error: Could not open video source" << std::endl;
         return -1;
     }

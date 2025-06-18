@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     libopencv-dev \
     libgtest-dev \
+    libyaml-cpp-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 

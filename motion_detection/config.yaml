@@ -1,0 +1,4 @@
+# Motion Detection Configuration
+threshold_value: 25         # Pixel intensity difference threshold
+min_contour_area: 500       # Minimum area (in pixels) for detected motion to be considered significant
+# Add more parameters as needed 
