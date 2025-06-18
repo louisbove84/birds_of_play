@@ -53,3 +53,4 @@ After building, run the application from the build directory:
 - Data logging and analysis
 - Network streaming capabilities
 - Integration with ML component for species classification 
+- ...
