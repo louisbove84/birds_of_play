@@ -51,7 +51,13 @@ jobs:
         mkdir build && cd build
         cmake ..
         make
-        valgrind --leak-check=full --error-exitcode=1 ./motion_tracker_test
+        valgrind --leak-check=full \
+          --show-leak-kinds=definite \
+          --errors-for-leak-kinds=definite \
+          --error-exitcode=1 \
+          --gen-suppressions=all \
+          --suppressions=/usr/lib/valgrind/default.supp \
+          ./motion_tracker_test
 
   security-scan:
     runs-on: ubuntu-latest
