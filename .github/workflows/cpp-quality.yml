@@ -66,7 +66,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libopencv-dev cmake
+        sudo apt-get install -y libopencv-dev cmake libgtest-dev
+        cd /usr/src/gtest
+        sudo cmake CMakeLists.txt
+        sudo make
+        sudo cp lib/libgtest*.a /usr/lib/
 
     - name: Build for CodeQL
       run: |
