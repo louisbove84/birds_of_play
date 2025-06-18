@@ -54,3 +54,9 @@ After building, run the application from the build directory:
 - Network streaming capabilities
 - Integration with ML component for species classification 
 - ...
+
+target_link_libraries(BirdsOfPlay
+    ${OpenCV_LIBS}
+    yaml-cpp
+    pthread
+)
