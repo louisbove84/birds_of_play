@@ -2,12 +2,12 @@ name: Build and Test
 
 on:
   push:
-    branches: [ "*" ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/build-test.yml'
   pull_request:
-    branches: [ "*" ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/build-test.yml'

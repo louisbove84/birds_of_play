@@ -2,12 +2,12 @@ name: C++ Code Quality
 
 on:
   push:
-    branches: [ "*" ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/cpp-quality.yml'
   pull_request:
-    branches: [ "*" ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/cpp-quality.yml'
