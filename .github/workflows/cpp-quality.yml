@@ -72,13 +72,6 @@ jobs:
         sudo make
         sudo cp lib/libgtest*.a /usr/lib/
 
-    - name: Build for CodeQL
-      run: |
-        cd motion_detection
-        mkdir build && cd build
-        cmake ..
-        make
-
     - name: Run OWASP Dependency Check
       uses: dependency-check/Dependency-Check_Action@main
       with:
@@ -92,6 +85,13 @@ jobs:
       with:
         languages: cpp
         build-mode: manual
+
+    - name: Build for CodeQL
+      run: |
+        cd motion_detection
+        mkdir build && cd build
+        cmake ..
+        make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
