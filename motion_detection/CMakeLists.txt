@@ -31,6 +31,17 @@ if(EXISTS "/opt/homebrew/lib")
     link_directories(/opt/homebrew/lib)
 endif()
 
+# Platform-specific linking
+if(UNIX AND NOT APPLE)
+    # Linux (e.g., Ubuntu CI)
+    set(EXTRA_LIBS stdc++)
+elseif(APPLE)
+    # macOS (do not add stdc++, use default)
+    set(EXTRA_LIBS "")
+else()
+    set(EXTRA_LIBS "")
+endif()
+
 # Add executable
 add_executable(BirdsOfPlay 
     src/main.cpp
@@ -42,6 +53,7 @@ target_link_libraries(BirdsOfPlay
     ${OpenCV_LIBS}
     yaml-cpp
     pthread
+    ${EXTRA_LIBS}
 )
 
 # Add test executable
@@ -58,6 +70,7 @@ target_link_libraries(motion_tracker_test
     yaml-cpp
     pthread
     m
+    ${EXTRA_LIBS}
 )
 
 # Enable testing
