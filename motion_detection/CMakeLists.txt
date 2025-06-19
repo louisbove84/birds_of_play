@@ -11,7 +11,10 @@ find_package(yaml-cpp REQUIRED)
 find_package(GTest REQUIRED)
 
 # Set MongoDB paths for CMake
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/opt/homebrew/lib/cmake")
+list(APPEND CMAKE_PREFIX_PATH 
+    "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/mongocxx-4.1.0"
+    "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/bsoncxx-4.1.0"
+)
 
 # Find MongoDB
 find_package(mongocxx REQUIRED)
