@@ -91,7 +91,6 @@ WORKDIR /app
 
 # Copy built files from builder stage
 COPY --from=builder /app/build/BirdsOfPlay .
-COPY --from=builder /app/build/motion_tracker_test .
 COPY --from=builder /app/build/config.yaml .
 
 # Set permissions
