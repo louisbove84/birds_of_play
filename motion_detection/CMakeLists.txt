@@ -17,13 +17,16 @@ if(APPLE)
         "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/bsoncxx-4.1.0"
     )
 elseif(UNIX AND NOT APPLE)
-    # Linux paths
+    # Linux paths - we installed to /usr/local
     list(APPEND CMAKE_PREFIX_PATH 
-        "/usr/lib/x86_64-linux-gnu/cmake/mongocxx-3.7.0"
-        "/usr/lib/x86_64-linux-gnu/cmake/bsoncxx-3.7.0"
-        "/usr/lib/x86_64-linux-gnu/cmake/libmongocxx-3.7.0"
-        "/usr/lib/x86_64-linux-gnu/cmake/libbsoncxx-3.7.0"
+        "/usr/local/lib/cmake/mongocxx-3.8.0"
+        "/usr/local/lib/cmake/bsoncxx-3.8.0"
+        "/usr/local/lib/cmake/libmongocxx-3.8.0"
+        "/usr/local/lib/cmake/libbsoncxx-3.8.0"
     )
+    
+    # Also add the lib directory to the library search path
+    link_directories("/usr/local/lib")
 endif()
 
 # Find MongoDB
