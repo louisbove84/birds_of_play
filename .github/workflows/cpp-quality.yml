@@ -73,7 +73,7 @@ jobs:
           --errors-for-leak-kinds=definite \
           --error-exitcode=1 \
           --gen-suppressions=all \
-          ./motion_tracker_test
+          ./BirdsOfPlay_test
 
   security-scan:
     runs-on: ubuntu-latest
