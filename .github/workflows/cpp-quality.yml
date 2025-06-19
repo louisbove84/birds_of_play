@@ -45,6 +45,10 @@ jobs:
         cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ..
         sudo make -j$(nproc)
         sudo make install
+        sudo ldconfig
+        echo "MongoDB C driver installed successfully"
+        ls -la /usr/local/lib/libbson*
+        ls -la /usr/local/lib/cmake/
 
     - name: Install MongoDB C++ Driver
       run: |
@@ -53,7 +57,7 @@ jobs:
         tar xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
         mkdir -p build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_PREFIX_PATH=/usr/local ..
         sudo make -j$(nproc)
         sudo make install
         sudo ldconfig
@@ -104,6 +108,10 @@ jobs:
         cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ..
         sudo make -j$(nproc)
         sudo make install
+        sudo ldconfig
+        echo "MongoDB C driver installed successfully"
+        ls -la /usr/local/lib/libbson*
+        ls -la /usr/local/lib/cmake/
 
     - name: Install MongoDB C++ Driver
       run: |
@@ -112,7 +120,7 @@ jobs:
         tar xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
         mkdir -p build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_PREFIX_PATH=/usr/local ..
         sudo make -j$(nproc)
         sudo make install
         sudo ldconfig
