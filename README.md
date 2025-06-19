@@ -19,6 +19,17 @@ A comprehensive system for bird tracking and analysis, combining motion detectio
 - Data visualization
 - User controls and settings
 
+## Modules
+
+### Motion Tracking
+- Detects and tracks moving objects (e.g., birds) in real time using OpenCV.
+- Configurable sensitivity for robust outdoor use.
+- Forms the foundation for further analysis and integration with other components.
+
+### Motion Path Visualization
+- Visualizes the path of detected objects as they move across the camera frame.
+- Useful for understanding movement patterns and verifying tracking accuracy in real time.
+
 ## Getting Started
 
 Each component has its own setup instructions in its respective directory:

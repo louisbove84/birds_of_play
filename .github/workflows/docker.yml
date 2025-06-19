@@ -2,8 +2,8 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    # branches: [ "*" ]
+    # tags: [ 'v**' ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/docker.yml'
