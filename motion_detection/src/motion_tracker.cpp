@@ -10,7 +10,9 @@ MotionTracker::MotionTracker(const std::string& configPath)
       thresholdValue(25.0),
       minContourArea(500),
       maxTrackingDistance(100.0),
-      maxThreshold(255) {
+      maxThreshold(255),
+      smoothingFactor(0.6),
+      minTrackingConfidence(0.5) {
     loadConfig(configPath);
 }
 
@@ -52,6 +54,8 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["max_tracking_distance"]) maxTrackingDistance = config["max_tracking_distance"].as<double>();
         if (config["max_trajectory_points"]) maxTrajectoryPoints = config["max_trajectory_points"].as<size_t>();
         if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
+        if (config["smoothing_factor"]) smoothingFactor = config["smoothing_factor"].as<double>();
+        if (config["min_tracking_confidence"]) minTrackingConfidence = config["min_tracking_confidence"].as<double>();
     } catch (const std::exception& e) {
         std::cerr << "Warning: Could not load config file: " << e.what() << ". Using defaults." << std::endl;
     }
@@ -78,6 +82,13 @@ TrackedObject* MotionTracker::findNearestObject(const cv::Rect& newBounds) {
     return nearest;
 }
 
+cv::Point MotionTracker::smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos) {
+    return cv::Point(
+        static_cast<int>(smoothedPos.x * smoothingFactor + newPos.x * (1 - smoothingFactor)),
+        static_cast<int>(smoothedPos.y * smoothingFactor + newPos.y * (1 - smoothingFactor))
+    );
+}
+
 void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
     // Mark all current objects for potential removal
     std::vector<bool> objectMatched(trackedObjects.size(), false);
@@ -89,10 +100,35 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
         if (matchedObj != nullptr) {
             // Update existing object
             size_t idx = matchedObj - &trackedObjects[0];
-            if (idx < objectMatched.size()) {  // Add bounds check
+            if (idx < objectMatched.size()) {
                 objectMatched[idx] = true;
                 matchedObj->currentBounds = bounds;
-                matchedObj->trajectory.push_back(matchedObj->getCenter());
+                
+                // Get new center position
+                cv::Point newCenter = matchedObj->getCenter();
+                
+                // Apply smoothing if we have a previous smoothed position
+                if (!matchedObj->trajectory.empty()) {
+                    matchedObj->smoothedCenter = smoothPosition(newCenter, matchedObj->smoothedCenter);
+                    matchedObj->trajectory.push_back(matchedObj->smoothedCenter);
+                } else {
+                    matchedObj->smoothedCenter = newCenter;
+                    matchedObj->trajectory.push_back(newCenter);
+                }
+                
+                // Update confidence based on consistent motion
+                if (matchedObj->trajectory.size() >= 2) {
+                    cv::Point prevMotion = matchedObj->trajectory.back() - matchedObj->trajectory[matchedObj->trajectory.size()-2];
+                    cv::Point currMotion = newCenter - matchedObj->trajectory.back();
+                    double motionSimilarity = (prevMotion.x * currMotion.x + prevMotion.y * currMotion.y) /
+                                            (sqrt(prevMotion.x * prevMotion.x + prevMotion.y * prevMotion.y + 1) *
+                                             sqrt(currMotion.x * currMotion.x + currMotion.y * currMotion.y + 1));
+                    matchedObj->confidence = 0.7 * matchedObj->confidence + 0.3 * (motionSimilarity + 1) / 2;
+                } else {
+                    matchedObj->confidence = 0.5;  // Initial confidence
+                }
+                
+                // Limit trajectory length
                 if (matchedObj->trajectory.size() > maxTrajectoryPoints) {
                     matchedObj->trajectory.pop_front();
                 }
@@ -102,15 +138,17 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
             TrackedObject newObj;
             newObj.id = nextObjectId++;
             newObj.currentBounds = bounds;
-            newObj.trajectory.push_back(cv::Point(bounds.x + bounds.width/2,
-                                                bounds.y + bounds.height/2));
+            newObj.smoothedCenter = newObj.getCenter();
+            newObj.confidence = 0.5;  // Initial confidence
+            newObj.trajectory.push_back(newObj.smoothedCenter);
             trackedObjects.push_back(newObj);
         }
     }
     
-    // Remove objects that weren't matched
+    // Remove objects that weren't matched or have low confidence
     for (int i = trackedObjects.size() - 1; i >= 0; --i) {
-        if (i < static_cast<int>(objectMatched.size()) && !objectMatched[i]) {
+        if (i < static_cast<int>(objectMatched.size()) && 
+            (!objectMatched[i] || trackedObjects[i].confidence < minTrackingConfidence)) {
             trackedObjects.erase(trackedObjects.begin() + i);
         }
     }

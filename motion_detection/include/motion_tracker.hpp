@@ -20,6 +20,8 @@ struct TrackedObject {
     int id;                                     // Unique identifier for this object
     cv::Rect currentBounds;                     // Current bounding box
     std::deque<cv::Point> trajectory;           // Path history (recent positions)
+    cv::Point smoothedCenter;  // Add smoothed center position
+    double confidence;         // Add tracking confidence
     cv::Point getCenter() const {
         return cv::Point(currentBounds.x + currentBounds.width/2,
                         currentBounds.y + currentBounds.height/2);
@@ -69,6 +71,13 @@ private:
     double maxTrackingDistance;
     int maxThreshold;
     static const int ESC_KEY = 27;  // Keep this as const since it's a key code
+
+    // Smoothing parameters
+    double smoothingFactor;
+    double minTrackingConfidence;
+    
+    // Helper method for position smoothing
+    cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
 };
 
 #endif // MOTION_TRACKER_HPP 

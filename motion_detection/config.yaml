@@ -1,14 +1,29 @@
 # Motion Detection Configuration
 
 # Basic motion detection parameters
-threshold_value: 50        # Pixel intensity difference threshold
-min_contour_area: 800      # Minimum area (in pixels) for detected motion to be considered significant
+threshold_value: 40         # Pixel intensity difference threshold (increased for less noise)
+min_contour_area: 2000     # Minimum area (in pixels) to reduce multiple detections
 
 # Trajectory tracking parameters
-max_tracking_distance: 100  # Maximum pixel distance to consider an object the same between frames
-max_trajectory_points: 30   # Number of previous positions to remember for each object's path
+max_tracking_distance: 100  # Maximum pixel distance (reduced to prevent jumping between objects)
+max_trajectory_points: 30   # Reduced trail length for cleaner visualization
 
 # Display parameters
 max_threshold: 255         # Maximum value for binary threshold operation
+
+# Motion smoothing parameters
+smoothing_factor: 0.6      # Higher value = more smoothing (0.0 to 1.0)
+min_tracking_confidence: 0.5  # Minimum confidence to maintain tracking
+
+# Data Collection parameters
+enable_data_collection: true           # Enable/disable data collection
+cleanup_old_data: true                 # If true, deletes old data on startup. If false, preserves old data
+image_format: "png"                    # Format for saving cropped images
+save_interval_seconds: 5               # How often to save data to disk
+
+# MongoDB Configuration
+mongodb_uri: "mongodb://localhost:27017"  # MongoDB connection URI
+database_name: "birds_of_play"           # Database name
+collection_prefix: "motion_tracking"      # Prefix for collections (will create motion_tracking_data and motion_tracking_images)
 
 # Add more parameters as needed 
