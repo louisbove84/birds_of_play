@@ -31,7 +31,10 @@ jobs:
           cmake \
           libopencv-dev \
           libgtest-dev \
-          libyaml-cpp-dev
+          libyaml-cpp-dev \
+          libmongoc-dev \
+          libmongocxx-dev \
+          libbsoncxx-dev
         if [ "${{ matrix.compiler }}" = "clang" ]; then
           sudo apt-get install -y clang
         fi
