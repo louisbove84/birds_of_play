@@ -101,6 +101,8 @@ target_link_libraries(${PROJECT_NAME}
         ${UUID_LIBRARIES}
         mongo::mongocxx_shared
         mongo::bsoncxx_shared
+        ${EXTRA_LIBS}
+        stdc++
 )
 
 # Copy config file to build directory
@@ -129,6 +131,8 @@ target_link_libraries(${PROJECT_NAME}_test
         ${UUID_LIBRARIES}
         mongo::mongocxx_shared
         mongo::bsoncxx_shared
+        ${EXTRA_LIBS}
+        stdc++
 )
 
 add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test) 
