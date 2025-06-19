@@ -13,7 +13,34 @@ max_threshold: 255         # Maximum value for binary threshold operation
 
 # Motion smoothing parameters
 smoothing_factor: 0.6      # Higher value = more smoothing (0.0 to 1.0)
-min_tracking_confidence: 0.5  # Minimum confidence to maintain tracking
+min_tracking_confidence: 0.8  # Minimum confidence to maintain tracking
+
+# Image Processing Techniques (enable/disable individual techniques)
+enable_gaussian_blur: true     # Reduce noise with Gaussian blur
+gaussian_blur_size: 5          # Size of Gaussian blur kernel (odd number)
+
+enable_morphology: true        # Enable morphological operations
+morphology_kernel_size: 5      # Size of morphological operation kernel (odd number)
+enable_morph_close: true       # Close operation to fill gaps within objects
+enable_morph_open: true        # Open operation to remove small noise
+enable_dilation: true          # Additional dilation to make objects more cohesive
+enable_erosion: false          # Erosion to reduce object size (use with caution)
+
+enable_contrast_enhancement: false  # Enhance contrast using CLAHE
+clahe_clip_limit: 2.0         # CLAHE clip limit for contrast enhancement
+clahe_tile_size: 8            # CLAHE tile size
+
+enable_median_blur: false     # Alternative blur method (good for salt-and-pepper noise)
+median_blur_size: 5           # Size of median blur kernel (odd number)
+
+enable_bilateral_filter: false # Edge-preserving smoothing
+bilateral_d: 15               # Bilateral filter diameter
+bilateral_sigma_color: 75     # Bilateral filter sigma color
+bilateral_sigma_space: 75     # Bilateral filter sigma space
+
+enable_adaptive_threshold: false  # Use adaptive thresholding instead of simple threshold
+adaptive_block_size: 11       # Block size for adaptive threshold
+adaptive_c: 2                 # Constant subtracted from mean
 
 # Data Collection parameters
 enable_data_collection: true           # Enable/disable data collection

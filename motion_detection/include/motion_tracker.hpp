@@ -76,6 +76,33 @@ private:
     double smoothingFactor;
     double minTrackingConfidence;
     
+    // Image Processing Technique parameters
+    bool enableGaussianBlur;
+    int gaussianBlurSize;
+    
+    bool enableMorphology;
+    int morphologyKernelSize;
+    bool enableMorphClose;
+    bool enableMorphOpen;
+    bool enableDilation;
+    bool enableErosion;
+    
+    bool enableContrastEnhancement;
+    double claheClipLimit;
+    int claheTileSize;
+    
+    bool enableMedianBlur;
+    int medianBlurSize;
+    
+    bool enableBilateralFilter;
+    int bilateralD;
+    double bilateralSigmaColor;
+    double bilateralSigmaSpace;
+    
+    bool enableAdaptiveThreshold;
+    int adaptiveBlockSize;
+    int adaptiveC;
+    
     // Helper method for position smoothing
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
 };

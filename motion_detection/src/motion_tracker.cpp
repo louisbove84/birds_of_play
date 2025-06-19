@@ -12,7 +12,27 @@ MotionTracker::MotionTracker(const std::string& configPath)
       maxTrackingDistance(100.0),
       maxThreshold(255),
       smoothingFactor(0.6),
-      minTrackingConfidence(0.5) {
+      minTrackingConfidence(0.5),
+      enableGaussianBlur(true),
+      gaussianBlurSize(5),
+      enableMorphology(true),
+      morphologyKernelSize(5),
+      enableMorphClose(true),
+      enableMorphOpen(true),
+      enableDilation(true),
+      enableErosion(false),
+      enableContrastEnhancement(false),
+      claheClipLimit(2.0),
+      claheTileSize(8),
+      enableMedianBlur(false),
+      medianBlurSize(5),
+      enableBilateralFilter(false),
+      bilateralD(15),
+      bilateralSigmaColor(75.0),
+      bilateralSigmaSpace(75.0),
+      enableAdaptiveThreshold(false),
+      adaptiveBlockSize(11),
+      adaptiveC(2) {
     loadConfig(configPath);
 }
 
@@ -56,6 +76,25 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
         if (config["smoothing_factor"]) smoothingFactor = config["smoothing_factor"].as<double>();
         if (config["min_tracking_confidence"]) minTrackingConfidence = config["min_tracking_confidence"].as<double>();
+        if (config["gaussian_blur_size"]) gaussianBlurSize = config["gaussian_blur_size"].as<int>();
+        if (config["morphology_kernel_size"]) morphologyKernelSize = config["morphology_kernel_size"].as<int>();
+        if (config["enable_morphology"]) enableMorphology = config["enable_morphology"].as<bool>();
+        if (config["enable_dilation"]) enableDilation = config["enable_dilation"].as<bool>();
+        if (config["enable_morph_close"]) enableMorphClose = config["enable_morph_close"].as<bool>();
+        if (config["enable_morph_open"]) enableMorphOpen = config["enable_morph_open"].as<bool>();
+        if (config["enable_erosion"]) enableErosion = config["enable_erosion"].as<bool>();
+        if (config["enable_contrast_enhancement"]) enableContrastEnhancement = config["enable_contrast_enhancement"].as<bool>();
+        if (config["clahe_clip_limit"]) claheClipLimit = config["clahe_clip_limit"].as<double>();
+        if (config["clahe_tile_size"]) claheTileSize = config["clahe_tile_size"].as<int>();
+        if (config["enable_median_blur"]) enableMedianBlur = config["enable_median_blur"].as<bool>();
+        if (config["median_blur_size"]) medianBlurSize = config["median_blur_size"].as<int>();
+        if (config["enable_bilateral_filter"]) enableBilateralFilter = config["enable_bilateral_filter"].as<bool>();
+        if (config["bilateral_d"]) bilateralD = config["bilateral_d"].as<int>();
+        if (config["bilateral_sigma_color"]) bilateralSigmaColor = config["bilateral_sigma_color"].as<double>();
+        if (config["bilateral_sigma_space"]) bilateralSigmaSpace = config["bilateral_sigma_space"].as<double>();
+        if (config["enable_adaptive_threshold"]) enableAdaptiveThreshold = config["enable_adaptive_threshold"].as<bool>();
+        if (config["adaptive_block_size"]) adaptiveBlockSize = config["adaptive_block_size"].as<int>();
+        if (config["adaptive_c"]) adaptiveC = config["adaptive_c"].as<int>();
     } catch (const std::exception& e) {
         std::cerr << "Warning: Could not load config file: " << e.what() << ". Using defaults." << std::endl;
     }
@@ -172,17 +211,72 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         return result;
     }
     
+    // Apply image processing techniques to current frame
+    cv::Mat processedFrame = grayFrame.clone();
+    
+    // 1. Contrast Enhancement (CLAHE)
+    if (enableContrastEnhancement) {
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(claheClipLimit, cv::Size(claheTileSize, claheTileSize));
+        clahe->apply(processedFrame, processedFrame);
+    }
+    
+    // 2. Gaussian Blur
+    if (enableGaussianBlur) {
+        cv::GaussianBlur(processedFrame, processedFrame, cv::Size(gaussianBlurSize, gaussianBlurSize), 0);
+    }
+    
+    // 3. Median Blur (alternative to Gaussian)
+    if (enableMedianBlur) {
+        cv::medianBlur(processedFrame, processedFrame, medianBlurSize);
+    }
+    
+    // 4. Bilateral Filter (edge-preserving smoothing)
+    if (enableBilateralFilter) {
+        cv::bilateralFilter(processedFrame, processedFrame, bilateralD, bilateralSigmaColor, bilateralSigmaSpace);
+    }
+    
     // Calculate absolute difference between frames
     cv::Mat frameDiff;
-    cv::absdiff(prevFrame, grayFrame, frameDiff);
+    cv::absdiff(prevFrame, processedFrame, frameDiff);
     
-    // Apply threshold
+    // Apply thresholding
     cv::Mat thresh;
-    cv::threshold(frameDiff, thresh, thresholdValue, maxThreshold, cv::THRESH_BINARY);
+    if (enableAdaptiveThreshold) {
+        cv::adaptiveThreshold(frameDiff, thresh, maxThreshold, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
+                             cv::THRESH_BINARY, adaptiveBlockSize, adaptiveC);
+    } else {
+        cv::threshold(frameDiff, thresh, thresholdValue, maxThreshold, cv::THRESH_BINARY);
+    }
+    
+    // Apply morphological operations
+    cv::Mat processed = thresh.clone();
+    if (enableMorphology) {
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(morphologyKernelSize, morphologyKernelSize));
+        
+        // Close operation to fill gaps within objects
+        if (enableMorphClose) {
+            cv::morphologyEx(processed, processed, cv::MORPH_CLOSE, kernel);
+        }
+        
+        // Open operation to remove small noise
+        if (enableMorphOpen) {
+            cv::morphologyEx(processed, processed, cv::MORPH_OPEN, kernel);
+        }
+        
+        // Dilation to make objects more cohesive
+        if (enableDilation) {
+            cv::dilate(processed, processed, kernel, cv::Point(-1, -1), 1);
+        }
+        
+        // Erosion to reduce object size (use with caution)
+        if (enableErosion) {
+            cv::erode(processed, processed, kernel, cv::Point(-1, -1), 1);
+        }
+    }
     
     // Find contours
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(processed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
     // Process contours and update trajectories
     std::vector<cv::Rect> newBounds;
@@ -198,8 +292,19 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     updateTrajectories(newBounds);
     result.trackedObjects = trackedObjects;
     
+    // Debug output
+    if (!trackedObjects.empty()) {
+        std::cout << "Tracking " << trackedObjects.size() << " objects:" << std::endl;
+        for (const auto& obj : trackedObjects) {
+            std::cout << "  Object " << obj.id << ": confidence=" << obj.confidence 
+                      << ", trajectory points=" << obj.trajectory.size() 
+                      << ", bounds=(" << obj.currentBounds.x << "," << obj.currentBounds.y 
+                      << "," << obj.currentBounds.width << "," << obj.currentBounds.height << ")" << std::endl;
+        }
+    }
+    
     // Update previous frame
-    prevFrame = grayFrame.clone();
+    prevFrame = processedFrame.clone();
     
     return result;
 } 
