@@ -1,4 +1,14 @@
 # Motion Detection Configuration
-threshold_value: 25         # Pixel intensity difference threshold
-min_contour_area: 500       # Minimum area (in pixels) for detected motion to be considered significant
+
+# Basic motion detection parameters
+threshold_value: 50        # Pixel intensity difference threshold
+min_contour_area: 800      # Minimum area (in pixels) for detected motion to be considered significant
+
+# Trajectory tracking parameters
+max_tracking_distance: 100  # Maximum pixel distance to consider an object the same between frames
+max_trajectory_points: 30   # Number of previous positions to remember for each object's path
+
+# Display parameters
+max_threshold: 255         # Maximum value for binary threshold operation
+
 # Add more parameters as needed 
