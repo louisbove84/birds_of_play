@@ -12,6 +12,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/bgsegm.hpp>
+#include <opencv2/video.hpp>
 #include <yaml-cpp/yaml.h>
 
 // Maximum number of points to store in trajectory (moved to config.yaml)
@@ -57,8 +58,25 @@ public:
                                           const cv::Mat& frameDiff, const cv::Mat& thresholded, 
                                           const cv::Mat& finalProcessed);
     
+    // Get split-screen visualization for main display
+    cv::Mat getSplitScreenVisualization(const cv::Mat& originalFrame);
+    
+    // Check if split-screen is enabled
+    bool isSplitScreenEnabled() const { return splitScreen; }
+    
+    // Draw motion overlays on a single frame
+    cv::Mat drawMotionOverlays(const cv::Mat& frame);
+    
     // Initialize background subtractor
     void initializeBackgroundSubtractor();
+
+    size_t getMinTrajectoryLength() const { return minTrajectoryLength; }
+    const std::vector<TrackedObject>& getTrackedObjects() const { return trackedObjects; }
+    void setTrackedObjects(const std::vector<TrackedObject>& objs) { trackedObjects = objs; }
+    
+    // Get list of object IDs that were lost in the last frame
+    std::vector<int> getLostObjectIds() const { return lostObjectIds; }
+    void clearLostObjectIds() { lostObjectIds.clear(); }
 
 private:
     void loadConfig(const std::string& configPath);
@@ -73,6 +91,7 @@ private:
     std::vector<TrackedObject> trackedObjects;
     int nextObjectId;
     size_t maxTrajectoryPoints;  // Moved from const to configurable
+    size_t minTrajectoryLength;  // Minimum trajectory points required to record
 
     // Configurable parameters (all loaded from config.yaml)
     double thresholdValue;
@@ -85,68 +104,99 @@ private:
     double smoothingFactor;
     double minTrackingConfidence;
     
-    // Image Processing Technique parameters
-    bool enableGaussianBlur;
-    int gaussianBlurSize;
+    // ===============================
+    // INPUT COLOR PROCESSING
+    // ===============================
+    std::string processingMode;  // "grayscale", "hsv", "rgb", "ycrcb"
     
-    bool enableMorphology;
-    int morphologyKernelSize;
-    bool enableMorphClose;
-    bool enableMorphOpen;
-    bool enableDilation;
-    bool enableErosion;
+    // ===============================
+    // IMAGE PREPROCESSING
+    // ===============================
+    bool contrastEnhancement;
+    std::string blurType;  // "none", "gaussian", "median", "bilateral"
     
-    bool enableContrastEnhancement;
+    // ===============================
+    // MOTION DETECTION METHODS
+    // ===============================
+    bool backgroundSubtraction;
+    std::string opticalFlowMode;  // "none", "farneback", "lucas-kanade"
+    double motionHistoryDuration;  // Seconds (0 = disabled)
+    
+    // ===============================
+    // THRESHOLDING
+    // ===============================
+    std::string thresholdType;  // "binary", "adaptive", "otsu"
+    
+    // ===============================
+    // MORPHOLOGICAL OPERATIONS
+    // ===============================
+    bool morphology;
+    int morphKernelSize;
+    bool morphClose;
+    bool morphOpen;
+    bool dilation;
+    bool erosion;
+    
+    // ===============================
+    // CONTOUR PROCESSING
+    // ===============================
+    bool convexHull;
+    bool contourApproximation;
+    bool contourFiltering;
+    double maxContourAspectRatio;
+    double minContourSolidity;
+    double contourEpsilonFactor;
+    
+    // ===============================
+    // VISUALIZATION & OUTPUT
+    // ===============================
+    bool splitScreen;
+    bool drawContours;
+    bool dataCollection;
+    bool saveOnMotion;
+    std::string splitScreenWindowName;
+    
+    // ===============================
+    // ADVANCED PARAMETERS
+    // ===============================
+    
+    // Contrast Enhancement (CLAHE)
     double claheClipLimit;
     int claheTileSize;
     
-    bool enableMedianBlur;
+    // Blur Parameters
+    int gaussianBlurSize;
     int medianBlurSize;
-    
-    bool enableBilateralFilter;
     int bilateralD;
     double bilateralSigmaColor;
     double bilateralSigmaSpace;
     
-    bool enableAdaptiveThreshold;
-    int adaptiveBlockSize;
-    int adaptiveC;
-    
-    // Background Subtraction parameters
-    bool enableBackgroundSubtraction;
+    // Background Subtraction (MOG2)
     int backgroundHistory;
     double backgroundThreshold;
     bool backgroundDetectShadows;
     cv::Ptr<cv::BackgroundSubtractorMOG2> bgSubtractor;
     
-    // Convex Hull parameters
-    bool enableConvexHull;
-    bool convexHullFill;
-    
-    // HSV Color Filtering parameters
-    bool enableHsvFiltering;
-    cv::Scalar hsvLower;
-    cv::Scalar hsvUpper;
-    
-    // Edge Detection parameters
-    bool enableEdgeDetection;
+    // Edge Detection (Canny)
     int cannyLowThreshold;
     int cannyHighThreshold;
     
-    // Contour Processing parameters
-    bool enableContourApproximation;
-    double contourEpsilonFactor;
-    bool enableContourFiltering;
-    double minAspectRatio;
-    double maxAspectRatio;
-    double minSolidity;
+    // Adaptive Thresholding
+    int adaptiveBlockSize;
+    int adaptiveC;
     
-    // Visualization parameters
-    bool enableSplitScreen;
-    std::string splitScreenWindowName;
+    // HSV Color Filtering
+    cv::Scalar hsvLower;
+    cv::Scalar hsvUpper;
+    
+    // Motion History (for visualization)
+    cv::Mat motionHistory;
+    double motionHistoryFps;
     
     // Helper method for position smoothing
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
+
+    std::vector<int> lostObjectIds;
 };
 
 #endif // MOTION_TRACKER_HPP 

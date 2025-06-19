@@ -80,9 +80,27 @@ app.get('/api/tracking/:uuid/image', async (req, res) => {
     }
 });
 
+// New API endpoint: return all objects in the database
+app.get('/api/tracking/all', async (req, res) => {
+    try {
+        const data = await db.collection('motion_tracking_data')
+            .find({})
+            .sort({ last_seen: -1 })
+            .toArray();
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve the database view page
+app.get('/database', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'database.html'));
 });
 
 app.listen(port, () => {

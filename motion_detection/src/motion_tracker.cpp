@@ -7,52 +7,100 @@ MotionTracker::MotionTracker(const std::string& configPath)
       isFirstFrame(true),
       nextObjectId(0),
       maxTrajectoryPoints(30),
+      minTrajectoryLength(3),
       thresholdValue(25.0),
       minContourArea(500),
       maxTrackingDistance(100.0),
       maxThreshold(255),
       smoothingFactor(0.6),
       minTrackingConfidence(0.5),
-      enableGaussianBlur(true),
-      gaussianBlurSize(5),
-      enableMorphology(true),
-      morphologyKernelSize(5),
-      enableMorphClose(true),
-      enableMorphOpen(true),
-      enableDilation(true),
-      enableErosion(false),
-      enableContrastEnhancement(false),
+      
+      // ===============================
+      // INPUT COLOR PROCESSING
+      // ===============================
+      processingMode("grayscale"),
+      
+      // ===============================
+      // IMAGE PREPROCESSING
+      // ===============================
+      contrastEnhancement(false),
+      blurType("gaussian"),
+      
+      // ===============================
+      // MOTION DETECTION METHODS
+      // ===============================
+      backgroundSubtraction(true),
+      opticalFlowMode("none"),
+      motionHistoryDuration(0.0),
+      
+      // ===============================
+      // THRESHOLDING
+      // ===============================
+      thresholdType("binary"),
+      
+      // ===============================
+      // MORPHOLOGICAL OPERATIONS
+      // ===============================
+      morphology(true),
+      morphKernelSize(5),
+      morphClose(true),
+      morphOpen(true),
+      dilation(true),
+      erosion(false),
+      
+      // ===============================
+      // CONTOUR PROCESSING
+      // ===============================
+      convexHull(true),
+      contourApproximation(true),
+      contourFiltering(true),
+      maxContourAspectRatio(2.0),
+      minContourSolidity(0.85),
+      contourEpsilonFactor(0.03),
+      
+      // ===============================
+      // VISUALIZATION & OUTPUT
+      // ===============================
+      splitScreen(true),
+      drawContours(true),
+      dataCollection(true),
+      saveOnMotion(true),
+      splitScreenWindowName("Motion Detection - Split Screen View"),
+      
+      // ===============================
+      // ADVANCED PARAMETERS
+      // ===============================
+      
+      // Contrast Enhancement (CLAHE)
       claheClipLimit(2.0),
       claheTileSize(8),
-      enableMedianBlur(false),
+      
+      // Blur Parameters
+      gaussianBlurSize(5),
       medianBlurSize(5),
-      enableBilateralFilter(false),
       bilateralD(15),
       bilateralSigmaColor(75.0),
       bilateralSigmaSpace(75.0),
-      enableAdaptiveThreshold(false),
-      adaptiveBlockSize(11),
-      adaptiveC(2),
-      enableBackgroundSubtraction(true),
+      
+      // Background Subtraction (MOG2)
       backgroundHistory(500),
       backgroundThreshold(16.0),
       backgroundDetectShadows(true),
-      enableConvexHull(true),
-      convexHullFill(true),
-      enableHsvFiltering(false),
-      hsvLower(0, 30, 60),
-      hsvUpper(20, 150, 255),
-      enableEdgeDetection(false),
+      
+      // Edge Detection (Canny)
       cannyLowThreshold(50),
       cannyHighThreshold(150),
-      enableContourApproximation(true),
-      contourEpsilonFactor(0.02),
-      enableContourFiltering(true),
-      minAspectRatio(0.3),
-      maxAspectRatio(3.0),
-      minSolidity(0.5),
-      enableSplitScreen(true),
-      splitScreenWindowName("Motion Detection - Split Screen View") {
+      
+      // Adaptive Thresholding
+      adaptiveBlockSize(11),
+      adaptiveC(2),
+      
+      // HSV Color Filtering
+      hsvLower(0, 30, 60),
+      hsvUpper(20, 150, 255),
+      
+      // Motion History
+      motionHistoryFps(30.0) {
     loadConfig(configPath);
 }
 
@@ -93,45 +141,50 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["min_contour_area"]) minContourArea = config["min_contour_area"].as<int>();
         if (config["max_tracking_distance"]) maxTrackingDistance = config["max_tracking_distance"].as<double>();
         if (config["max_trajectory_points"]) maxTrajectoryPoints = config["max_trajectory_points"].as<size_t>();
+        if (config["min_trajectory_length"]) minTrajectoryLength = config["min_trajectory_length"].as<size_t>();
+        
         if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
         if (config["smoothing_factor"]) smoothingFactor = config["smoothing_factor"].as<double>();
         if (config["min_tracking_confidence"]) minTrackingConfidence = config["min_tracking_confidence"].as<double>();
         if (config["gaussian_blur_size"]) gaussianBlurSize = config["gaussian_blur_size"].as<int>();
-        if (config["morphology_kernel_size"]) morphologyKernelSize = config["morphology_kernel_size"].as<int>();
-        if (config["enable_morphology"]) enableMorphology = config["enable_morphology"].as<bool>();
-        if (config["enable_dilation"]) enableDilation = config["enable_dilation"].as<bool>();
-        if (config["enable_morph_close"]) enableMorphClose = config["enable_morph_close"].as<bool>();
-        if (config["enable_morph_open"]) enableMorphOpen = config["enable_morph_open"].as<bool>();
-        if (config["enable_erosion"]) enableErosion = config["enable_erosion"].as<bool>();
-        if (config["enable_contrast_enhancement"]) enableContrastEnhancement = config["enable_contrast_enhancement"].as<bool>();
+        if (config["morphology_kernel_size"]) morphKernelSize = config["morphology_kernel_size"].as<int>();
+        if (config["enable_morphology"]) morphology = config["enable_morphology"].as<bool>();
+        if (config["enable_dilation"]) dilation = config["enable_dilation"].as<bool>();
+        if (config["enable_morph_close"]) morphClose = config["enable_morph_close"].as<bool>();
+        if (config["enable_morph_open"]) morphOpen = config["enable_morph_open"].as<bool>();
+        if (config["enable_erosion"]) erosion = config["enable_erosion"].as<bool>();
+        if (config["enable_contrast_enhancement"]) contrastEnhancement = config["enable_contrast_enhancement"].as<bool>();
         if (config["clahe_clip_limit"]) claheClipLimit = config["clahe_clip_limit"].as<double>();
         if (config["clahe_tile_size"]) claheTileSize = config["clahe_tile_size"].as<int>();
-        if (config["enable_median_blur"]) enableMedianBlur = config["enable_median_blur"].as<bool>();
+        if (config["enable_median_blur"]) medianBlurSize = config["enable_median_blur"].as<int>();
         if (config["median_blur_size"]) medianBlurSize = config["median_blur_size"].as<int>();
-        if (config["enable_bilateral_filter"]) enableBilateralFilter = config["enable_bilateral_filter"].as<bool>();
+        if (config["enable_bilateral_filter"]) bilateralD = config["enable_bilateral_filter"].as<int>();
         if (config["bilateral_d"]) bilateralD = config["bilateral_d"].as<int>();
         if (config["bilateral_sigma_color"]) bilateralSigmaColor = config["bilateral_sigma_color"].as<double>();
         if (config["bilateral_sigma_space"]) bilateralSigmaSpace = config["bilateral_sigma_space"].as<double>();
-        if (config["enable_adaptive_threshold"]) enableAdaptiveThreshold = config["enable_adaptive_threshold"].as<bool>();
+        if (config["enable_adaptive_threshold"]) adaptiveBlockSize = config["enable_adaptive_threshold"].as<int>();
         if (config["adaptive_block_size"]) adaptiveBlockSize = config["adaptive_block_size"].as<int>();
         if (config["adaptive_c"]) adaptiveC = config["adaptive_c"].as<int>();
         
+        // Processing mode
+        if (config["processing_mode"]) processingMode = config["processing_mode"].as<std::string>();
+        
         // Visualization parameters
-        if (config["enable_split_screen"]) enableSplitScreen = config["enable_split_screen"].as<bool>();
+        if (config["enable_split_screen"]) splitScreen = config["enable_split_screen"].as<bool>();
         if (config["split_screen_window_name"]) splitScreenWindowName = config["split_screen_window_name"].as<std::string>();
         
         // Background Subtraction parameters
-        if (config["enable_background_subtraction"]) enableBackgroundSubtraction = config["enable_background_subtraction"].as<bool>();
+        if (config["enable_background_subtraction"]) backgroundSubtraction = config["enable_background_subtraction"].as<bool>();
         if (config["background_history"]) backgroundHistory = config["background_history"].as<int>();
         if (config["background_threshold"]) backgroundThreshold = config["background_threshold"].as<double>();
         if (config["background_detect_shadows"]) backgroundDetectShadows = config["background_detect_shadows"].as<bool>();
         
         // Convex Hull parameters
-        if (config["enable_convex_hull"]) enableConvexHull = config["enable_convex_hull"].as<bool>();
-        if (config["convex_hull_fill"]) convexHullFill = config["convex_hull_fill"].as<bool>();
+        if (config["enable_convex_hull"]) convexHull = config["enable_convex_hull"].as<bool>();
+        if (config["max_contour_aspect_ratio"]) maxContourAspectRatio = config["max_contour_aspect_ratio"].as<double>();
+        if (config["min_contour_solidity"]) minContourSolidity = config["min_contour_solidity"].as<double>();
         
         // HSV Color Filtering parameters
-        if (config["enable_hsv_filtering"]) enableHsvFiltering = config["enable_hsv_filtering"].as<bool>();
         if (config["hsv_lower_h"]) hsvLower[0] = config["hsv_lower_h"].as<int>();
         if (config["hsv_lower_s"]) hsvLower[1] = config["hsv_lower_s"].as<int>();
         if (config["hsv_lower_v"]) hsvLower[2] = config["hsv_lower_v"].as<int>();
@@ -140,17 +193,35 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["hsv_upper_v"]) hsvUpper[2] = config["hsv_upper_v"].as<int>();
         
         // Edge Detection parameters
-        if (config["enable_edge_detection"]) enableEdgeDetection = config["enable_edge_detection"].as<bool>();
+        if (config["enable_edge_detection"]) cannyLowThreshold = config["enable_edge_detection"].as<int>();
         if (config["canny_low_threshold"]) cannyLowThreshold = config["canny_low_threshold"].as<int>();
         if (config["canny_high_threshold"]) cannyHighThreshold = config["canny_high_threshold"].as<int>();
         
         // Contour Processing parameters
-        if (config["enable_contour_approximation"]) enableContourApproximation = config["enable_contour_approximation"].as<bool>();
+        if (config["enable_contour_approximation"]) contourApproximation = config["enable_contour_approximation"].as<bool>();
         if (config["contour_epsilon_factor"]) contourEpsilonFactor = config["contour_epsilon_factor"].as<double>();
-        if (config["enable_contour_filtering"]) enableContourFiltering = config["enable_contour_filtering"].as<bool>();
-        if (config["min_aspect_ratio"]) minAspectRatio = config["min_aspect_ratio"].as<double>();
-        if (config["max_aspect_ratio"]) maxAspectRatio = config["max_aspect_ratio"].as<double>();
-        if (config["min_solidity"]) minSolidity = config["min_solidity"].as<double>();
+        if (config["enable_contour_filtering"]) contourFiltering = config["enable_contour_filtering"].as<bool>();
+        if (config["max_contour_aspect_ratio"]) maxContourAspectRatio = config["max_contour_aspect_ratio"].as<double>();
+        if (config["min_contour_solidity"]) minContourSolidity = config["min_contour_solidity"].as<double>();
+        
+        // Motion Detection parameters
+        if (config["optical_flow_mode"]) opticalFlowMode = config["optical_flow_mode"].as<std::string>();
+        if (config["motion_history_duration"]) motionHistoryDuration = config["motion_history_duration"].as<double>();
+        if (config["motion_history_fps"]) motionHistoryFps = config["motion_history_fps"].as<double>();
+        
+        // Thresholding parameters
+        if (config["threshold_type"]) thresholdType = config["threshold_type"].as<std::string>();
+        
+        // Morphological operations parameters
+        if (config["enable_morphology"]) morphology = config["enable_morphology"].as<bool>();
+        if (config["enable_morph_close"]) morphClose = config["enable_morph_close"].as<bool>();
+        if (config["enable_morph_open"]) morphOpen = config["enable_morph_open"].as<bool>();
+        if (config["enable_erosion"]) erosion = config["enable_erosion"].as<bool>();
+        
+        // Visualization parameters
+        if (config["enable_draw_contours"]) drawContours = config["enable_draw_contours"].as<bool>();
+        if (config["enable_data_collection"]) dataCollection = config["enable_data_collection"].as<bool>();
+        if (config["enable_save_on_motion"]) saveOnMotion = config["enable_save_on_motion"].as<bool>();
     } catch (const std::exception& e) {
         std::cerr << "Warning: Could not load config file: " << e.what() << ". Using defaults." << std::endl;
     }
@@ -241,9 +312,12 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
     }
     
     // Remove objects that weren't matched or have low confidence
+    lostObjectIds.clear(); // Clear previous lost objects
     for (int i = trackedObjects.size() - 1; i >= 0; --i) {
         if (i < static_cast<int>(objectMatched.size()) && 
             (!objectMatched[i] || trackedObjects[i].confidence < minTrackingConfidence)) {
+            // Add to lost objects list before removing
+            lostObjectIds.push_back(trackedObjects[i].id);
             trackedObjects.erase(trackedObjects.begin() + i);
         }
     }
@@ -252,36 +326,42 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
 cv::Mat MotionTracker::createSplitScreenVisualization(const cv::Mat& originalFrame, const cv::Mat& processedFrame, 
                                                       const cv::Mat& frameDiff, const cv::Mat& thresholded, 
                                                       const cv::Mat& finalProcessed) {
-    // Count how many views we need to show
-    int numViews = 1; // Always show original
+    // Prepare view names and frames
     std::vector<std::string> viewNames = {"Original"};
     std::vector<cv::Mat> viewFrames = {originalFrame};
-    
-    // Add HSV mask if enabled
-    if (enableHsvFiltering) {
-        numViews++;
-        viewNames.push_back("HSV Mask");
-        cv::Mat hsvFrame, hsvMask;
-        cv::cvtColor(originalFrame, hsvFrame, cv::COLOR_BGR2HSV);
-        cv::inRange(hsvFrame, hsvLower, hsvUpper, hsvMask);
-        cv::Mat hsvColor;
-        cv::cvtColor(hsvMask, hsvColor, cv::COLOR_GRAY2BGR);
-        viewFrames.push_back(hsvColor);
+    bool hasMorphology = false;
+    int morphIndex = -1;
+
+    // Add color space conversion view if not RGB
+    if (processingMode != "rgb") {
+        viewNames.push_back(processingMode.substr(0, 1).append(processingMode.substr(1)).append(" Convert"));
+        cv::Mat convertedColor;
+        if (processingMode == "grayscale") {
+            cv::cvtColor(processedFrame, convertedColor, cv::COLOR_GRAY2BGR);
+        } else if (processingMode == "hsv") {
+            cv::Mat hsvFrame, hsvMask;
+            cv::cvtColor(originalFrame, hsvFrame, cv::COLOR_BGR2HSV);
+            cv::inRange(hsvFrame, hsvLower, hsvUpper, hsvMask);
+            cv::cvtColor(hsvMask, convertedColor, cv::COLOR_GRAY2BGR);
+        } else if (processingMode == "ycrcb") {
+            cv::Mat ycrcbFrame;
+            cv::cvtColor(originalFrame, ycrcbFrame, cv::COLOR_BGR2YCrCb);
+            std::vector<cv::Mat> channels;
+            cv::split(ycrcbFrame, channels);
+            cv::cvtColor(channels[0], convertedColor, cv::COLOR_GRAY2BGR);
+        }
+        viewFrames.push_back(convertedColor);
     }
-    
-    // Add processed frame if any processing was applied
-    bool anyProcessing = enableContrastEnhancement || enableGaussianBlur || enableMedianBlur || enableBilateralFilter;
-    if (anyProcessing) {
-        numViews++;
-        viewNames.push_back("Processed");
+    // Add processed frame if any preprocessing was applied
+    bool anyPreprocessing = contrastEnhancement || (blurType != "none");
+    if (anyPreprocessing) {
+        viewNames.push_back("Preprocessed");
         cv::Mat processedColor;
         cv::cvtColor(processedFrame, processedColor, cv::COLOR_GRAY2BGR);
         viewFrames.push_back(processedColor);
     }
-    
     // Add edge detection if enabled
-    if (enableEdgeDetection) {
-        numViews++;
+    if (cannyLowThreshold > 0 && cannyHighThreshold > 0) {
         viewNames.push_back("Edges");
         cv::Mat edgeMask;
         cv::Canny(processedFrame, edgeMask, cannyLowThreshold, cannyHighThreshold);
@@ -289,10 +369,8 @@ cv::Mat MotionTracker::createSplitScreenVisualization(const cv::Mat& originalFra
         cv::cvtColor(edgeMask, edgeColor, cv::COLOR_GRAY2BGR);
         viewFrames.push_back(edgeColor);
     }
-    
     // Add background subtraction if enabled
-    if (enableBackgroundSubtraction && !bgSubtractor.empty()) {
-        numViews++;
+    if (backgroundSubtraction && !bgSubtractor.empty()) {
         viewNames.push_back("BG Subtract");
         cv::Mat bgMask;
         bgSubtractor->apply(processedFrame, bgMask);
@@ -300,64 +378,212 @@ cv::Mat MotionTracker::createSplitScreenVisualization(const cv::Mat& originalFra
         cv::cvtColor(bgMask, bgColor, cv::COLOR_GRAY2BGR);
         viewFrames.push_back(bgColor);
     }
-    
     // Always show frame difference
-    numViews++;
     viewNames.push_back("Frame Diff");
     cv::Mat diffColor;
     cv::cvtColor(frameDiff, diffColor, cv::COLOR_GRAY2BGR);
     viewFrames.push_back(diffColor);
-    
     // Always show thresholded
-    numViews++;
     viewNames.push_back("Thresholded");
     cv::Mat threshColor;
     cv::cvtColor(thresholded, threshColor, cv::COLOR_GRAY2BGR);
     viewFrames.push_back(threshColor);
-    
     // Add final processed if morphology was applied
-    if (enableMorphology) {
-        numViews++;
+    if (morphology) {
         viewNames.push_back("Morphology");
         cv::Mat finalColor;
         cv::cvtColor(finalProcessed, finalColor, cv::COLOR_GRAY2BGR);
         viewFrames.push_back(finalColor);
+        hasMorphology = true;
+        morphIndex = static_cast<int>(viewFrames.size()) - 1;
+    }
+    // Draw overlays on full-size original and morphology
+    cv::Mat originalWithOverlay = drawMotionOverlays(originalFrame.clone());
+    cv::Mat morphWithOverlay;
+    if (hasMorphology) {
+        morphWithOverlay = drawMotionOverlays(viewFrames[morphIndex].clone());
+    }
+    // Layout: Large panels for Original and Morphology (if present), rest are small
+    int smallPanelCount = static_cast<int>(viewFrames.size()) - 1 - (hasMorphology ? 1 : 0);
+    int largePanelWidth = originalFrame.cols / 2;
+    int largePanelHeight = originalFrame.rows / 2;
+    int smallPanelWidth = originalFrame.cols / 4;
+    int smallPanelHeight = originalFrame.rows / 4;
+    int totalWidth = largePanelWidth * (hasMorphology ? 2 : 1);
+    int totalHeight = largePanelHeight + (smallPanelCount > 0 ? smallPanelHeight : 0);
+    
+    // Create visualization canvas with black background
+    cv::Mat visualization(totalHeight, totalWidth, CV_8UC3, cv::Scalar(0, 0, 0));
+    
+    // Place Original (large, top-left)
+    cv::Mat resizedOriginal;
+    cv::resize(originalWithOverlay, resizedOriginal, cv::Size(largePanelWidth, largePanelHeight));
+    resizedOriginal.copyTo(visualization(cv::Rect(0, 0, largePanelWidth, largePanelHeight)));
+    cv::putText(visualization, "Original", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0,255,0), 2);
+    
+    // Place Morphology (large, top-right) if present
+    if (hasMorphology) {
+        cv::Mat resizedMorph;
+        cv::resize(morphWithOverlay, resizedMorph, cv::Size(largePanelWidth, largePanelHeight));
+        resizedMorph.copyTo(visualization(cv::Rect(largePanelWidth, 0, largePanelWidth, largePanelHeight)));
+        cv::putText(visualization, "Morphology", cv::Point(largePanelWidth+10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0,255,0), 2);
+    } else {
+        // Fill the right half with black if no morphology
+        cv::rectangle(visualization, cv::Rect(largePanelWidth, 0, largePanelWidth, largePanelHeight), cv::Scalar(0,0,0), -1);
     }
     
-    // Calculate layout (try to make it roughly square)
-    int cols = std::ceil(std::sqrt(numViews));
-    int rows = std::ceil(static_cast<double>(numViews) / cols);
-    
-    // Calculate individual view size
-    int viewWidth = originalFrame.cols / cols;
-    int viewHeight = originalFrame.rows / rows;
-    
-    // Create the combined visualization
-    cv::Mat visualization(rows * viewHeight, cols * viewWidth, CV_8UC3, cv::Scalar(0, 0, 0));
-    
-    // Place each view in the grid
-    for (int i = 0; i < numViews; ++i) {
-        int row = i / cols;
-        int col = i % cols;
+    // Place small panels in a row below
+    int smallY = largePanelHeight;
+    int smallX = 0;
+    for (int i = 1; i < static_cast<int>(viewFrames.size()); ++i) {
+        if (hasMorphology && i == morphIndex) continue; // skip, already placed
+        if (viewNames[i] == "Original") continue; // skip, already placed
         
-        // Resize the frame to fit in the grid
-        cv::Mat resizedFrame;
-        cv::resize(viewFrames[i], resizedFrame, cv::Size(viewWidth, viewHeight));
-        
-        // Copy to the correct position
-        resizedFrame.copyTo(visualization(cv::Rect(col * viewWidth, row * viewHeight, viewWidth, viewHeight)));
-        
-        // Add label
-        cv::putText(visualization, viewNames[i], 
-                    cv::Point(col * viewWidth + 10, row * viewHeight + 30),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+        cv::Mat resizedSmall;
+        cv::resize(viewFrames[i], resizedSmall, cv::Size(smallPanelWidth, smallPanelHeight));
+        resizedSmall.copyTo(visualization(cv::Rect(smallX, smallY, smallPanelWidth, smallPanelHeight)));
+        cv::putText(visualization, viewNames[i], cv::Point(smallX+10, smallY+30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0,255,0), 2);
+        smallX += smallPanelWidth;
+        if (smallX + smallPanelWidth > totalWidth) break; // only one row
+    }
+    
+    // Fill remaining space in the small panels row with black rectangles
+    while (smallX < totalWidth) {
+        cv::rectangle(visualization, cv::Rect(smallX, smallY, smallPanelWidth, smallPanelHeight), cv::Scalar(0,0,0), -1);
+        smallX += smallPanelWidth;
+    }
+    
+    // Fill any remaining vertical space with black
+    if (smallPanelCount == 0) {
+        // If no small panels, fill the entire bottom half with black
+        cv::rectangle(visualization, cv::Rect(0, largePanelHeight, totalWidth, largePanelHeight), cv::Scalar(0,0,0), -1);
     }
     
     return visualization;
 }
 
+cv::Mat MotionTracker::getSplitScreenVisualization(const cv::Mat& originalFrame) {
+    // Process the frame to get all intermediate results
+    cv::Mat processedFrame = originalFrame.clone();
+    
+    // Apply color space conversion
+    if (processingMode == "grayscale") {
+        cv::cvtColor(processedFrame, processedFrame, cv::COLOR_BGR2GRAY);
+    } else if (processingMode == "hsv") {
+        cv::cvtColor(processedFrame, processedFrame, cv::COLOR_BGR2HSV);
+    } else if (processingMode == "ycrcb") {
+        cv::cvtColor(processedFrame, processedFrame, cv::COLOR_BGR2YCrCb);
+    }
+    
+    // Apply preprocessing
+    if (contrastEnhancement) {
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(claheClipLimit, cv::Size(claheTileSize, claheTileSize));
+        clahe->apply(processedFrame, processedFrame);
+    }
+    
+    if (blurType == "gaussian") {
+        cv::GaussianBlur(processedFrame, processedFrame, cv::Size(gaussianBlurSize, gaussianBlurSize), 0);
+    } else if (blurType == "median") {
+        cv::medianBlur(processedFrame, processedFrame, medianBlurSize);
+    } else if (blurType == "bilateral") {
+        cv::bilateralFilter(processedFrame, processedFrame, bilateralD, bilateralSigmaColor, bilateralSigmaSpace);
+    }
+    
+    // Calculate frame difference
+    cv::Mat frameDiff;
+    if (!prevFrame.empty()) {
+        cv::absdiff(processedFrame, prevFrame, frameDiff);
+    } else {
+        frameDiff = cv::Mat::zeros(processedFrame.size(), processedFrame.type());
+    }
+    
+    // Apply thresholding
+    cv::Mat thresholded;
+    if (thresholdType == "binary") {
+        cv::threshold(frameDiff, thresholded, thresholdValue, maxThreshold, cv::THRESH_BINARY);
+    } else if (thresholdType == "adaptive") {
+        cv::adaptiveThreshold(frameDiff, thresholded, maxThreshold, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, adaptiveBlockSize, adaptiveC);
+    } else if (thresholdType == "otsu") {
+        cv::threshold(frameDiff, thresholded, 0, maxThreshold, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    } else {
+        thresholded = frameDiff;
+    }
+    
+    // Apply morphological operations
+    cv::Mat finalProcessed = thresholded.clone();
+    if (morphology) {
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(morphKernelSize, morphKernelSize));
+        
+        if (morphClose) {
+            cv::morphologyEx(finalProcessed, finalProcessed, cv::MORPH_CLOSE, kernel);
+        }
+        if (morphOpen) {
+            cv::morphologyEx(finalProcessed, finalProcessed, cv::MORPH_OPEN, kernel);
+        }
+        if (dilation) {
+            cv::dilate(finalProcessed, finalProcessed, kernel);
+        }
+        if (erosion) {
+            cv::erode(finalProcessed, finalProcessed, kernel);
+        }
+    }
+    
+    // Create and return the split-screen visualization
+    return createSplitScreenVisualization(originalFrame, processedFrame, frameDiff, thresholded, finalProcessed);
+}
+
+cv::Mat MotionTracker::drawMotionOverlays(const cv::Mat& frame) {
+    cv::Mat result = frame.clone();
+    
+    // Draw motion detection overlays
+    for (const auto& obj : trackedObjects) {
+        // Draw bounding box
+        cv::Scalar boxColor;
+        if (obj.confidence > 0.8) {
+            boxColor = cv::Scalar(0, 255, 0);  // Green for high confidence
+        } else if (obj.confidence > 0.6) {
+            boxColor = cv::Scalar(0, 255, 255);  // Yellow for medium confidence
+        } else {
+            boxColor = cv::Scalar(0, 0, 255);  // Red for low confidence
+        }
+        
+        cv::rectangle(result, obj.currentBounds, boxColor, 3);
+        
+        // Draw object ID and confidence
+        std::string label = "ID:" + std::to_string(obj.id) + " (" + 
+                           std::to_string(static_cast<int>(obj.confidence * 100)) + "%)";
+        cv::putText(result, label, 
+                    cv::Point(obj.currentBounds.x, obj.currentBounds.y - 10),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.8, boxColor, 2);
+        
+        // Draw motion trail
+        if (obj.trajectory.size() > 1) {
+            // Draw trail with fading colors
+            for (size_t j = 1; j < obj.trajectory.size(); ++j) {
+                double alpha = static_cast<double>(j) / obj.trajectory.size();
+                cv::Scalar trailColor(
+                    static_cast<int>(boxColor[0] * alpha),
+                    static_cast<int>(boxColor[1] * alpha),
+                    static_cast<int>(boxColor[2] * alpha)
+                );
+                cv::line(result, obj.trajectory[j-1], obj.trajectory[j], trailColor, 3);
+            }
+            
+            // Draw current position as a circle
+            cv::circle(result, obj.trajectory.back(), 8, boxColor, -1);
+        }
+    }
+    
+    // Add status information
+    std::string statusText = "Objects: " + std::to_string(trackedObjects.size());
+    cv::putText(result, statusText, cv::Point(10, 30), 
+                cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
+    
+    return result;
+}
+
 void MotionTracker::initializeBackgroundSubtractor() {
-    if (enableBackgroundSubtraction) {
+    if (backgroundSubtraction) {
         bgSubtractor = cv::createBackgroundSubtractorMOG2(
             backgroundHistory, 
             backgroundThreshold, 
@@ -375,73 +601,78 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     }
     
     // Initialize background subtractor if needed
-    if (enableBackgroundSubtraction && bgSubtractor.empty()) {
+    if (backgroundSubtraction && bgSubtractor.empty()) {
         initializeBackgroundSubtractor();
     }
     
-    // Convert frame to grayscale for processing
-    cv::Mat grayFrame;
-    cv::cvtColor(frame, grayFrame, cv::COLOR_BGR2GRAY);
+    // Start with the original frame for processing
+    cv::Mat processedFrame;
+    
+    // 1. Apply processing mode (HSV, Grayscale, or RGB)
+    if (processingMode == "hsv") {
+        // HSV Color Filtering
+        cv::Mat hsvFrame;
+        cv::cvtColor(frame, hsvFrame, cv::COLOR_BGR2HSV);
+        cv::inRange(hsvFrame, hsvLower, hsvUpper, processedFrame);
+    } else if (processingMode == "grayscale") {
+        // Grayscale processing (default)
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGR2GRAY);
+    } else if (processingMode == "rgb") {
+        // RGB processing (no color conversion)
+        processedFrame = frame.clone();
+    } else {
+        // Default to grayscale if unknown mode
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGR2GRAY);
+    }
     
     if (isFirstFrame) {
-        prevFrame = grayFrame.clone();
+        prevFrame = processedFrame.clone();
         isFirstFrame = false;
         return result;
     }
     
-    // Start with the original frame for processing
-    cv::Mat processedFrame = grayFrame.clone();
-    
-    // 1. HSV Color Filtering (if enabled, apply to original frame)
-    cv::Mat hsvMask;
-    if (enableHsvFiltering) {
-        cv::Mat hsvFrame;
-        cv::cvtColor(frame, hsvFrame, cv::COLOR_BGR2HSV);
-        cv::inRange(hsvFrame, hsvLower, hsvUpper, hsvMask);
-        // Apply HSV mask to grayscale frame
-        cv::bitwise_and(processedFrame, hsvMask, processedFrame);
-    }
-    
     // 2. Contrast Enhancement (CLAHE)
-    if (enableContrastEnhancement) {
+    if (contrastEnhancement) {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(claheClipLimit, cv::Size(claheTileSize, claheTileSize));
         clahe->apply(processedFrame, processedFrame);
     }
     
-    // 3. Gaussian Blur
-    if (enableGaussianBlur) {
+    // 3. Apply blur based on blur_type
+    if (blurType == "gaussian") {
         cv::GaussianBlur(processedFrame, processedFrame, cv::Size(gaussianBlurSize, gaussianBlurSize), 0);
-    }
-    
-    // 4. Median Blur (alternative to Gaussian)
-    if (enableMedianBlur) {
+    } else if (blurType == "median") {
         cv::medianBlur(processedFrame, processedFrame, medianBlurSize);
+    } else if (blurType == "bilateral") {
+        // Ensure the image is 8-bit single channel for bilateral filter
+        cv::Mat bilateralInput;
+        if (processedFrame.type() != CV_8UC1) {
+            processedFrame.convertTo(bilateralInput, CV_8UC1);
+        } else {
+            bilateralInput = processedFrame;
+        }
+        cv::bilateralFilter(bilateralInput, processedFrame, bilateralD, bilateralSigmaColor, bilateralSigmaSpace);
     }
+    // If blurType is "none", skip blurring
     
-    // 5. Bilateral Filter (edge-preserving smoothing)
-    if (enableBilateralFilter) {
-        cv::bilateralFilter(processedFrame, processedFrame, bilateralD, bilateralSigmaColor, bilateralSigmaSpace);
-    }
-    
-    // 6. Edge Detection (Canny)
+    // 4. Edge Detection (Canny)
     cv::Mat edgeMask;
-    if (enableEdgeDetection) {
+    if (cannyLowThreshold > 0 && cannyHighThreshold > 0) {
         cv::Canny(processedFrame, edgeMask, cannyLowThreshold, cannyHighThreshold);
     }
     
-    // 7. Background Subtraction (MOG2)
+    // 5. Background Subtraction (MOG2)
     cv::Mat bgMask;
-    if (enableBackgroundSubtraction && !bgSubtractor.empty()) {
+    if (backgroundSubtraction && !bgSubtractor.empty()) {
         bgSubtractor->apply(processedFrame, bgMask);
     }
     
-    // 8. Frame Difference (traditional motion detection)
+    // 6. Frame Difference (traditional motion detection)
     cv::Mat frameDiff;
     cv::absdiff(prevFrame, processedFrame, frameDiff);
     
-    // 9. Combine different motion detection methods
+    // 7. Combine different motion detection methods
     cv::Mat motionMask;
-    if (enableBackgroundSubtraction && !bgSubtractor.empty()) {
+    if (backgroundSubtraction && !bgSubtractor.empty()) {
         // Use background subtraction as primary method
         motionMask = bgMask.clone();
         
@@ -454,61 +685,69 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         motionMask = frameDiff.clone();
     }
     
-    // 10. Apply thresholding
+    // 8. Apply thresholding
     cv::Mat thresh;
-    if (enableAdaptiveThreshold) {
+    if (thresholdType == "adaptive") {
         cv::adaptiveThreshold(motionMask, thresh, maxThreshold, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
                              cv::THRESH_BINARY, adaptiveBlockSize, adaptiveC);
     } else {
         cv::threshold(motionMask, thresh, thresholdValue, maxThreshold, cv::THRESH_BINARY);
     }
     
-    // 11. Apply morphological operations
+    // 9. Apply morphological operations
     cv::Mat processed = thresh.clone();
-    if (enableMorphology) {
-        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(morphologyKernelSize, morphologyKernelSize));
+    if (morphology) {
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(morphKernelSize, morphKernelSize));
         
         // Close operation to fill gaps within objects
-        if (enableMorphClose) {
+        if (morphClose) {
             cv::morphologyEx(processed, processed, cv::MORPH_CLOSE, kernel);
         }
         
         // Open operation to remove small noise
-        if (enableMorphOpen) {
+        if (morphOpen) {
             cv::morphologyEx(processed, processed, cv::MORPH_OPEN, kernel);
         }
         
         // Dilation to make objects more cohesive
-        if (enableDilation) {
+        if (dilation) {
             cv::dilate(processed, processed, kernel, cv::Point(-1, -1), 1);
         }
         
         // Erosion to reduce object size (use with caution)
-        if (enableErosion) {
+        if (erosion) {
             cv::erode(processed, processed, kernel, cv::Point(-1, -1), 1);
         }
     }
     
-    // 12. Find contours
+    // 10. Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(processed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
-    // 13. Process contours with advanced filtering
+    // Debug: Show contour count
+    static int frameCount = 0;
+    frameCount++;
+    if (frameCount % 30 == 0) { // Show every 30 frames
+        std::cout << "Found " << contours.size() << " contours" << std::endl;
+    }
+    
+    // 11. Process contours with advanced filtering
     std::vector<cv::Rect> newBounds;
+    int contoursPassed = 0;
     for (const auto& contour : contours) {
         const double area = cv::contourArea(contour);
         if (area < minContourArea) continue;
         
         // Contour approximation to reduce noise
         std::vector<cv::Point> approxContour = contour;
-        if (enableContourApproximation) {
+        if (contourApproximation) {
             double epsilon = contourEpsilonFactor * cv::arcLength(contour, true);
             cv::approxPolyDP(contour, approxContour, epsilon, true);
         }
         
         // Convex hull processing
         std::vector<cv::Point> hull;
-        if (enableConvexHull) {
+        if (convexHull) {
             cv::convexHull(approxContour, hull);
             
             // Calculate solidity (area / convex hull area)
@@ -516,36 +755,44 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
             double solidity = (hullArea > 0) ? area / hullArea : 0;
             
             // Filter by solidity
-            if (enableContourFiltering && solidity < minSolidity) continue;
+            if (contourFiltering && solidity < minContourSolidity) continue;
             
             // Use convex hull for bounding box calculation
             cv::Rect bounds = cv::boundingRect(hull);
             
             // Filter by aspect ratio
-            if (enableContourFiltering) {
+            if (contourFiltering) {
                 double aspectRatio = static_cast<double>(bounds.width) / bounds.height;
-                if (aspectRatio < minAspectRatio || aspectRatio > maxAspectRatio) continue;
+                if (aspectRatio > maxContourAspectRatio) continue;
             }
             
             result.hasMotion = true;
             newBounds.push_back(bounds);
+            contoursPassed++;
         } else {
             // Use original contour
             cv::Rect bounds = cv::boundingRect(approxContour);
             
             // Filter by aspect ratio
-            if (enableContourFiltering) {
+            if (contourFiltering) {
                 double aspectRatio = static_cast<double>(bounds.width) / bounds.height;
-                if (aspectRatio < minAspectRatio || aspectRatio > maxAspectRatio) continue;
+                if (aspectRatio > maxContourAspectRatio) continue;
             }
             
             result.hasMotion = true;
             newBounds.push_back(bounds);
+            contoursPassed++;
         }
     }
     
+    // Debug: Show how many contours passed filtering
+    if (frameCount % 30 == 0) {
+        std::cout << "Contours passed filtering: " << contoursPassed << " (min_area=" << minContourArea 
+                  << ", max_aspect=" << maxContourAspectRatio << ", min_solidity=" << minContourSolidity << ")" << std::endl;
+    }
+    
     // Create and display split-screen visualization if enabled
-    if (enableSplitScreen) {
+    if (splitScreen) {
         cv::Mat visualization = createSplitScreenVisualization(frame, processedFrame, frameDiff, thresh, processed);
         cv::imshow(splitScreenWindowName, visualization);
     }
@@ -554,14 +801,30 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     updateTrajectories(newBounds);
     result.trackedObjects = trackedObjects;
     
-    // Debug output
+    // Debug output - only show objects that meet minimum trajectory length
     if (!trackedObjects.empty()) {
-        std::cout << "Tracking " << trackedObjects.size() << " objects:" << std::endl;
+        std::vector<TrackedObject> filteredObjects;
         for (const auto& obj : trackedObjects) {
-            std::cout << "  Object " << obj.id << ": confidence=" << obj.confidence 
-                      << ", trajectory points=" << obj.trajectory.size() 
-                      << ", bounds=(" << obj.currentBounds.x << "," << obj.currentBounds.y 
-                      << "," << obj.currentBounds.width << "," << obj.currentBounds.height << ")" << std::endl;
+            if (obj.trajectory.size() >= minTrajectoryLength) {
+                filteredObjects.push_back(obj);
+            }
+        }
+        
+        if (!filteredObjects.empty()) {
+            std::cout << "Tracking " << filteredObjects.size() << " objects (min trajectory length: " << minTrajectoryLength << "):" << std::endl;
+            for (const auto& obj : filteredObjects) {
+                std::cout << "  Object " << obj.id << ": confidence=" << obj.confidence 
+                          << ", trajectory points=" << obj.trajectory.size() 
+                          << ", bounds=(" << obj.currentBounds.x << "," << obj.currentBounds.y 
+                          << "," << obj.currentBounds.width << "," << obj.currentBounds.height << ")" << std::endl;
+            }
+        }
+    } else {
+        // Show when no objects are being tracked
+        static int noObjectCount = 0;
+        noObjectCount++;
+        if (noObjectCount % 30 == 0) { // Show every 30 frames (about 1 second)
+            std::cout << "No objects currently being tracked. Move your hands or objects in front of the camera." << std::endl;
         }
     }
     

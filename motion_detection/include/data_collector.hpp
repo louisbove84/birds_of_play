@@ -37,6 +37,9 @@ public:
     void addTrackingData(int object_id, const cv::Mat& frame, const cv::Rect& bounds, 
                         const cv::Point& position, double confidence);
     
+    // Handle objects that are no longer being tracked
+    void handleObjectLost(int object_id);
+    
     // Save current data to MongoDB
     void saveData();
 

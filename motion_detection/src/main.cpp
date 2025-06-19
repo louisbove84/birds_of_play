@@ -37,9 +37,18 @@ int main() {
     MotionTracker tracker(config_path.string());
     DataCollector collector(config_path.string());
     
+    // Initialize motion tracker with camera
+    if (!tracker.initialize(0)) {
+        std::cerr << "Error: Could not initialize motion tracker with camera." << std::endl;
+        return -1;
+    }
+    
     if (!collector.initialize()) {
         std::cerr << "Warning: Data collection disabled or failed to initialize" << std::endl;
     }
+
+    std::cout << "Motion tracking system initialized successfully!" << std::endl;
+    std::cout << "Press 'q' or ESC to quit." << std::endl;
 
     cv::Mat frame;
     char key = 0;
@@ -54,41 +63,53 @@ int main() {
         // Process frame and get tracked objects
         MotionResult result = tracker.processFrame(frame);
 
+        // Handle objects that were lost in this frame
+        std::vector<int> lostObjectIds = tracker.getLostObjectIds();
+        for (int lostId : lostObjectIds) {
+            collector.handleObjectLost(lostId);
+        }
+
         // Update data collection for each tracked object
         if (result.hasMotion) {
             for (const auto& obj : result.trackedObjects) {
-                collector.addTrackingData(
-                    obj.id,
-                    frame,
-                    obj.currentBounds,
-                    obj.trajectory.back(),  // Current position is the last point in trajectory
-                    obj.confidence
-                );
-            }
-
-            // Draw tracking visualization
-            for (const auto& obj : result.trackedObjects) {
-                cv::Scalar color(0, 255, 0);  // Green color for tracking
-                
-                // Draw bounding box
-                cv::rectangle(frame, obj.currentBounds, color, 2);
-                
-                // Draw trajectory
-                if (obj.trajectory.size() > 1) {
-                    for (size_t i = 1; i < obj.trajectory.size(); ++i) {
-                        cv::line(frame, obj.trajectory[i-1], obj.trajectory[i], color, 2);
-                    }
+                if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
+                    collector.addTrackingData(
+                        obj.id,
+                        frame,
+                        obj.currentBounds,
+                        obj.trajectory.back(),  // Current position is the last point in trajectory
+                        obj.confidence
+                    );
                 }
-                
-                // Draw object ID
-                cv::Point textPos(obj.currentBounds.x, obj.currentBounds.y - 10);
-                cv::putText(frame, "Object " + std::to_string(obj.id),
-                           textPos, cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
             }
         }
 
-        // Show the frame
-        cv::imshow("Motion Tracking", frame);
+        // Draw enhanced motion overlays (only for objects with sufficient trajectory length)
+        cv::Mat filteredFrame = frame.clone();
+        std::vector<TrackedObject> filteredObjects;
+        for (const auto& obj : result.trackedObjects) {
+            if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
+                filteredObjects.push_back(obj);
+            }
+        }
+        // Temporarily replace trackedObjects for overlay drawing
+        auto originalTrackedObjects = tracker.getTrackedObjects();
+        tracker.setTrackedObjects(filteredObjects);
+        
+        // Use split-screen visualization as the main display
+        cv::Mat displayFrame;
+        if (tracker.isSplitScreenEnabled()) {
+            // Get the split-screen visualization which includes black backgrounds
+            displayFrame = tracker.getSplitScreenVisualization(frame);
+        } else {
+            // Fallback to original frame with overlays
+            displayFrame = tracker.drawMotionOverlays(filteredFrame);
+        }
+        
+        tracker.setTrackedObjects(originalTrackedObjects);
+
+        // Show the frame with overlays
+        cv::imshow("Motion Tracking", displayFrame);
         key = cv::waitKey(1);
     }
 

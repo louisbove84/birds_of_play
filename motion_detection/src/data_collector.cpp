@@ -20,15 +20,17 @@ DataCollector::DataCollector(const std::string& config_path)
     // Load configuration
     try {
         YAML::Node config = YAML::LoadFile(config_path);
-        enabled = config["enable_data_collection"].as<bool>();
+        enabled = config["data_collection"].as<bool>();
         shouldCleanupOldData = config["cleanup_old_data"].as<bool>();
         mongoUri = config["mongodb_uri"].as<std::string>();
         dbName = config["database_name"].as<std::string>();
         std::string prefix = config["collection_prefix"].as<std::string>();
         collectionName = prefix;
         imageFormat = config["image_format"].as<std::string>();
-        saveIntervalSeconds = config["save_interval_seconds"].as<int>();
         minTrackingConfidence = config["min_tracking_confidence"].as<double>();
+        
+        // Set default save interval since it's not in the new config
+        saveIntervalSeconds = 5;
     } catch (const std::exception& e) {
         std::cerr << "Warning: Could not load data collection config: " << e.what() << std::endl;
         enabled = false;
@@ -37,6 +39,8 @@ DataCollector::DataCollector(const std::string& config_path)
         mongoUri = "mongodb://localhost:27017";
         dbName = "birds_of_play";
         collectionName = "motion_tracking";
+        imageFormat = "png";
+        saveIntervalSeconds = 5;
     }
 }
 
@@ -95,11 +99,22 @@ void DataCollector::addTrackingData(int object_id, const cv::Mat& frame, const c
     data.trajectory.push_back(position);
     data.confidence = confidence;
     
-    // Check if it's time to save data
-    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastSaveTime).count();
-    if (elapsed >= saveIntervalSeconds) {
-        saveData();
-        lastSaveTime = now;
+    // Note: No longer saving data automatically - will save when object is lost
+}
+
+void DataCollector::handleObjectLost(int object_id) {
+    if (!enabled) return;
+    
+    // Check if we have data for this object
+    auto it = trackingData.find(object_id);
+    if (it != trackingData.end()) {
+        // Save the object data to database
+        if (it->second.confidence >= minTrackingConfidence) {
+            saveTrackingData(it->second);
+        }
+        
+        // Remove from tracking data
+        trackingData.erase(it);
     }
 }
 
@@ -107,12 +122,15 @@ void DataCollector::saveData() {
     if (!enabled || trackingData.empty()) return;
     
     try {
-        // Save each tracked object that meets confidence threshold
+        // Save any remaining tracked objects (typically called on shutdown)
         for (const auto& pair : trackingData) {
             if (pair.second.confidence >= minTrackingConfidence) {
                 saveTrackingData(pair.second);
             }
         }
+        
+        // Clear the tracking data after saving
+        trackingData.clear();
     } catch (const mongocxx::operation_exception& e) {
         std::cerr << "MongoDB operation error: " << e.what() << std::endl;
     }
