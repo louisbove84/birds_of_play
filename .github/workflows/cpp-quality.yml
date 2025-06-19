@@ -40,15 +40,16 @@ jobs:
         curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
         tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
-        mkdir build && cd build
+        mkdir -p build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
         sudo cmake --build . --target install
+        sudo ldconfig
 
     - name: Build and Run Tests
       run: |
         cd motion_detection
-        mkdir build && cd build
-        cmake ..
+        mkdir -p build && cd build
+        cmake -DCMAKE_PREFIX_PATH=/usr/local/lib/cmake ..
         make
         valgrind --leak-check=full \
           --show-leak-kinds=definite \
@@ -85,9 +86,10 @@ jobs:
         curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
         tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
-        mkdir build && cd build
+        mkdir -p build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
         sudo cmake --build . --target install
+        sudo ldconfig
 
     - name: Run OWASP Dependency Check
       uses: dependency-check/Dependency-Check_Action@main
@@ -106,8 +108,8 @@ jobs:
     - name: Build for CodeQL
       run: |
         cd motion_detection
-        mkdir build && cd build
-        cmake ..
+        mkdir -p build && cd build
+        cmake -DCMAKE_PREFIX_PATH=/usr/local/lib/cmake ..
         make
 
     - name: Perform CodeQL Analysis
