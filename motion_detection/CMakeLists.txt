@@ -10,11 +10,21 @@ find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(GTest REQUIRED)
 
-# Set MongoDB paths for CMake
-list(APPEND CMAKE_PREFIX_PATH 
-    "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/mongocxx-4.1.0"
-    "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/bsoncxx-4.1.0"
-)
+# Set MongoDB paths for CMake based on platform
+if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH 
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/mongocxx-4.1.0"
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/bsoncxx-4.1.0"
+    )
+elseif(UNIX AND NOT APPLE)
+    # Linux paths
+    list(APPEND CMAKE_PREFIX_PATH 
+        "/usr/lib/x86_64-linux-gnu/cmake/mongocxx-3.7.0"
+        "/usr/lib/x86_64-linux-gnu/cmake/bsoncxx-3.7.0"
+        "/usr/lib/x86_64-linux-gnu/cmake/libmongocxx-3.7.0"
+        "/usr/lib/x86_64-linux-gnu/cmake/libbsoncxx-3.7.0"
+    )
+endif()
 
 # Find MongoDB
 find_package(mongocxx REQUIRED)
