@@ -10,23 +10,15 @@ find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(GTest REQUIRED)
 
+# Set MongoDB paths for CMake
+set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/opt/homebrew/lib/cmake")
+
 # Find MongoDB
 find_package(mongocxx REQUIRED)
 find_package(bsoncxx REQUIRED)
 
 # Add uuid library
 find_library(UUID_LIBRARIES uuid)
-
-# Set MongoDB paths
-set(MONGODB_INCLUDE_DIRS
-    /opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/include/bsoncxx/v_noabi
-    /opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/include/mongocxx/v_noabi
-)
-
-set(MONGODB_LIBRARIES
-    /opt/homebrew/lib/libmongocxx.dylib
-    /opt/homebrew/lib/libbsoncxx.dylib
-)
 
 # Add source files (excluding main.cpp)
 set(LIB_SOURCES
@@ -49,7 +41,8 @@ include_directories(
     ${YAML_CPP_INCLUDE_DIR}
     ${GTEST_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${MONGODB_INCLUDE_DIRS}
+    ${MONGOCXX_INCLUDE_DIRS}
+    ${BSONCXX_INCLUDE_DIRS}
 )
 
 # Add Homebrew include path for macOS (Apple Silicon)
@@ -83,7 +76,8 @@ target_include_directories(${PROJECT_NAME}
         ${OpenCV_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIR}
         ${UUID_INCLUDE_DIRS}
-        ${MONGODB_INCLUDE_DIRS}
+        ${MONGOCXX_INCLUDE_DIRS}
+        ${BSONCXX_INCLUDE_DIRS}
 )
 
 # Link libraries
@@ -92,7 +86,8 @@ target_link_libraries(${PROJECT_NAME}
         ${OpenCV_LIBS}
         yaml-cpp
         ${UUID_LIBRARIES}
-        ${MONGODB_LIBRARIES}
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
 )
 
 # Copy config file to build directory
@@ -109,7 +104,8 @@ target_include_directories(${PROJECT_NAME}_test
         ${OpenCV_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIR}
         ${UUID_INCLUDE_DIRS}
-        ${MONGODB_INCLUDE_DIRS}
+        ${MONGOCXX_INCLUDE_DIRS}
+        ${BSONCXX_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME}_test
@@ -118,7 +114,8 @@ target_link_libraries(${PROJECT_NAME}_test
         ${OpenCV_LIBS}
         yaml-cpp
         ${UUID_LIBRARIES}
-        ${MONGODB_LIBRARIES}
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
 )
 
 add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test) 
