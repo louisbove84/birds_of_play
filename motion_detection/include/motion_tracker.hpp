@@ -11,6 +11,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
+#include <opencv2/bgsegm.hpp>
 #include <yaml-cpp/yaml.h>
 
 // Maximum number of points to store in trajectory (moved to config.yaml)
@@ -50,6 +51,14 @@ public:
         return cap.read(frame);
     }
     static int getEscKey() { return ESC_KEY; }
+    
+    // Split-screen visualization method
+    cv::Mat createSplitScreenVisualization(const cv::Mat& originalFrame, const cv::Mat& processedFrame, 
+                                          const cv::Mat& frameDiff, const cv::Mat& thresholded, 
+                                          const cv::Mat& finalProcessed);
+    
+    // Initialize background subtractor
+    void initializeBackgroundSubtractor();
 
 private:
     void loadConfig(const std::string& configPath);
@@ -102,6 +111,39 @@ private:
     bool enableAdaptiveThreshold;
     int adaptiveBlockSize;
     int adaptiveC;
+    
+    // Background Subtraction parameters
+    bool enableBackgroundSubtraction;
+    int backgroundHistory;
+    double backgroundThreshold;
+    bool backgroundDetectShadows;
+    cv::Ptr<cv::BackgroundSubtractorMOG2> bgSubtractor;
+    
+    // Convex Hull parameters
+    bool enableConvexHull;
+    bool convexHullFill;
+    
+    // HSV Color Filtering parameters
+    bool enableHsvFiltering;
+    cv::Scalar hsvLower;
+    cv::Scalar hsvUpper;
+    
+    // Edge Detection parameters
+    bool enableEdgeDetection;
+    int cannyLowThreshold;
+    int cannyHighThreshold;
+    
+    // Contour Processing parameters
+    bool enableContourApproximation;
+    double contourEpsilonFactor;
+    bool enableContourFiltering;
+    double minAspectRatio;
+    double maxAspectRatio;
+    double minSolidity;
+    
+    // Visualization parameters
+    bool enableSplitScreen;
+    std::string splitScreenWindowName;
     
     // Helper method for position smoothing
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);

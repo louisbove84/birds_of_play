@@ -42,11 +42,47 @@ enable_adaptive_threshold: false  # Use adaptive thresholding instead of simple 
 adaptive_block_size: 11       # Block size for adaptive threshold
 adaptive_c: 2                 # Constant subtracted from mean
 
+# Background Subtraction (MOG2)
+enable_background_subtraction: true  # Use MOG2 background subtractor
+background_history: 500       # Number of frames for background model
+background_threshold: 16      # Threshold for background subtraction
+background_detect_shadows: true  # Detect shadows (slower but more accurate)
+
+# Convex Hull Processing
+enable_convex_hull: true      # Use convex hull to fill gaps in contours
+convex_hull_fill: true        # Fill the convex hull area
+
+# HSV Color Filtering (useful for skin detection, object tracking)
+enable_hsv_filtering: false   # Enable HSV color filtering
+hsv_lower_h: 0               # Lower bound for Hue (0-179)
+hsv_lower_s: 30              # Lower bound for Saturation (0-255)
+hsv_lower_v: 60              # Lower bound for Value (0-255)
+hsv_upper_h: 20              # Upper bound for Hue (0-179)
+hsv_upper_s: 150             # Upper bound for Saturation (0-255)
+hsv_upper_v: 255             # Upper bound for Value (0-255)
+
+# Additional Advanced Techniques
+enable_edge_detection: false  # Use Canny edge detection
+canny_low_threshold: 50       # Canny low threshold
+canny_high_threshold: 150     # Canny high threshold
+
+enable_contour_approximation: true  # Approximate contours to reduce noise
+contour_epsilon_factor: 0.02   # Approximation accuracy (0.01-0.05)
+
+enable_contour_filtering: true  # Filter contours by shape properties
+min_aspect_ratio: 0.3         # Minimum width/height ratio
+max_aspect_ratio: 3.0         # Maximum width/height ratio
+min_solidity: 0.5             # Minimum contour solidity (area/convex_hull_area)
+
 # Data Collection parameters
 enable_data_collection: true           # Enable/disable data collection
 cleanup_old_data: true                 # If true, deletes old data on startup. If false, preserves old data
 image_format: "png"                    # Format for saving cropped images
 save_interval_seconds: 5               # How often to save data to disk
+
+# Visualization parameters
+enable_split_screen: true              # Enable/disable split-screen visualization
+split_screen_window_name: "Motion Detection - Split Screen View"  # Window title for split-screen view
 
 # MongoDB Configuration
 mongodb_uri: "mongodb://localhost:27017"  # MongoDB connection URI
