@@ -28,21 +28,34 @@ jobs:
           libboost-all-dev \
           libssl-dev \
           pkg-config \
-          curl
+          curl \
+          uuid-dev
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make
         sudo cp lib/libgtest*.a /usr/lib/
 
-    - name: Install MongoDB C++ Driver (mongocxx)
+    - name: Install MongoDB C Driver
+      run: |
+        cd /tmp
+        curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/1.24.3/mongo-c-driver-1.24.3.tar.gz
+        tar xzf mongo-c-driver-1.24.3.tar.gz
+        cd mongo-c-driver-1.24.3
+        mkdir -p cmake-build && cd cmake-build
+        cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
+
+    - name: Install MongoDB C++ Driver
       run: |
         cd /tmp
         curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
-        tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
+        tar xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
         mkdir -p build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
-        sudo cmake --build . --target install
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
         sudo ldconfig
 
     - name: Build and Run Tests
@@ -74,21 +87,34 @@ jobs:
           libboost-all-dev \
           libssl-dev \
           pkg-config \
-          curl
+          curl \
+          uuid-dev
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make
         sudo cp lib/libgtest*.a /usr/lib/
 
-    - name: Install MongoDB C++ Driver (mongocxx)
+    - name: Install MongoDB C Driver
+      run: |
+        cd /tmp
+        curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/1.24.3/mongo-c-driver-1.24.3.tar.gz
+        tar xzf mongo-c-driver-1.24.3.tar.gz
+        cd mongo-c-driver-1.24.3
+        mkdir -p cmake-build && cd cmake-build
+        cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
+
+    - name: Install MongoDB C++ Driver
       run: |
         cd /tmp
         curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
-        tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
+        tar xzf mongo-cxx-driver-r3.8.0.tar.gz
         cd mongo-cxx-driver-r3.8.0
         mkdir -p build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
-        sudo cmake --build . --target install
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
         sudo ldconfig
 
     - name: Run OWASP Dependency Check
