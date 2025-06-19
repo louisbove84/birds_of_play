@@ -2,19 +2,19 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/build-test.yml'
   pull_request:
-    branches: [ main ]
+    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/build-test.yml'
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         compiler: [gcc, clang]
@@ -25,12 +25,46 @@ jobs:
 
     - name: Install dependencies
       run: |
+        # Add MongoDB repository
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+        echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+        
+        # Install MongoDB C++ driver from source
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
           cmake \
           libopencv-dev \
-          libgtest-dev
+          libgtest-dev \
+          libyaml-cpp-dev \
+          pkg-config \
+          libssl-dev \
+          libsasl2-dev
+        
+        # Build and install mongo-c-driver
+        cd $GITHUB_WORKSPACE
+        wget https://github.com/mongodb/mongo-c-driver/releases/download/1.24.3/mongo-c-driver-1.24.3.tar.gz
+        tar xzf mongo-c-driver-1.24.3.tar.gz
+        cd mongo-c-driver-1.24.3
+        mkdir cmake-build
+        cd cmake-build
+        cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
+        
+        # Build and install mongo-cxx-driver
+        cd $GITHUB_WORKSPACE
+        wget https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
+        tar xzf mongo-cxx-driver-r3.8.0.tar.gz
+        cd mongo-cxx-driver-r3.8.0/build
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
+        sudo make -j$(nproc)
+        sudo make install
+        
+        # Update library cache and export paths
+        sudo ldconfig
+        echo "CMAKE_PREFIX_PATH=/usr/local/lib/cmake" >> $GITHUB_ENV
+        
         if [ "${{ matrix.compiler }}" = "clang" ]; then
           sudo apt-get install -y clang
         fi
@@ -42,6 +76,7 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
               -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
               -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic" \
+              -DCMAKE_PREFIX_PATH=/usr/local/lib/cmake \
               ..
 
     - name: Build
