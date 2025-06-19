@@ -74,12 +74,12 @@ endif()
 # Platform-specific linking
 if(UNIX AND NOT APPLE)
     # Linux (e.g., Ubuntu CI)
-    set(EXTRA_LIBS stdc++)
+    set(EXTRA_LIBS stdc++ m)
 elseif(APPLE)
     # macOS (do not add stdc++, use default)
-    set(EXTRA_LIBS "")
+    set(EXTRA_LIBS m)
 else()
-    set(EXTRA_LIBS "")
+    set(EXTRA_LIBS m)
 endif()
 
 # Create main executable
@@ -106,6 +106,7 @@ target_link_libraries(${PROJECT_NAME}
         mongo::bsoncxx_shared
         ${EXTRA_LIBS}
         stdc++
+        m
 )
 
 # Copy config file to build directory
@@ -136,6 +137,7 @@ target_link_libraries(${PROJECT_NAME}_test
         mongo::bsoncxx_shared
         ${EXTRA_LIBS}
         stdc++
+        m
 )
 
 add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test) 
