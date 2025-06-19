@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     libsasl2-dev \
+    uuid-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install MongoDB C driver
@@ -70,6 +71,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libssl-dev \
     libsasl2-dev \
+    uuid-runtime \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy MongoDB runtime libraries
