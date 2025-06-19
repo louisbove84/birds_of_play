@@ -2,12 +2,10 @@ name: C++ Code Quality
 
 on:
   push:
-    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/cpp-quality.yml'
   pull_request:
-    # branches: [ "*" ]
     paths:
       - 'motion_detection/**'
       - '.github/workflows/cpp-quality.yml'
@@ -26,29 +24,25 @@ jobs:
           libopencv-dev \
           libgtest-dev \
           libyaml-cpp-dev \
-          cmake
+          cmake \
+          libboost-all-dev \
+          libssl-dev \
+          pkg-config \
+          curl
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make
         sudo cp lib/libgtest*.a /usr/lib/
 
-    # Temporarily disabled clang-tidy
-    # - name: Run clang-tidy
-    #   run: |
-    #     cd motion_detection
-    #     clang-tidy include/motion_tracker.hpp src/motion_tracker.cpp src/main.cpp -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type -- -I/usr/include/opencv4
-
-    # Temporarily disabled cppcheck
-    # - name: Run cppcheck
-    #   run: |
-    #     cd motion_detection
-    #     cppcheck --enable=all \
-    #       --suppress=missingIncludeSystem \
-    #       --suppress=unusedFunction \
-    #       --error-exitcode=1 \
-    #       -I include \
-    #       -I /usr/include/opencv4 \
-    #       src/ tests/
+    - name: Install MongoDB C++ Driver (mongocxx)
+      run: |
+        cd /tmp
+        curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
+        tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
+        cd mongo-cxx-driver-r3.8.0
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+        sudo cmake --build . --target install
 
     - name: Build and Run Tests
       run: |
@@ -75,11 +69,25 @@ jobs:
           libopencv-dev \
           libgtest-dev \
           libyaml-cpp-dev \
-          cmake
+          cmake \
+          libboost-all-dev \
+          libssl-dev \
+          pkg-config \
+          curl
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
         sudo make
         sudo cp lib/libgtest*.a /usr/lib/
+
+    - name: Install MongoDB C++ Driver (mongocxx)
+      run: |
+        cd /tmp
+        curl -LO https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.0/mongo-cxx-driver-r3.8.0.tar.gz
+        tar -xzf mongo-cxx-driver-r3.8.0.tar.gz
+        cd mongo-cxx-driver-r3.8.0
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+        sudo cmake --build . --target install
 
     - name: Run OWASP Dependency Check
       uses: dependency-check/Dependency-Check_Action@main
@@ -106,4 +114,4 @@ jobs:
       uses: github/codeql-action/analyze@v2
       with:
         category: "/language:cpp"
-      continue-on-error: true 
+      continue-on-error: true
