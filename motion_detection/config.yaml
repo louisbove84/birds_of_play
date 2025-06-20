@@ -48,9 +48,9 @@ erosion: false                      # Shrink object (applied last)
 convex_hull: true                   # Wrap contours in convex hull
 contour_approximation: true         # Reduce contour complexity with approxPolyDP()
 contour_filtering: true             # Filter small or invalid contours
-min_contour_area: 100               # Filter by minimum area (reduced from 300)
-max_contour_aspect_ratio: 5.0       # Filter by max width/height ratio (increased from 2.0)
-min_contour_solidity: 0.3           # Solidity = area / convex_hull_area (reduced from 0.85)
+min_contour_area: 300               # Filter by minimum area (increased from 100)
+max_contour_aspect_ratio: 3.0       # Filter by max width/height ratio (decreased from 5.0)
+min_contour_solidity: 0.5           # Solidity = area / convex_hull_area (increased from 0.3)
 # After finding contours: filter by shape, apply convex hull or approximation
 
 # ===============================
@@ -67,15 +67,15 @@ save_on_motion: true                # Only save frames where motion is detected
 # ===============================
 
 # Motion Detection Core Settings
-threshold_value: 25                 # Threshold for binary thresholding (reduced from 30)
+threshold_value: 40                 # Threshold for binary thresholding (increased from 25)
 max_threshold: 255                  # Maximum value for binary threshold operation
 max_tracking_distance: 200          # Maximum distance to track moving objects (increased from 150)
 max_trajectory_points: 30           # Maximum trail length for visualization
-min_trajectory_length: 10            # Minimum trajectory points required to record an object (reduced from 10)
+min_trajectory_length: 15           # Minimum trajectory points required to record an object (increased from 10)
 
 # Motion Smoothing
 smoothing_factor: 0.7               # Smoothing for more stable tracking
-min_tracking_confidence: 0.3        # Minimum confidence threshold to maintain tracking (reduced from 0.6)
+min_tracking_confidence: 0.6        # Minimum confidence threshold to maintain tracking (increased from 0.3)
 
 # Contrast Enhancement (CLAHE)
 clahe_clip_limit: 3.0               # Clip limit for CLAHE
@@ -90,7 +90,7 @@ bilateral_sigma_space: 75           # Bilateral filter sigma space
 
 # Background Subtraction (MOG2)
 background_history: 300             # Background history length
-background_threshold: 20            # Background subtraction threshold
+background_threshold: 30            # Background subtraction threshold (increased from 20)
 background_detect_shadows: false    # Detect shadows
 
 # Edge Detection (Canny)
@@ -122,4 +122,14 @@ image_format: "png"                 # Format for saving cropped images
 # MongoDB Configuration
 mongodb_uri: "mongodb://localhost:27017"
 database_name: "birds_of_play"
-collection_prefix: "motion_tracking" 
+collection_prefix: "motion_tracking"
+
+# For development and debugging
+# ===============================
+logging:
+  log_level: "debug"  # Options: "trace", "debug", "info", "warn", "error", "critical", "off"
+  log_to_file: true
+  log_file_path: "birdsofplay.log"
+
+debug:
+  split_screen: true                # Show split-screen debug view 

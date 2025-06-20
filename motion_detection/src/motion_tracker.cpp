@@ -1,13 +1,16 @@
 #include "motion_tracker.hpp"
+#include "logger.hpp"
 #include <iostream>
 #include <cmath>
+#include <random>
+#include <sstream>
 
 MotionTracker::MotionTracker(const std::string& configPath) 
     : isRunning(false),
       isFirstFrame(true),
       nextObjectId(0),
       maxTrajectoryPoints(30),
-      minTrajectoryLength(3),
+      minTrajectoryLength(10),
       thresholdValue(25.0),
       minContourArea(500),
       maxTrackingDistance(100.0),
@@ -120,7 +123,7 @@ bool MotionTracker::initialize(const std::string& videoSource) {
 bool MotionTracker::initialize(int deviceIndex) {
     cap.open(deviceIndex);
     if (!cap.isOpened()) {
-        std::cerr << "Error: Could not open video device index " << deviceIndex << std::endl;
+        Logger::getInstance()->critical("Error: Could not open video device index {}", deviceIndex);
         return false;
     }
     isRunning = true;
@@ -142,6 +145,7 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["max_tracking_distance"]) maxTrackingDistance = config["max_tracking_distance"].as<double>();
         if (config["max_trajectory_points"]) maxTrajectoryPoints = config["max_trajectory_points"].as<size_t>();
         if (config["min_trajectory_length"]) minTrajectoryLength = config["min_trajectory_length"].as<size_t>();
+        Logger::getInstance()->info("Loaded min_trajectory_length: {}", minTrajectoryLength);
         
         if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
         if (config["smoothing_factor"]) smoothingFactor = config["smoothing_factor"].as<double>();
@@ -222,22 +226,25 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["enable_draw_contours"]) drawContours = config["enable_draw_contours"].as<bool>();
         if (config["enable_data_collection"]) dataCollection = config["enable_data_collection"].as<bool>();
         if (config["enable_save_on_motion"]) saveOnMotion = config["enable_save_on_motion"].as<bool>();
-    } catch (const std::exception& e) {
-        std::cerr << "Warning: Could not load config file: " << e.what() << ". Using defaults." << std::endl;
+        
+        // Debug: Print loaded config values
+        Logger::getInstance()->info("=== CONFIG LOADED ===");
+        Logger::getInstance()->info("min_trajectory_length: {}", minTrajectoryLength);
+        Logger::getInstance()->info("min_contour_area: {}", minContourArea);
+        Logger::getInstance()->info("threshold_value: {}", thresholdValue);
+        Logger::getInstance()->info("=====================");
+    } catch (const YAML::Exception& e) {
+        Logger::getInstance()->critical("Warning: Could not load config file: {}. Error: {}", configPath, e.what());
     }
 }
 
-TrackedObject* MotionTracker::findNearestObject(const cv::Rect& newBounds) {
-    cv::Point newCenter(newBounds.x + newBounds.width/2, 
-                       newBounds.y + newBounds.height/2);
-    
+TrackedObject* MotionTracker::findNearestObject(const cv::Rect& bounds) {
     TrackedObject* nearest = nullptr;
     double minDistance = maxTrackingDistance;
-    
+    cv::Point center = cv::Point(bounds.x + bounds.width/2, bounds.y + bounds.height/2);
+
     for (auto& obj : trackedObjects) {
-        cv::Point objCenter = obj.getCenter();
-        double distance = std::sqrt(std::pow(newCenter.x - objCenter.x, 2) + 
-                                  std::pow(newCenter.y - objCenter.y, 2));
+        double distance = cv::norm(center - obj.getCenter());
         
         if (distance < minDistance) {
             minDistance = distance;
@@ -271,7 +278,7 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
                 matchedObj->currentBounds = bounds;
                 
                 // Get new center position
-                cv::Point newCenter = matchedObj->getCenter();
+                cv::Point newCenter = cv::Point(bounds.x + bounds.width/2, bounds.y + bounds.height/2);
                 
                 // Apply smoothing if we have a previous smoothed position
                 if (!matchedObj->trajectory.empty()) {
@@ -301,13 +308,8 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
             }
         } else {
             // Create new tracked object
-            TrackedObject newObj;
-            newObj.id = nextObjectId++;
-            newObj.currentBounds = bounds;
-            newObj.smoothedCenter = newObj.getCenter();
-            newObj.confidence = 0.5;  // Initial confidence
-            newObj.trajectory.push_back(newObj.smoothedCenter);
-            trackedObjects.push_back(newObj);
+            std::string new_uuid = generateUUID();
+            trackedObjects.emplace_back(nextObjectId++, bounds, new_uuid);
         }
     }
     
@@ -589,6 +591,7 @@ void MotionTracker::initializeBackgroundSubtractor() {
             backgroundThreshold, 
             backgroundDetectShadows
         );
+        Logger::getInstance()->info("Using Background Subtraction (MOG2)");
     }
 }
 
@@ -728,7 +731,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 30 == 0) { // Show every 30 frames
-        std::cout << "Found " << contours.size() << " contours" << std::endl;
+        Logger::getInstance()->debug("Found {} contours", contours.size());
     }
     
     // 11. Process contours with advanced filtering
@@ -787,8 +790,8 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     
     // Debug: Show how many contours passed filtering
     if (frameCount % 30 == 0) {
-        std::cout << "Contours passed filtering: " << contoursPassed << " (min_area=" << minContourArea 
-                  << ", max_aspect=" << maxContourAspectRatio << ", min_solidity=" << minContourSolidity << ")" << std::endl;
+        Logger::getInstance()->debug("Contours passed filtering: {} (min_area={}, max_aspect={}, min_solidity={})", 
+                                   contoursPassed, minContourArea, maxContourAspectRatio, minContourSolidity);
     }
     
     // Create and display split-screen visualization if enabled
@@ -805,18 +808,21 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     if (!trackedObjects.empty()) {
         std::vector<TrackedObject> filteredObjects;
         for (const auto& obj : trackedObjects) {
+            // Add detailed debug output right before the check
+            Logger::getInstance()->debug("Checking Object {}: trajectory.size()={}, minTrajectoryLength={}. Filter condition met? {}",
+                                       obj.id, obj.trajectory.size(), minTrajectoryLength, (obj.trajectory.size() >= minTrajectoryLength ? "Yes" : "No"));
+
             if (obj.trajectory.size() >= minTrajectoryLength) {
                 filteredObjects.push_back(obj);
             }
         }
         
         if (!filteredObjects.empty()) {
-            std::cout << "Tracking " << filteredObjects.size() << " objects (min trajectory length: " << minTrajectoryLength << "):" << std::endl;
+            Logger::getInstance()->info("Tracking {} objects (min trajectory length: {}):", filteredObjects.size(), minTrajectoryLength);
             for (const auto& obj : filteredObjects) {
-                std::cout << "  Object " << obj.id << ": confidence=" << obj.confidence 
-                          << ", trajectory points=" << obj.trajectory.size() 
-                          << ", bounds=(" << obj.currentBounds.x << "," << obj.currentBounds.y 
-                          << "," << obj.currentBounds.width << "," << obj.currentBounds.height << ")" << std::endl;
+                Logger::getInstance()->info("  Object {}: confidence={}, trajectory points={}, bounds=({},{},{},{})", 
+                                          obj.id, obj.confidence, obj.trajectory.size(), 
+                                          obj.currentBounds.x, obj.currentBounds.y, obj.currentBounds.width, obj.currentBounds.height);
             }
         }
     } else {
@@ -824,7 +830,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         static int noObjectCount = 0;
         noObjectCount++;
         if (noObjectCount % 30 == 0) { // Show every 30 frames (about 1 second)
-            std::cout << "No objects currently being tracked. Move your hands or objects in front of the camera." << std::endl;
+            Logger::getInstance()->info("No objects currently being tracked. Move your hands or objects in front of the camera.");
         }
     }
     
@@ -832,4 +838,35 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     prevFrame = processedFrame.clone();
     
     return result;
+}
+
+const TrackedObject* MotionTracker::findTrackedObjectById(int id) const {
+    for (const auto& obj : trackedObjects) {
+        if (obj.id == id) {
+            return &obj;
+        }
+    }
+    return nullptr;
+}
+
+std::string MotionTracker::generateUUID() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
+    std::uniform_int_distribution<> dis2(8, 11);
+
+    std::stringstream ss;
+    int i;
+    ss << std::hex;
+    for (i = 0; i < 8; i++) ss << dis(gen);
+    ss << "-";
+    for (i = 0; i < 4; i++) ss << dis(gen);
+    ss << "-4";
+    for (i = 0; i < 3; i++) ss << dis(gen);
+    ss << "-";
+    ss << dis2(gen);
+    for (i = 0; i < 3; i++) ss << dis(gen);
+    ss << "-";
+    for (i = 0; i < 12; i++) ss << dis(gen);
+    return ss.str();
 } 

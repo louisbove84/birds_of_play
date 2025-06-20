@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <deque>
+#include <chrono>
 
 // Third-party includes
 #include <opencv2/core.hpp>
@@ -19,14 +20,26 @@
 // const size_t MAX_TRAJECTORY_POINTS = 30;
 
 struct TrackedObject {
-    int id;                                     // Unique identifier for this object
-    cv::Rect currentBounds;                     // Current bounding box
-    std::deque<cv::Point> trajectory;           // Path history (recent positions)
-    cv::Point smoothedCenter;  // Add smoothed center position
-    double confidence;         // Add tracking confidence
+    int id;
+    cv::Rect currentBounds;
+    std::deque<cv::Point> trajectory; // Using deque for efficient pop_front
+    cv::Point smoothedCenter;
+    double confidence;
+    int framesWithoutDetection;
+    std::chrono::system_clock::time_point firstSeen;
+    std::string uuid;
+    cv::Mat initialFrame;
+
     cv::Point getCenter() const {
-        return cv::Point(currentBounds.x + currentBounds.width/2,
-                        currentBounds.y + currentBounds.height/2);
+        return cv::Point(currentBounds.x + currentBounds.width / 2,
+                         currentBounds.y + currentBounds.height / 2);
+    }
+
+    TrackedObject(int obj_id, const cv::Rect& bounds, std::string new_uuid) : 
+        id(obj_id), currentBounds(bounds), confidence(1.0), 
+        framesWithoutDetection(0), firstSeen(std::chrono::system_clock::now()), uuid(new_uuid) {
+        smoothedCenter = getCenter();
+        trajectory.push_back(smoothedCenter);
     }
 };
 
@@ -77,6 +90,12 @@ public:
     // Get list of object IDs that were lost in the last frame
     std::vector<int> getLostObjectIds() const { return lostObjectIds; }
     void clearLostObjectIds() { lostObjectIds.clear(); }
+
+    // Getters for configuration values
+    const TrackedObject* findTrackedObjectById(int id) const;
+
+    // Getters for internal state
+    cv::VideoCapture& getCap() { return cap; }
 
 private:
     void loadConfig(const std::string& configPath);
@@ -197,6 +216,7 @@ private:
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
 
     std::vector<int> lostObjectIds;
+    std::string generateUUID();
 };
 
 #endif // MOTION_TRACKER_HPP 

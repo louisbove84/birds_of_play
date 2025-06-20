@@ -1,0 +1,3 @@
+[submodule "motion_detection/libs/spdlog"]
+	path = motion_detection/libs/spdlog
+	url = https://github.com/gabime/spdlog.git

@@ -93,6 +93,36 @@ app.get('/api/tracking/all', async (req, res) => {
     }
 });
 
+// DELETE endpoint: clear all tracking data
+app.delete('/api/tracking/all', async (req, res) => {
+    try {
+        const result = await db.collection('motion_tracking_data').deleteMany({});
+        const imageResult = await db.collection('motion_tracking_images').deleteMany({});
+        res.json({ 
+            message: 'Database cleared successfully',
+            deletedObjects: result.deletedCount,
+            deletedImages: imageResult.deletedCount
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE endpoint: clear specific UUID
+app.delete('/api/tracking/:uuid', async (req, res) => {
+    try {
+        const result = await db.collection('motion_tracking_data').deleteOne({ uuid: req.params.uuid });
+        const imageResult = await db.collection('motion_tracking_images').deleteOne({ uuid: req.params.uuid });
+        res.json({ 
+            message: 'Object deleted successfully',
+            deletedObjects: result.deletedCount,
+            deletedImages: imageResult.deletedCount
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

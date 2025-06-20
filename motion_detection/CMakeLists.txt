@@ -51,6 +51,10 @@ set(HEADERS
 # Add compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
+# Add spdlog and make its headers available globally
+add_subdirectory(libs/spdlog)
+include_directories(libs/spdlog/include)
+
 # Include directories
 include_directories(
     ${OpenCV_INCLUDE_DIRS}
@@ -83,7 +87,7 @@ else()
 endif()
 
 # Create main executable
-add_executable(${PROJECT_NAME} ${LIB_SOURCES} src/main.cpp ${HEADERS})
+add_executable(${PROJECT_NAME} ${LIB_SOURCES} src/main.cpp src/logger.cpp ${HEADERS})
 
 # Include directories
 target_include_directories(${PROJECT_NAME} 
@@ -94,6 +98,7 @@ target_include_directories(${PROJECT_NAME}
         ${UUID_INCLUDE_DIRS}
         ${MONGOCXX_INCLUDE_DIRS}
         ${BSONCXX_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
 )
 
 # Link libraries
@@ -107,6 +112,7 @@ target_link_libraries(${PROJECT_NAME}
         ${EXTRA_LIBS}
         stdc++
         m
+        spdlog::spdlog_header_only
 )
 
 # Copy config file to build directory
@@ -116,7 +122,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.yaml
 # Enable testing
 enable_testing()
 
-add_executable(${PROJECT_NAME}_test tests/motion_tracker_test.cpp ${LIB_SOURCES})
+add_executable(${PROJECT_NAME}_test tests/motion_tracker_test.cpp ${LIB_SOURCES} src/logger.cpp)
 target_include_directories(${PROJECT_NAME}_test 
     PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -140,4 +146,29 @@ target_link_libraries(${PROJECT_NAME}_test
         m
 )
 
-add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test) 
+add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test)
+
+# Unit Testing
+# ==============================================================================
+if(BUILD_TESTING)
+    # Add the test executable
+    add_executable(BirdsOfPlay_test 
+        tests/motion_tracker_test.cpp
+        src/logger.cpp
+    )
+
+    # Link the necessary libraries to the test executable
+    target_link_libraries(BirdsOfPlay_test PRIVATE 
+        GTest::gtest_main 
+        spdlog::spdlog_header_only
+        ${OpenCV_LIBS}
+        mongocxx::mongocxx
+        yaml-cpp
+    )
+
+    # Add include directories for the test executable
+    target_include_directories(BirdsOfPlay_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+    )
+endif() 

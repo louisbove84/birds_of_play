@@ -1,8 +1,11 @@
 #include "motion_tracker.hpp"
 #include "data_collector.hpp"
+#include "logger.hpp"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <filesystem>
+#include <string>
+namespace fs = std::filesystem;
 
 // Colors for different tracked objects (cycled through based on object ID)
 const std::vector<cv::Scalar> COLORS = {
@@ -18,20 +21,15 @@ cv::Scalar getColor(int objectId) {
     return COLORS[objectId % COLORS.size()];
 }
 
-int main() {
-    // Initialize video capture
-    cv::VideoCapture cap(0);
-    if (!cap.isOpened()) {
-        std::cerr << "Error: Could not open camera." << std::endl;
-        return -1;
-    }
+int main(int argc, char** argv) {
+    fs::path config_path = (argc > 1) ? argv[1] : "config.yaml";
+    YAML::Node config = YAML::LoadFile(config_path.string());
 
-    // Get config file path
-    std::filesystem::path config_path = std::filesystem::current_path() / "config.yaml";
-    if (!std::filesystem::exists(config_path)) {
-        std::cerr << "Error: Could not find config.yaml" << std::endl;
-        return -1;
-    }
+    // Initialize logger first
+    std::string logLevel = config["logging"]["log_level"] ? config["logging"]["log_level"].as<std::string>() : "info";
+    bool logToFile = config["logging"]["log_to_file"] ? config["logging"]["log_to_file"].as<bool>() : false;
+    std::string logFilePath = config["logging"]["log_file_path"] ? config["logging"]["log_file_path"].as<std::string>() : "birdsofplay.log";
+    Logger::init(logLevel, logFilePath, logToFile);
 
     // Initialize motion tracker and data collector
     MotionTracker tracker(config_path.string());
@@ -39,16 +37,23 @@ int main() {
     
     // Initialize motion tracker with camera
     if (!tracker.initialize(0)) {
-        std::cerr << "Error: Could not initialize motion tracker with camera." << std::endl;
+        Logger::getInstance()->critical("Error: Could not initialize motion tracker with camera.");
         return -1;
     }
     
     if (!collector.initialize()) {
-        std::cerr << "Warning: Data collection disabled or failed to initialize" << std::endl;
+        Logger::getInstance()->warn("Data collection disabled or failed to initialize");
     }
 
-    std::cout << "Motion tracking system initialized successfully!" << std::endl;
-    std::cout << "Press 'q' or ESC to quit." << std::endl;
+    Logger::getInstance()->info("Motion tracking system initialized successfully!");
+    Logger::getInstance()->info("Press 'q' or ESC to quit.");
+
+    cv::VideoCapture cap; // Define cap here
+    if (!tracker.getCap().isOpened()) {
+        Logger::getInstance()->critical("Camera is not open after tracker initialization.");
+        return -1;
+    }
+    cap = tracker.getCap(); // Get the already-opened capture from the tracker
 
     cv::Mat frame;
     char key = 0;
@@ -72,6 +77,10 @@ int main() {
         // Update data collection for each tracked object
         if (result.hasMotion) {
             for (const auto& obj : result.trackedObjects) {
+                // Debug: Show trajectory length for each object
+                std::cout << "Object " << obj.id << " trajectory length: " << obj.trajectory.size() 
+                          << " (min required: " << tracker.getMinTrajectoryLength() << ")" << std::endl;
+                
                 if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
                     collector.addTrackingData(
                         obj.id,
@@ -83,6 +92,19 @@ int main() {
                 }
             }
         }
+
+        // Update data collection for lost objects
+        for (const auto& id : tracker.getLostObjectIds()) {
+            Logger::getInstance()->debug("Object {} lost. Forwarding to data collector.", id);
+            // We need the full object, not just the ID. This requires a small change in MotionTracker.
+            // For now, let's assume a function getLostObjectById exists.
+            // This will be fixed in the next step.
+            const auto* obj = tracker.findTrackedObjectById(id);
+            if (obj) {
+                collector.addLostObject(*obj);
+            }
+        }
+        tracker.clearLostObjectIds();
 
         // Draw enhanced motion overlays (only for objects with sufficient trajectory length)
         cv::Mat filteredFrame = frame.clone();

@@ -15,6 +15,9 @@
 #include <mongocxx/database.hpp>
 #include <mongocxx/collection.hpp>
 
+// Forward-declare TrackedObject to break the circular dependency
+struct TrackedObject;
+
 struct TrackingData {
     std::string uuid;
     std::chrono::system_clock::time_point first_seen;
@@ -42,6 +45,8 @@ public:
     
     // Save current data to MongoDB
     void saveData();
+
+    void addLostObject(const TrackedObject& object);
 
 private:
     // Configuration

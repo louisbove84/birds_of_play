@@ -1,4 +1,5 @@
 #include "data_collector.hpp"
+#include "motion_tracker.hpp"
 #include <yaml-cpp/yaml.h>
 #include <iomanip>
 #include <sstream>
@@ -6,6 +7,7 @@
 #include <bsoncxx/builder/basic/array.hpp>
 #include <bsoncxx/json.hpp>
 #include <mongocxx/exception/operation_exception.hpp>
+#include "logger.hpp"
 
 using bsoncxx::builder::basic::document;
 using bsoncxx::builder::basic::array;
@@ -31,8 +33,8 @@ DataCollector::DataCollector(const std::string& config_path)
         
         // Set default save interval since it's not in the new config
         saveIntervalSeconds = 5;
-    } catch (const std::exception& e) {
-        std::cerr << "Warning: Could not load data collection config: " << e.what() << std::endl;
+    } catch (const YAML::Exception& e) {
+        Logger::getInstance()->warn("DataCollector: Could not load or parse config file: {}. Using defaults. Error: {}", config_path, e.what());
         enabled = false;
         shouldCleanupOldData = true;
         minTrackingConfidence = 0.5;
@@ -51,7 +53,10 @@ DataCollector::~DataCollector() {
 }
 
 bool DataCollector::initialize() {
-    if (!enabled) return false;
+    if (!enabled) {
+        Logger::getInstance()->warn("DataCollector is disabled in the config file.");
+        return false;
+    }
     
     try {
         // Connect to MongoDB
@@ -66,9 +71,10 @@ bool DataCollector::initialize() {
         }
         
         lastSaveTime = std::chrono::system_clock::now();
+        Logger::getInstance()->info("Successfully connected to MongoDB for data collection.");
         return true;
-    } catch (const std::exception& e) {
-        std::cerr << "Error initializing MongoDB connection: " << e.what() << std::endl;
+    } catch (const mongocxx::exception& e) {
+        Logger::getInstance()->critical("MongoDB connection failed: {}", e.what());
         return false;
     }
 }
@@ -226,4 +232,48 @@ std::vector<uint8_t> DataCollector::matToVector(const cv::Mat& image) {
     std::vector<uint8_t> encoded;
     cv::imencode("." + imageFormat, image, encoded);
     return encoded;
+}
+
+void DataCollector::addLostObject(const TrackedObject& object) {
+    if (!enabled) return;
+
+    Logger::getInstance()->info("Object {} lost. Saving to database. Trajectory size: {}", object.id, object.trajectory.size());
+
+    try {
+        auto collection = db[collectionName + "_data"];
+        auto image_collection = db[collectionName + "_images"];
+
+        bsoncxx::builder::basic::document data_builder{};
+        data_builder.append(bsoncxx::builder::basic::kvp("uuid", object.uuid));
+        data_builder.append(bsoncxx::builder::basic::kvp("first_seen", bsoncxx::types::b_date{object.firstSeen}));
+        data_builder.append(bsoncxx::builder::basic::kvp("last_seen", bsoncxx::types::b_date{std::chrono::system_clock::now()}));
+        data_builder.append(bsoncxx::builder::basic::kvp("confidence", object.confidence));
+        
+        auto trajectory_array = bsoncxx::builder::basic::array{};
+        for (const auto& p : object.trajectory) {
+            trajectory_array.append([&p](bsoncxx::builder::basic::sub_document sub_doc) {
+                sub_doc.append(bsoncxx::builder::basic::kvp("x", p.x));
+                sub_doc.append(bsoncxx::builder::basic::kvp("y", p.y));
+            });
+        }
+        data_builder.append(bsoncxx::builder::basic::kvp("trajectory", trajectory_array));
+        
+        collection.insert_one(data_builder.view());
+
+        if (!object.initialFrame.empty()) {
+            std::vector<uchar> buf;
+            cv::imencode(".png", object.initialFrame, buf);
+            bsoncxx::builder::basic::document image_builder{};
+            image_builder.append(bsoncxx::builder::basic::kvp("uuid", object.uuid));
+            image_builder.append(bsoncxx::builder::basic::kvp("image", bsoncxx::types::b_binary{
+                bsoncxx::binary_sub_type::k_binary,
+                static_cast<uint32_t>(buf.size()),
+                buf.data()
+            }));
+            image_collection.insert_one(image_builder.view());
+        }
+
+    } catch (const mongocxx::exception& e) {
+        Logger::getInstance()->error("Failed to save lost object {} to MongoDB: {}", object.id, e.what());
+    }
 } 
