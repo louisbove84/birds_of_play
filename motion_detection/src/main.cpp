@@ -29,7 +29,14 @@ int main(int argc, char** argv) {
     std::string logLevel = config["logging"]["log_level"] ? config["logging"]["log_level"].as<std::string>() : "info";
     bool logToFile = config["logging"]["log_to_file"] ? config["logging"]["log_to_file"].as<bool>() : false;
     std::string logFilePath = config["logging"]["log_file_path"] ? config["logging"]["log_file_path"].as<std::string>() : "birdsofplay.log";
+    
+    // Ensure log directory exists (e.g., "logs/")
+    fs::path logDir = fs::path(logFilePath).parent_path();
+    if (!logDir.empty()) {
+        fs::create_directories(logDir);
+    }
     Logger::init(logLevel, logFilePath, logToFile);
+    LOG_INFO("Logger initialized at {}", logFilePath);
 
     // Initialize motion tracker and data collector
     MotionTracker tracker(config_path.string());
@@ -37,20 +44,20 @@ int main(int argc, char** argv) {
     
     // Initialize motion tracker with camera
     if (!tracker.initialize(0)) {
-        Logger::getInstance()->critical("Error: Could not initialize motion tracker with camera.");
+        LOG_CRITICAL("Error: Could not initialize motion tracker with camera.");
         return -1;
     }
     
     if (!collector.initialize()) {
-        Logger::getInstance()->warn("Data collection disabled or failed to initialize");
+        LOG_WARN("Data collection disabled or failed to initialize");
     }
 
-    Logger::getInstance()->info("Motion tracking system initialized successfully!");
-    Logger::getInstance()->info("Press 'q' or ESC to quit.");
+    LOG_INFO("Motion tracking system initialized successfully!");
+    LOG_INFO("Press 'q' or ESC to quit.");
 
     cv::VideoCapture cap; // Define cap here
     if (!tracker.getCap().isOpened()) {
-        Logger::getInstance()->critical("Camera is not open after tracker initialization.");
+        LOG_CRITICAL("Camera is not open after tracker initialization.");
         return -1;
     }
     cap = tracker.getCap(); // Get the already-opened capture from the tracker
@@ -76,11 +83,7 @@ int main(int argc, char** argv) {
 
         // Update data collection for each tracked object
         if (result.hasMotion) {
-            for (const auto& obj : result.trackedObjects) {
-                // Debug: Show trajectory length for each object
-                std::cout << "Object " << obj.id << " trajectory length: " << obj.trajectory.size() 
-                          << " (min required: " << tracker.getMinTrajectoryLength() << ")" << std::endl;
-                
+            for (const auto& obj : result.trackedObjects) { 
                 if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
                     collector.addTrackingData(
                         obj.id,
@@ -95,7 +98,7 @@ int main(int argc, char** argv) {
 
         // Update data collection for lost objects
         for (const auto& id : tracker.getLostObjectIds()) {
-            Logger::getInstance()->debug("Object {} lost. Forwarding to data collector.", id);
+            LOG_DEBUG("Object {} lost. Forwarding to data collector.", id);
             // We need the full object, not just the ID. This requires a small change in MotionTracker.
             // For now, let's assume a function getLostObjectById exists.
             // This will be fixed in the next step.

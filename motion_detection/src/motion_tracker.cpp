@@ -123,7 +123,7 @@ bool MotionTracker::initialize(const std::string& videoSource) {
 bool MotionTracker::initialize(int deviceIndex) {
     cap.open(deviceIndex);
     if (!cap.isOpened()) {
-        Logger::getInstance()->critical("Error: Could not open video device index {}", deviceIndex);
+        LOG_CRITICAL("Error: Could not open video device index {}", deviceIndex);
         return false;
     }
     isRunning = true;
@@ -145,7 +145,7 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["max_tracking_distance"]) maxTrackingDistance = config["max_tracking_distance"].as<double>();
         if (config["max_trajectory_points"]) maxTrajectoryPoints = config["max_trajectory_points"].as<size_t>();
         if (config["min_trajectory_length"]) minTrajectoryLength = config["min_trajectory_length"].as<size_t>();
-        Logger::getInstance()->info("Loaded min_trajectory_length: {}", minTrajectoryLength);
+        LOG_INFO("Loaded min_trajectory_length: {}", minTrajectoryLength);
         
         if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
         if (config["smoothing_factor"]) smoothingFactor = config["smoothing_factor"].as<double>();
@@ -228,13 +228,13 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["enable_save_on_motion"]) saveOnMotion = config["enable_save_on_motion"].as<bool>();
         
         // Debug: Print loaded config values
-        Logger::getInstance()->info("=== CONFIG LOADED ===");
-        Logger::getInstance()->info("min_trajectory_length: {}", minTrajectoryLength);
-        Logger::getInstance()->info("min_contour_area: {}", minContourArea);
-        Logger::getInstance()->info("threshold_value: {}", thresholdValue);
-        Logger::getInstance()->info("=====================");
+        LOG_INFO("=== CONFIG LOADED ===");
+        LOG_INFO("min_trajectory_length: {}", minTrajectoryLength);
+        LOG_INFO("min_contour_area: {}", minContourArea);
+        LOG_INFO("threshold_value: {}", thresholdValue);
+        LOG_INFO("=====================");
     } catch (const YAML::Exception& e) {
-        Logger::getInstance()->critical("Warning: Could not load config file: {}. Error: {}", configPath, e.what());
+        LOG_CRITICAL("Warning: Could not load config file: {}. Error: {}", configPath, e.what());
     }
 }
 
@@ -591,7 +591,7 @@ void MotionTracker::initializeBackgroundSubtractor() {
             backgroundThreshold, 
             backgroundDetectShadows
         );
-        Logger::getInstance()->info("Using Background Subtraction (MOG2)");
+        LOG_INFO("Using Background Subtraction (MOG2)");
     }
 }
 
@@ -731,7 +731,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 30 == 0) { // Show every 30 frames
-        Logger::getInstance()->debug("Found {} contours", contours.size());
+        LOG_DEBUG("Found {} contours", contours.size());
     }
     
     // 11. Process contours with advanced filtering
@@ -790,8 +790,9 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     
     // Debug: Show how many contours passed filtering
     if (frameCount % 30 == 0) {
-        Logger::getInstance()->debug("Contours passed filtering: {} (min_area={}, max_aspect={}, min_solidity={})", 
+        LOG_DEBUG("Contours passed filtering: {} (min_area={}, max_aspect={}, min_solidity={})", 
                                    contoursPassed, minContourArea, maxContourAspectRatio, minContourSolidity);
+        (void)contoursPassed; // Suppress unused variable warning
     }
     
     // Create and display split-screen visualization if enabled
@@ -809,7 +810,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         std::vector<TrackedObject> filteredObjects;
         for (const auto& obj : trackedObjects) {
             // Add detailed debug output right before the check
-            Logger::getInstance()->debug("Checking Object {}: trajectory.size()={}, minTrajectoryLength={}. Filter condition met? {}",
+            LOG_DEBUG("Checking Object {}: trajectory.size()={}, minTrajectoryLength={}. Filter condition met? {}",
                                        obj.id, obj.trajectory.size(), minTrajectoryLength, (obj.trajectory.size() >= minTrajectoryLength ? "Yes" : "No"));
 
             if (obj.trajectory.size() >= minTrajectoryLength) {
@@ -818,9 +819,9 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         }
         
         if (!filteredObjects.empty()) {
-            Logger::getInstance()->info("Tracking {} objects (min trajectory length: {}):", filteredObjects.size(), minTrajectoryLength);
+            LOG_INFO("Tracking {} objects (min trajectory length: {}):", filteredObjects.size(), minTrajectoryLength);
             for (const auto& obj : filteredObjects) {
-                Logger::getInstance()->info("  Object {}: confidence={}, trajectory points={}, bounds=({},{},{},{})", 
+                LOG_INFO("  Object {}: confidence={}, trajectory points={}, bounds=({},{},{},{})", 
                                           obj.id, obj.confidence, obj.trajectory.size(), 
                                           obj.currentBounds.x, obj.currentBounds.y, obj.currentBounds.width, obj.currentBounds.height);
             }
@@ -830,7 +831,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         static int noObjectCount = 0;
         noObjectCount++;
         if (noObjectCount % 30 == 0) { // Show every 30 frames (about 1 second)
-            Logger::getInstance()->info("No objects currently being tracked. Move your hands or objects in front of the camera.");
+            LOG_INFO("No objects currently being tracked. Move your hands or objects in front of the camera.");
         }
     }
     

@@ -34,7 +34,7 @@ DataCollector::DataCollector(const std::string& config_path)
         // Set default save interval since it's not in the new config
         saveIntervalSeconds = 5;
     } catch (const YAML::Exception& e) {
-        Logger::getInstance()->warn("DataCollector: Could not load or parse config file: {}. Using defaults. Error: {}", config_path, e.what());
+        LOG_WARN("DataCollector: Could not load or parse config file: {}. Using defaults. Error: {}", config_path, e.what());
         enabled = false;
         shouldCleanupOldData = true;
         minTrackingConfidence = 0.5;
@@ -54,7 +54,7 @@ DataCollector::~DataCollector() {
 
 bool DataCollector::initialize() {
     if (!enabled) {
-        Logger::getInstance()->warn("DataCollector is disabled in the config file.");
+        LOG_WARN("DataCollector is disabled in the config file.");
         return false;
     }
     
@@ -71,10 +71,10 @@ bool DataCollector::initialize() {
         }
         
         lastSaveTime = std::chrono::system_clock::now();
-        Logger::getInstance()->info("Successfully connected to MongoDB for data collection.");
+        LOG_INFO("Successfully connected to MongoDB for data collection.");
         return true;
     } catch (const mongocxx::exception& e) {
-        Logger::getInstance()->critical("MongoDB connection failed: {}", e.what());
+        LOG_CRITICAL("MongoDB connection failed: {}", e.what());
         return false;
     }
 }
@@ -237,7 +237,7 @@ std::vector<uint8_t> DataCollector::matToVector(const cv::Mat& image) {
 void DataCollector::addLostObject(const TrackedObject& object) {
     if (!enabled) return;
 
-    Logger::getInstance()->info("Object {} lost. Saving to database. Trajectory size: {}", object.id, object.trajectory.size());
+    LOG_INFO("Object {} lost. Saving to database. Trajectory size: {}", object.id, object.trajectory.size());
 
     try {
         auto collection = db[collectionName + "_data"];
@@ -274,6 +274,6 @@ void DataCollector::addLostObject(const TrackedObject& object) {
         }
 
     } catch (const mongocxx::exception& e) {
-        Logger::getInstance()->error("Failed to save lost object {} to MongoDB: {}", object.id, e.what());
+        LOG_ERROR("Failed to save lost object {} to MongoDB: {}", object.id, e.what());
     }
 } 
