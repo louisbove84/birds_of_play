@@ -138,6 +138,7 @@ private:
     // MOTION DETECTION METHODS
     // ===============================
     bool backgroundSubtraction;
+    std::string backgroundSubtractionMethod;  // "none", "MOG2", "PBAS"
     std::string opticalFlowMode;  // "none", "farneback", "lucas-kanade"
     double motionHistoryDuration;  // Seconds (0 = disabled)
     
@@ -194,7 +195,15 @@ private:
     int backgroundHistory;
     double backgroundThreshold;
     bool backgroundDetectShadows;
-    cv::Ptr<cv::BackgroundSubtractorMOG2> bgSubtractor;
+    
+    // Background Subtraction (PBAS)
+    int pbasHistory;
+    double pbasThreshold;
+    double pbasLearningRate;
+    bool pbasDetectShadows;
+    
+    // Background subtractor (can be MOG2 or PBAS)
+    cv::Ptr<cv::BackgroundSubtractor> bgSubtractor;
     
     // Edge Detection (Canny)
     int cannyLowThreshold;

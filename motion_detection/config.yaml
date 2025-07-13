@@ -9,7 +9,7 @@ processing_mode: "grayscale"        # Options: "grayscale", "hsv", "rgb", "ycrcb
 # ===============================
 # IMAGE PREPROCESSING
 # ===============================
-contrast_enhancement: true          # Apply CLAHE for better contrast
+contrast_enhancement: true          # Apply CLAHE (make pixels more uniformly distributed)
 blur_type: "gaussian"               # Options: "none", "gaussian", "median", "bilateral"
 # Apply blur and contrast enhancement immediately after color conversion
 # If blur_type != "none", apply the specified smoothing filter
@@ -18,7 +18,8 @@ blur_type: "gaussian"               # Options: "none", "gaussian", "median", "bi
 # ===============================
 # MOTION DETECTION METHODS
 # ===============================
-background_subtraction: true        # Use cv::BackgroundSubtractorMOG2
+background_subtraction: true        # Enable background subtraction
+background_subtraction_method: "PBAS"  # Options: "none", "MOG2", "PBAS" (uses KNN internally)
 optical_flow_mode: "none"           # Options: "none", "farneback", "lucas-kanade"
 motion_history_duration: 0          # Seconds (0 = disabled)
 # Use background subtraction to produce a binary mask before thresholding
@@ -92,6 +93,12 @@ bilateral_sigma_space: 75           # Bilateral filter sigma space
 background_history: 300             # Background history length
 background_threshold: 30            # Background subtraction threshold (increased from 20)
 background_detect_shadows: false    # Detect shadows
+
+# Background Subtraction (PBAS)
+pbas_history: 500                   # PBAS history length
+pbas_threshold: 16.0                # PBAS threshold
+pbas_learning_rate: 0.01            # PBAS learning rate
+pbas_detect_shadows: true           # PBAS detect shadows
 
 # Edge Detection (Canny)
 canny_low_threshold: 50             # Canny low threshold

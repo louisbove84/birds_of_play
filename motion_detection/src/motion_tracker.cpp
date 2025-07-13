@@ -33,6 +33,7 @@ MotionTracker::MotionTracker(const std::string& configPath)
       // MOTION DETECTION METHODS
       // ===============================
       backgroundSubtraction(true),
+      backgroundSubtractionMethod("MOG2"),
       opticalFlowMode("none"),
       motionHistoryDuration(0.0),
       
@@ -89,6 +90,12 @@ MotionTracker::MotionTracker(const std::string& configPath)
       backgroundHistory(500),
       backgroundThreshold(16.0),
       backgroundDetectShadows(true),
+      
+      // Background Subtraction (PBAS)
+      pbasHistory(500),
+      pbasThreshold(16.0),
+      pbasLearningRate(0.01),
+      pbasDetectShadows(true),
       
       // Edge Detection (Canny)
       cannyLowThreshold(50),
@@ -179,9 +186,16 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         
         // Background Subtraction parameters
         if (config["enable_background_subtraction"]) backgroundSubtraction = config["enable_background_subtraction"].as<bool>();
+        if (config["background_subtraction_method"]) backgroundSubtractionMethod = config["background_subtraction_method"].as<std::string>();
         if (config["background_history"]) backgroundHistory = config["background_history"].as<int>();
         if (config["background_threshold"]) backgroundThreshold = config["background_threshold"].as<double>();
         if (config["background_detect_shadows"]) backgroundDetectShadows = config["background_detect_shadows"].as<bool>();
+        
+        // PBAS parameters
+        if (config["pbas_history"]) pbasHistory = config["pbas_history"].as<int>();
+        if (config["pbas_threshold"]) pbasThreshold = config["pbas_threshold"].as<double>();
+        if (config["pbas_learning_rate"]) pbasLearningRate = config["pbas_learning_rate"].as<double>();
+        if (config["pbas_detect_shadows"]) pbasDetectShadows = config["pbas_detect_shadows"].as<bool>();
         
         // Convex Hull parameters
         if (config["enable_convex_hull"]) convexHull = config["enable_convex_hull"].as<bool>();
@@ -373,7 +387,8 @@ cv::Mat MotionTracker::createSplitScreenVisualization(const cv::Mat& originalFra
     }
     // Add background subtraction if enabled
     if (backgroundSubtraction && !bgSubtractor.empty()) {
-        viewNames.push_back("BG Subtract");
+        std::string bgMethodName = (backgroundSubtractionMethod == "PBAS") ? "KNN" : "MOG2";
+        viewNames.push_back("BG " + bgMethodName);
         cv::Mat bgMask;
         bgSubtractor->apply(processedFrame, bgMask);
         cv::Mat bgColor;
@@ -578,6 +593,11 @@ cv::Mat MotionTracker::drawMotionOverlays(const cv::Mat& frame) {
     
     // Add status information
     std::string statusText = "Objects: " + std::to_string(trackedObjects.size());
+    if (backgroundSubtraction && backgroundSubtractionMethod != "none") {
+        statusText += " | BG: " + backgroundSubtractionMethod;
+    } else {
+        statusText += " | BG: OFF";
+    }
     cv::putText(result, statusText, cv::Point(10, 30), 
                 cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
     
@@ -586,12 +606,31 @@ cv::Mat MotionTracker::drawMotionOverlays(const cv::Mat& frame) {
 
 void MotionTracker::initializeBackgroundSubtractor() {
     if (backgroundSubtraction) {
-        bgSubtractor = cv::createBackgroundSubtractorMOG2(
-            backgroundHistory, 
-            backgroundThreshold, 
-            backgroundDetectShadows
-        );
-        LOG_INFO("Using Background Subtraction (MOG2)");
+        if (backgroundSubtractionMethod == "MOG2") {
+            bgSubtractor = cv::createBackgroundSubtractorMOG2(
+                backgroundHistory, 
+                backgroundThreshold, 
+                backgroundDetectShadows
+            );
+            LOG_INFO("Using Background Subtraction (MOG2)");
+        } else if (backgroundSubtractionMethod == "PBAS") {
+            // Use KNN as a good alternative to PBAS (both are adaptive methods)
+            bgSubtractor = cv::createBackgroundSubtractorKNN(
+                pbasHistory,
+                pbasThreshold,
+                pbasDetectShadows
+            );
+            LOG_INFO("Using Background Subtraction (KNN) as PBAS alternative");
+        } else if (backgroundSubtractionMethod == "none") {
+            LOG_INFO("Background subtraction disabled");
+        } else {
+            LOG_WARN("Unknown background subtraction method: {}. Using MOG2 as fallback.", backgroundSubtractionMethod);
+            bgSubtractor = cv::createBackgroundSubtractorMOG2(
+                backgroundHistory, 
+                backgroundThreshold, 
+                backgroundDetectShadows
+            );
+        }
     }
 }
 
