@@ -9,8 +9,8 @@
 #include <bsoncxx/builder/basic/kvp.hpp>      // bsoncxx::builder::basic::kvp
 #include <bsoncxx/builder/basic/array.hpp>    // bsoncxx::builder::basic::array
 #include <bsoncxx/types.hpp>            // bsoncxx::types::b_date, bsoncxx::types::b_binary
-#include <mongocxx/exception.hpp>       // mongocxx::exception
-#include <mongocxx/operation_exception.hpp>   // mongocxx::operation_exception
+#include <mongocxx/v_noabi/mongocxx/exception/exception.hpp>       // mongocxx::exception
+#include <mongocxx/v_noabi/mongocxx/exception/operation_exception.hpp>   // mongocxx::operation_exception
 
 using bsoncxx::builder::basic::document;
 using bsoncxx::builder::basic::array;

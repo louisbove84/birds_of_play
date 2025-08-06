@@ -7,13 +7,15 @@
 #include <filesystem>                   // std::filesystem
 #include <chrono>                       // std::chrono::system_clock
 #include <uuid/uuid.h>                  // uuid_t, uuid_generate, uuid_unparse_lower
-#include <bsoncxx/builder/basic/document.hpp>  // bsoncxx::builder::basic::document
-#include <bsoncxx/types.hpp>            // bsoncxx::types::b_date, bsoncxx::types::b_binary
-#include <mongocxx/client.hpp>          // mongocxx::client
-#include <mongocxx/instance.hpp>        // mongocxx::instance
-#include <mongocxx/uri.hpp>             // mongocxx::uri
-#include <mongocxx/database.hpp>        // mongocxx::database
-#include <mongocxx/collection.hpp>      // mongocxx::collection
+#include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
+#include "motion_tracker.hpp"           // TrackedObject struct
+#include <bsoncxx/v_noabi/bsoncxx/builder/basic/document.hpp>  // bsoncxx::builder::basic::document
+#include <bsoncxx/v_noabi/bsoncxx/types.hpp>            // bsoncxx::types::b_date, bsoncxx::types::b_binary
+#include <mongocxx/v_noabi/mongocxx/client.hpp>          // mongocxx::client
+#include <mongocxx/v_noabi/mongocxx/instance.hpp>        // mongocxx::instance
+#include <mongocxx/v_noabi/mongocxx/uri.hpp>             // mongocxx::uri
+#include <mongocxx/v_noabi/mongocxx/database.hpp>        // mongocxx::database
+#include <mongocxx/v_noabi/mongocxx/collection.hpp>      // mongocxx::collection
 
 // Forward-declare TrackedObject to break the circular dependency
 struct TrackedObject;

@@ -135,7 +135,49 @@ birds_of_play/
 
 ---
 
-## 🏗️ Architecture Overview
+🏗️ Architecture Overview for Bird Tracking App
+
+1. Motion Detection (C++):
+
+- Apply heuristic-based frame processing (background subtraction, thresholding, morphological operations) using OpenCV to detect moving regions.
+- Generate regions of interest (ROIs) as std::vector<cv::Rect> via contour detection (cv::findContours), minimizing false negatives.
+- Crop ROIs from the frame (cv::Mat) for efficient transfer to Python.
+
+
+2. Object Detection with YOLOv11 (Python):
+
+- Pass cropped ROIs to Python via PyBind11 or sockets.
+- Run YOLOv11 on each ROI to detect and classify objects (e.g., "bird," "drone") with confidence scores, using a low threshold (e.g., 0.3) to reduce false negatives.
+- Adjust detected bounding boxes to original frame coordinates and return to C++ as boxes, labels, and confidences.
+
+
+Object Tracking (C++):
+
+- Enhance TrackedObject with a Kalman filter (cv::KalmanFilter) for position/velocity prediction.
+- Split detections into high-confidence (e.g., conf > 0.5) and low-confidence (e.g., 0.1 < conf ≤ 0.5).
+- Match detections to tracks using IoU-based similarity and the Hungarian algorithm:
+  - First stage: Match high-confidence detections to predicted track positions.
+  - Second stage: Match low-confidence detections to unmatched tracks.
+- Update matched tracks with new boxes, labels, confidences, and trajectories.
+- Create new tracks for unmatched high-confidence detections.
+- Remove stale tracks (e.g., after 30 frames without detection or confidence < 0.5).
+
+
+Data Storage (C++):
+
+- Store all detected tracks (TrackedObject with ID, box, label, confidence, trajectory) and cropped ROI images in a database (e.g., SQLite) for later identification.
+- Include metadata (e.g., timestamp, frame index) for traceability.
+
+
+Classification and Refinement (C++):
+
+- Group tracks by similarity using unsupervised clustering (e.g., k-means on trajectory features or appearance embeddings) to identify bird/drone types.
+- Allow user verification/rejection of clusters via a GUI, updating the database with corrected labels.
+- Periodically train a lightweight supervised model (e.g., SVM, MobileNet) on user-verified data.
+- Compare the trained model’s performance with open-source bird/drone classifiers (e.g., on CUB-200, VisDrone) to evaluate feasibility for edge deployment.
+
+
+
 
 ```mermaid
 graph TB

@@ -82,6 +82,8 @@ int main(int argc, char** argv) {
             collector.handleObjectLost(lostId);
         }
 
+        // NEED TO PASS TRACKED REGOIN TO YOLO11
+
         // Update data collection for each tracked object
         if (result.hasMotion) {
             for (const auto& obj : result.trackedObjects) { 

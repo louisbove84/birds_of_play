@@ -106,6 +106,14 @@ public:
     // Getters for internal state
     cv::VideoCapture& getCap() { return cap; }
 
+    // Frame processing methods (made public for testing)
+    cv::Mat preprocessFrame(const cv::Mat& frame);
+    cv::Mat detectMotion(const cv::Mat& processedFrame, cv::Mat& frameDiff, cv::Mat& thresh);
+    cv::Mat applyMorphologicalOps(const cv::Mat& thresh);
+    std::vector<cv::Rect> extractContours(const cv::Mat& processed);
+    void logTrackingResults();
+    void setPrevFrame(const cv::Mat& frame);
+
 private:
     void loadConfig(const std::string& configPath);
     TrackedObject* findNearestObject(const cv::Rect& newBounds);
@@ -137,7 +145,6 @@ private:
     std::deque<std::vector<cv::Rect>> previousBounds;
 
     // Configurable parameters (all loaded from config.yaml)
-    double thresholdValue;
     int minContourArea;
     double maxTrackingDistance;
     int maxThreshold;
@@ -167,9 +174,8 @@ private:
     double motionHistoryDuration;  // Seconds (0 = disabled)
     
     // ===============================
-    // THRESHOLDING
+    // THRESHOLDING (Otsu only)
     // ===============================
-    std::string thresholdType;  // "binary", "adaptive", "otsu"
     
     // ===============================
     // MORPHOLOGICAL OPERATIONS
@@ -241,9 +247,7 @@ private:
     int cannyLowThreshold;
     int cannyHighThreshold;
     
-    // Adaptive Thresholding
-    int adaptiveBlockSize;
-    int adaptiveC;
+
     
     // HSV Color Filtering
     cv::Scalar hsvLower;
@@ -261,6 +265,8 @@ private:
     
     // Helper method for position smoothing
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
+
+
 
     std::vector<int> lostObjectIds;
     std::string generateUUID();
