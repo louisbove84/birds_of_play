@@ -2,19 +2,22 @@
 #define MOTION_TRACKER_HPP
 
 // System includes
-#include <string>
-#include <vector>
-#include <deque>
-#include <chrono>
+#include <string>                       // std::string
+#include <vector>                       // std::vector
+#include <deque>                        // std::deque
+#include <chrono>                       // std::chrono::system_clock
 
 // Third-party includes
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/videoio.hpp>
-#include <opencv2/bgsegm.hpp>
-#include <opencv2/video.hpp>
-#include <yaml-cpp/yaml.h>
+#include <opencv2/core.hpp>             // cv::Point, cv::Rect, cv::Scalar, cv::Mat
+#include <opencv2/imgproc.hpp>          // cv::resize, cv::threshold, cv::findContours
+#include <opencv2/highgui.hpp>          // cv::imshow, cv::waitKey, cv::destroyAllWindows
+#include <opencv2/videoio.hpp>          // cv::VideoCapture, cv::VideoWriter
+#include <opencv2/bgsegm.hpp>           // cv::createBackgroundSubtractorMOG2
+#include <opencv2/video.hpp>            // cv::BackgroundSubtractor
+#include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
+
+// Local includes
+#include "object_classifier.hpp"        // ObjectClassifier class, ClassificationResult struct
 
 // Maximum number of points to store in trajectory (moved to config.yaml)
 // const size_t MAX_TRAJECTORY_POINTS = 30;
@@ -29,6 +32,11 @@ struct TrackedObject {
     std::chrono::system_clock::time_point firstSeen;
     std::string uuid;
     cv::Mat initialFrame;
+    
+    // Classification results
+    std::string classLabel;
+    float classConfidence;
+    int classId;
 
     cv::Point getCenter() const {
         return cv::Point(currentBounds.x + currentBounds.width / 2,
@@ -37,7 +45,8 @@ struct TrackedObject {
 
     TrackedObject(int obj_id, const cv::Rect& bounds, std::string new_uuid) : 
         id(obj_id), currentBounds(bounds), confidence(1.0), 
-        framesWithoutDetection(0), firstSeen(std::chrono::system_clock::now()), uuid(new_uuid) {
+        framesWithoutDetection(0), firstSeen(std::chrono::system_clock::now()), uuid(new_uuid),
+        classLabel("unknown"), classConfidence(0.0f), classId(-1) {
         smoothedCenter = getCenter();
         trajectory.push_back(smoothedCenter);
     }
@@ -100,7 +109,19 @@ public:
 private:
     void loadConfig(const std::string& configPath);
     TrackedObject* findNearestObject(const cv::Rect& newBounds);
-    void updateTrajectories(std::vector<cv::Rect>& newBounds);
+    void updateTrajectories(std::vector<cv::Rect>& newBounds, const cv::Mat& currentFrame);
+
+    // Spatial merging and motion clustering methods
+    std::vector<cv::Rect> mergeSpatialOverlaps(const std::vector<cv::Rect>& bounds);
+    std::vector<cv::Rect> clusterByMotion(const std::vector<cv::Rect>& bounds);
+    double calculateOverlapRatio(const cv::Rect& rect1, const cv::Rect& rect2);
+    double calculateDistance(const cv::Rect& rect1, const cv::Rect& rect2);
+    cv::Point calculateMotionVector(const cv::Rect& current, const cv::Rect& previous);
+    double calculateCosineSimilarity(const cv::Point& vec1, const cv::Point& vec2);
+    cv::Rect findClosestPreviousRect(const cv::Rect& current, const std::vector<cv::Rect>& previous);
+    
+    // Object classification method
+    ClassificationResult classifyDetectedObject(const cv::Mat& frame, const cv::Rect& bounds);
 
     cv::VideoCapture cap;
     cv::Mat prevFrame;
@@ -111,6 +132,9 @@ private:
     int nextObjectId;
     size_t maxTrajectoryPoints;  // Moved from const to configurable
     size_t minTrajectoryLength;  // Minimum trajectory points required to record
+
+    // Motion history for clustering
+    std::deque<std::vector<cv::Rect>> previousBounds;
 
     // Configurable parameters (all loaded from config.yaml)
     double thresholdValue;
@@ -168,13 +192,21 @@ private:
     double contourEpsilonFactor;
     
     // ===============================
-    // VISUALIZATION & OUTPUT
+    // OBJECT TRACKING
     // ===============================
     bool splitScreen;
     bool drawContours;
     bool dataCollection;
     bool saveOnMotion;
     std::string splitScreenWindowName;
+    
+    // Spatial Merging and Motion Clustering
+    bool spatialMerging;
+    double spatialMergeDistance;
+    double spatialMergeOverlapThreshold;
+    bool motionClustering;
+    double motionSimilarityThreshold;
+    int motionHistoryFrames;
     
     // ===============================
     // ADVANCED PARAMETERS
@@ -220,6 +252,12 @@ private:
     // Motion History (for visualization)
     cv::Mat motionHistory;
     double motionHistoryFps;
+    
+    // Object Classifier
+    ObjectClassifier classifier;
+    bool enableClassification;
+    std::string modelPath;
+    std::string labelsPath;
     
     // Helper method for position smoothing
     cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);

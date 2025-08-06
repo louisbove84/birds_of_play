@@ -1,9 +1,9 @@
-#include "motion_tracker.hpp"
-#include "logger.hpp"
-#include <iostream>
-#include <cmath>
-#include <random>
-#include <sstream>
+#include "motion_tracker.hpp"           // MotionTracker class, TrackedObject struct
+#include "logger.hpp"                   // LOG_INFO, LOG_ERROR, LOG_DEBUG macros
+#include <iostream>                     // std::cout, std::cerr
+#include <cmath>                        // std::sqrt, std::abs
+#include <random>                       // std::random_device, std::mt19937
+#include <sstream>                      // std::stringstream
 
 MotionTracker::MotionTracker(const std::string& configPath) 
     : isRunning(false),
@@ -71,6 +71,14 @@ MotionTracker::MotionTracker(const std::string& configPath)
       saveOnMotion(true),
       splitScreenWindowName("Motion Detection - Split Screen View"),
       
+      // Spatial Merging and Motion Clustering
+      spatialMerging(true),
+      spatialMergeDistance(50.0),
+      spatialMergeOverlapThreshold(0.3),
+      motionClustering(true),
+      motionSimilarityThreshold(0.7),
+      motionHistoryFrames(5),
+      
       // ===============================
       // ADVANCED PARAMETERS
       // ===============================
@@ -110,7 +118,12 @@ MotionTracker::MotionTracker(const std::string& configPath)
       hsvUpper(20, 150, 255),
       
       // Motion History
-      motionHistoryFps(30.0) {
+      motionHistoryFps(30.0),
+      
+      // Object Classification
+      enableClassification(true),
+      modelPath("models/squeezenet.onnx"),
+      labelsPath("models/imagenet_labels.txt") {
     loadConfig(configPath);
 }
 
@@ -133,6 +146,17 @@ bool MotionTracker::initialize(int deviceIndex) {
         LOG_CRITICAL("Error: Could not open video device index {}", deviceIndex);
         return false;
     }
+    
+    // Initialize object classifier if enabled
+    if (enableClassification) {
+        if (!classifier.initialize(modelPath, labelsPath)) {
+            LOG_WARN("Failed to initialize object classifier. Classification will be disabled.");
+            enableClassification = false;
+        } else {
+            LOG_INFO("Object classifier initialized successfully");
+        }
+    }
+    
     isRunning = true;
     return true;
 }
@@ -241,11 +265,27 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["enable_data_collection"]) dataCollection = config["enable_data_collection"].as<bool>();
         if (config["enable_save_on_motion"]) saveOnMotion = config["enable_save_on_motion"].as<bool>();
         
+        // Spatial Merging and Motion Clustering parameters
+        if (config["spatial_merging"]) spatialMerging = config["spatial_merging"].as<bool>();
+        if (config["spatial_merge_distance"]) spatialMergeDistance = config["spatial_merge_distance"].as<double>();
+        if (config["spatial_merge_overlap_threshold"]) spatialMergeOverlapThreshold = config["spatial_merge_overlap_threshold"].as<double>();
+        if (config["motion_clustering"]) motionClustering = config["motion_clustering"].as<bool>();
+        if (config["motion_similarity_threshold"]) motionSimilarityThreshold = config["motion_similarity_threshold"].as<double>();
+        if (config["motion_history_frames"]) motionHistoryFrames = config["motion_history_frames"].as<int>();
+        
+        // Object Classification parameters
+        if (config["enable_classification"]) enableClassification = config["enable_classification"].as<bool>();
+        if (config["model_path"]) modelPath = config["model_path"].as<std::string>();
+        if (config["labels_path"]) labelsPath = config["labels_path"].as<std::string>();
+        
         // Debug: Print loaded config values
         LOG_INFO("=== CONFIG LOADED ===");
         LOG_INFO("min_trajectory_length: {}", minTrajectoryLength);
         LOG_INFO("min_contour_area: {}", minContourArea);
         LOG_INFO("threshold_value: {}", thresholdValue);
+        LOG_INFO("spatial_merging: {}", spatialMerging);
+        LOG_INFO("motion_clustering: {}", motionClustering);
+        LOG_INFO("enable_classification: {}", enableClassification);
         LOG_INFO("=====================");
     } catch (const YAML::Exception& e) {
         LOG_CRITICAL("Warning: Could not load config file: {}. Error: {}", configPath, e.what());
@@ -276,7 +316,7 @@ cv::Point MotionTracker::smoothPosition(const cv::Point& newPos, const cv::Point
     );
 }
 
-void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
+void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds, const cv::Mat& currentFrame) {
     // Mark all current objects for potential removal
     std::vector<bool> objectMatched(trackedObjects.size(), false);
     
@@ -324,6 +364,14 @@ void MotionTracker::updateTrajectories(std::vector<cv::Rect>& newBounds) {
             // Create new tracked object
             std::string new_uuid = generateUUID();
             trackedObjects.emplace_back(nextObjectId++, bounds, new_uuid);
+            
+            // Classify the new object
+            if (enableClassification) {
+                ClassificationResult classification = classifyDetectedObject(currentFrame, bounds);
+                trackedObjects.back().classLabel = classification.label;
+                trackedObjects.back().classConfidence = classification.confidence;
+                trackedObjects.back().classId = classification.class_id;
+            }
         }
     }
     
@@ -834,6 +882,23 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         (void)contoursPassed; // Suppress unused variable warning
     }
     
+    // Apply spatial merging and motion clustering
+    if (spatialMerging && !newBounds.empty()) {
+        newBounds = mergeSpatialOverlaps(newBounds);
+    }
+    
+    if (motionClustering && !newBounds.empty()) {
+        newBounds = clusterByMotion(newBounds);
+    }
+    
+    // Update motion history for clustering
+    if (motionClustering) {
+        previousBounds.push_back(newBounds);
+        if (previousBounds.size() > static_cast<size_t>(motionHistoryFrames)) {
+            previousBounds.pop_front();
+        }
+    }
+    
     // Create and display split-screen visualization if enabled
     if (splitScreen) {
         cv::Mat visualization = createSplitScreenVisualization(frame, processedFrame, frameDiff, thresh, processed);
@@ -841,7 +906,7 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     }
     
     // Update object trajectories
-    updateTrajectories(newBounds);
+    updateTrajectories(newBounds, frame);
     result.trackedObjects = trackedObjects;
     
     // Debug output - only show objects that meet minimum trajectory length
@@ -909,4 +974,199 @@ std::string MotionTracker::generateUUID() {
     ss << "-";
     for (i = 0; i < 12; i++) ss << dis(gen);
     return ss.str();
+}
+
+// Spatial Merging and Motion Clustering Implementation
+
+std::vector<cv::Rect> MotionTracker::mergeSpatialOverlaps(const std::vector<cv::Rect>& bounds) {
+    if (bounds.empty()) return bounds;
+    
+    std::vector<cv::Rect> mergedBounds = bounds;
+    bool merged = true;
+    
+    while (merged) {
+        merged = false;
+        std::vector<cv::Rect> newMergedBounds;
+        std::vector<bool> used(mergedBounds.size(), false);
+        
+        for (size_t i = 0; i < mergedBounds.size(); ++i) {
+            if (used[i]) continue;
+            
+            cv::Rect current = mergedBounds[i];
+            used[i] = true;
+            
+            for (size_t j = i + 1; j < mergedBounds.size(); ++j) {
+                if (used[j]) continue;
+                
+                cv::Rect other = mergedBounds[j];
+                
+                // Check if boxes should be merged based on distance or overlap
+                double distance = calculateDistance(current, other);
+                double overlap = calculateOverlapRatio(current, other);
+                
+                if (distance <= spatialMergeDistance || overlap >= spatialMergeOverlapThreshold) {
+                    // Merge the rectangles
+                    int x1 = std::min(current.x, other.x);
+                    int y1 = std::min(current.y, other.y);
+                    int x2 = std::max(current.x + current.width, other.x + other.width);
+                    int y2 = std::max(current.y + current.height, other.y + other.height);
+                    
+                    current = cv::Rect(x1, y1, x2 - x1, y2 - y1);
+                    used[j] = true;
+                    merged = true;
+                    
+                    LOG_DEBUG("Merged bounding boxes: distance={}, overlap={}", distance, overlap);
+                }
+            }
+            
+            newMergedBounds.push_back(current);
+        }
+        
+        mergedBounds = newMergedBounds;
+    }
+    
+    LOG_DEBUG("Spatial merging: {} -> {} bounding boxes", bounds.size(), mergedBounds.size());
+    return mergedBounds;
+}
+
+std::vector<cv::Rect> MotionTracker::clusterByMotion(const std::vector<cv::Rect>& bounds) {
+    if (bounds.empty() || previousBounds.empty()) return bounds;
+    
+    // Get the most recent previous bounds
+    const std::vector<cv::Rect>& prevBounds = previousBounds.back();
+    if (prevBounds.empty()) return bounds;
+    
+    std::vector<cv::Rect> clusteredBounds = bounds;
+    std::vector<bool> used(bounds.size(), false);
+    std::vector<cv::Rect> finalBounds;
+    
+    for (size_t i = 0; i < bounds.size(); ++i) {
+        if (used[i]) continue;
+        
+        std::vector<size_t> cluster = {i};
+        used[i] = true;
+        
+        // Find the closest previous bounding box for motion calculation
+        cv::Rect closestPrev = findClosestPreviousRect(bounds[i], prevBounds);
+        cv::Point currentMotion = calculateMotionVector(bounds[i], closestPrev);
+        
+        for (size_t j = i + 1; j < bounds.size(); ++j) {
+            if (used[j]) continue;
+            
+            cv::Rect closestPrevJ = findClosestPreviousRect(bounds[j], prevBounds);
+            cv::Point otherMotion = calculateMotionVector(bounds[j], closestPrevJ);
+            double similarity = calculateCosineSimilarity(currentMotion, otherMotion);
+            
+            if (similarity >= motionSimilarityThreshold) {
+                cluster.push_back(j);
+                used[j] = true;
+                LOG_DEBUG("Motion clustering: similarity={}", similarity);
+            }
+        }
+        
+        // Merge clustered bounding boxes
+        if (cluster.size() > 1) {
+            cv::Rect mergedRect = bounds[cluster[0]];
+            for (size_t k = 1; k < cluster.size(); ++k) {
+                cv::Rect other = bounds[cluster[k]];
+                int x1 = std::min(mergedRect.x, other.x);
+                int y1 = std::min(mergedRect.y, other.y);
+                int x2 = std::max(mergedRect.x + mergedRect.width, other.x + other.width);
+                int y2 = std::max(mergedRect.y + mergedRect.height, other.y + other.height);
+                mergedRect = cv::Rect(x1, y1, x2 - x1, y2 - y1);
+            }
+            finalBounds.push_back(mergedRect);
+        } else {
+            finalBounds.push_back(bounds[cluster[0]]);
+        }
+    }
+    
+    LOG_DEBUG("Motion clustering: {} -> {} bounding boxes", bounds.size(), finalBounds.size());
+    return finalBounds;
+}
+
+double MotionTracker::calculateOverlapRatio(const cv::Rect& rect1, const cv::Rect& rect2) {
+    // Calculate intersection
+    int x1 = std::max(rect1.x, rect2.x);
+    int y1 = std::max(rect1.y, rect2.y);
+    int x2 = std::min(rect1.x + rect1.width, rect2.x + rect2.width);
+    int y2 = std::min(rect1.y + rect1.height, rect2.y + rect2.height);
+    
+    if (x2 <= x1 || y2 <= y1) return 0.0; // No overlap
+    
+    int intersectionArea = (x2 - x1) * (y2 - y1);
+    int unionArea = rect1.width * rect1.height + rect2.width * rect2.height - intersectionArea;
+    
+    return static_cast<double>(intersectionArea) / unionArea;
+}
+
+double MotionTracker::calculateDistance(const cv::Rect& rect1, const cv::Rect& rect2) {
+    cv::Point center1(rect1.x + rect1.width / 2, rect1.y + rect1.height / 2);
+    cv::Point center2(rect2.x + rect2.width / 2, rect2.y + rect2.height / 2);
+    
+    return cv::norm(center1 - center2);
+}
+
+cv::Point MotionTracker::calculateMotionVector(const cv::Rect& current, const cv::Rect& previous) {
+    cv::Point currentCenter(current.x + current.width / 2, current.y + current.height / 2);
+    cv::Point previousCenter(previous.x + previous.width / 2, previous.y + previous.height / 2);
+    
+    return currentCenter - previousCenter;
+}
+
+double MotionTracker::calculateCosineSimilarity(const cv::Point& vec1, const cv::Point& vec2) {
+    double dotProduct = vec1.x * vec2.x + vec1.y * vec2.y;
+    double magnitude1 = std::sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+    double magnitude2 = std::sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+    
+    if (magnitude1 == 0 || magnitude2 == 0) return 0.0;
+    
+    return dotProduct / (magnitude1 * magnitude2);
+}
+
+cv::Rect MotionTracker::findClosestPreviousRect(const cv::Rect& current, const std::vector<cv::Rect>& previous) {
+    if (previous.empty()) return current; // Return current if no previous bounds
+    
+    cv::Rect closest = previous[0];
+    double minDistance = calculateDistance(current, closest);
+    
+    for (const auto& prev : previous) {
+        double distance = calculateDistance(current, prev);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closest = prev;
+        }
+    }
+    
+    return closest;
+}
+
+ClassificationResult MotionTracker::classifyDetectedObject(const cv::Mat& frame, const cv::Rect& bounds) {
+    if (!enableClassification || !classifier.isModelLoaded()) {
+        return ClassificationResult("unknown", 0.0f, -1);
+    }
+    
+    try {
+        // Ensure bounds are within frame
+        cv::Rect safeBounds = bounds & cv::Rect(0, 0, frame.cols, frame.rows);
+        if (safeBounds.width <= 0 || safeBounds.height <= 0) {
+            return ClassificationResult("unknown", 0.0f, -1);
+        }
+        
+        // Crop the object region
+        cv::Mat croppedImage = frame(safeBounds);
+        
+        // Classify the cropped image
+        ClassificationResult result = classifier.classifyObject(croppedImage);
+        
+        LOG_DEBUG("Object classification: {} (confidence: {:.2f})", result.label, result.confidence);
+        return result;
+        
+    } catch (const cv::Exception& e) {
+        LOG_ERROR("OpenCV error during object classification: {}", e.what());
+    } catch (const std::exception& e) {
+        LOG_ERROR("Error during object classification: {}", e.what());
+    }
+    
+    return ClassificationResult("unknown", 0.0f, -1);
 } 

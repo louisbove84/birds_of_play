@@ -1,11 +1,12 @@
-#include "motion_tracker.hpp"
-#include "data_collector.hpp"
-#include "logger.hpp"
-#include <opencv2/opencv.hpp>
-#include <iostream>
-#include <filesystem>
-#include <string>
-namespace fs = std::filesystem;
+#include "motion_tracker.hpp"           // MotionTracker class, TrackedObject struct
+#include "data_collector.hpp"           // DataCollector class, MongoDB integration
+#include "logger.hpp"                   // LOG_INFO, LOG_ERROR, LOG_DEBUG macros
+#include <opencv2/opencv.hpp>           // cv::Mat, cv::VideoCapture, cv::imshow, etc.
+#include <iostream>                     // std::cout, std::cerr, std::endl
+#include <filesystem>                   // std::filesystem (fs::path, fs::create_directories)
+#include <string>                       // std::string
+#include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
+namespace fs = std::filesystem;         // Shorthand for std::filesystem
 
 // Colors for different tracked objects (cycled through based on object ID)
 const std::vector<cv::Scalar> COLORS = {
@@ -90,7 +91,10 @@ int main(int argc, char** argv) {
                         frame,
                         obj.currentBounds,
                         obj.trajectory.back(),  // Current position is the last point in trajectory
-                        obj.confidence
+                        obj.confidence,
+                        obj.classLabel,
+                        obj.classConfidence,
+                        obj.classId
                     );
                 }
             }

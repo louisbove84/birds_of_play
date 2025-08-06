@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 100
+target-version = ['py38']
+
+[tool.coverage.run]
+source = ["src/python"]
+omit = ["*/tests/*", "*/test_*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+python_files = "test_*.py"
+addopts = "--cov=src/python --cov-report=html --cov-report=term-missing"

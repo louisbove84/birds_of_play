@@ -1,0 +1,142 @@
+# Motion Detection Configuration
+
+# ===============================
+# INPUT COLOR PROCESSING
+# ===============================
+processing_mode: "grayscale"        # Options: "grayscale", "hsv", "rgb", "ycrcb"
+# Apply this as the first step: convert input image to chosen color space using cvtColor()
+
+# ===============================
+# IMAGE PREPROCESSING
+# ===============================
+contrast_enhancement: true          # Apply CLAHE (make pixels more uniformly distributed)
+blur_type: "gaussian"               # Options: "none", "gaussian", "median", "bilateral"
+# Apply blur and contrast enhancement immediately after color conversion
+# If blur_type != "none", apply the specified smoothing filter
+# If contrast_enhancement == true && processing_mode == "grayscale", apply CLAHE
+
+# ===============================
+# MOTION DETECTION METHODS
+# ===============================
+background_subtraction: true        # Enable background subtraction
+background_subtraction_method: "MOG2"  # Options: "none", "MOG2", "PBAS" (uses KNN internally)
+optical_flow_mode: "none"           # Options: "none", "farneback", "lucas-kanade"
+motion_history_duration: 0          # Seconds (0 = disabled)
+# Use background subtraction to produce a binary mask before thresholding
+# If optical_flow_mode != "none", compute flow and use it to guide/augment detection
+# If motion_history_duration > 0, accumulate a motion trail for visualization
+
+# ===============================
+# THRESHOLDING
+# ===============================
+threshold_type: "binary"            # Options: "binary", "adaptive", "otsu"
+# Apply after background subtraction (if enabled), before morphological operations
+
+# ===============================
+# MORPHOLOGICAL OPERATIONS
+# ===============================
+morphology: true                    # Enable all morphology steps
+morph_kernel_size: 5                # Kernel size for all operations
+morph_close: true                   # Fill holes in object (applied first)
+morph_open: true                    # Remove noise blobs (applied second)
+dilation: true                      # Expand object (applied third)
+erosion: false                      # Shrink object (applied last)
+# Apply in this order: close → open → dilation → erosion using same kernel
+
+# ===============================
+# CONTOUR PROCESSING
+# ===============================
+convex_hull: true                   # Wrap contours in convex hull
+contour_approximation: true         # Reduce contour complexity with approxPolyDP()
+contour_filtering: true             # Filter small or invalid contours
+min_contour_area: 300               # Filter by minimum area (increased from 100)
+max_contour_aspect_ratio: 3.0       # Filter by max width/height ratio (decreased from 5.0)
+min_contour_solidity: 0.5           # Solidity = area / convex_hull_area (increased from 0.3)
+# After finding contours: filter by shape, apply convex hull or approximation
+
+# ===============================
+# VISUALIZATION & OUTPUT
+# ===============================
+split_screen: true                  # Show original + processed side-by-side
+draw_contours: true                 # Draw detected object outlines
+data_collection: true               # Enable save or log for detections
+save_on_motion: true                # Only save frames where motion is detected
+# Display occurs at end of frame pipeline, optionally saves annotated images
+
+# ===============================
+# ADVANCED PARAMETERS
+# ===============================
+
+# Motion Detection Core Settings
+threshold_value: 40                 # Threshold for binary thresholding (increased from 25)
+max_threshold: 255                  # Maximum value for binary threshold operation
+max_tracking_distance: 200          # Maximum distance to track moving objects (increased from 150)
+max_trajectory_points: 30           # Maximum trail length for visualization
+min_trajectory_length: 15           # Minimum trajectory points required to record an object (increased from 10)
+
+# Motion Smoothing
+smoothing_factor: 0.7               # Smoothing for more stable tracking
+min_tracking_confidence: 0.6        # Minimum confidence threshold to maintain tracking (increased from 0.3)
+
+# Contrast Enhancement (CLAHE)
+clahe_clip_limit: 3.0               # Clip limit for CLAHE
+clahe_tile_size: 8                  # CLAHE tile size
+
+# Blur Parameters
+gaussian_blur_size: 7               # Gaussian blur kernel size
+median_blur_size: 5                 # Median blur kernel size
+bilateral_d: 15                     # Bilateral filter diameter
+bilateral_sigma_color: 75           # Bilateral filter sigma color
+bilateral_sigma_space: 75           # Bilateral filter sigma space
+
+# Background Subtraction (MOG2)
+background_history: 300             # Background history length
+background_threshold: 30            # Background subtraction threshold (increased from 20)
+background_detect_shadows: false    # Detect shadows
+
+# Background Subtraction (PBAS)
+pbas_history: 500                   # PBAS history length
+pbas_threshold: 16.0                # PBAS threshold
+pbas_learning_rate: 0.01            # PBAS learning rate
+pbas_detect_shadows: true           # PBAS detect shadows
+
+# Edge Detection (Canny)
+canny_low_threshold: 50             # Canny low threshold
+canny_high_threshold: 150           # Canny high threshold
+
+# Adaptive Thresholding
+adaptive_block_size: 11             # Block size for adaptive threshold
+adaptive_c: 2                       # Constant subtracted from mean
+
+# Contour Approximation
+contour_epsilon_factor: 0.03        # Approximation accuracy factor
+
+# HSV Color Filtering
+hsv_lower_h: 0                      # Lower bound for Hue (0-179)
+hsv_lower_s: 30                     # Lower bound for Saturation (0-255)
+hsv_lower_v: 60                     # Lower bound for Value (0-255)
+hsv_upper_h: 20                     # Upper bound for Hue (0-179)
+hsv_upper_s: 150                    # Upper bound for Saturation (0-255)
+hsv_upper_v: 255                    # Upper bound for Value (0-255)
+
+# Visualization
+split_screen_window_name: "Motion Detection - Split Screen View"
+
+# Data Collection
+cleanup_old_data: true              # Delete old data on startup
+image_format: "png"                 # Format for saving cropped images
+
+# MongoDB Configuration
+mongodb_uri: "mongodb://localhost:27017"
+database_name: "birds_of_play"
+collection_prefix: "motion_tracking"
+
+# For development and debugging
+# ===============================
+logging:
+  log_level: "debug"  # Options: "trace", "debug", "info", "warn", "error", "critical", "off"
+  log_to_file: true
+  log_file_path: "birdsofplay.log"
+
+debug:
+  split_screen: true                # Show split-screen debug view 

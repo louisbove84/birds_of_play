@@ -1,13 +1,16 @@
-#include "data_collector.hpp"
-#include "motion_tracker.hpp"
-#include <yaml-cpp/yaml.h>
-#include <iomanip>
-#include <sstream>
-#include <bsoncxx/builder/basic/document.hpp>
-#include <bsoncxx/builder/basic/array.hpp>
-#include <bsoncxx/json.hpp>
-#include <mongocxx/exception/operation_exception.hpp>
-#include "logger.hpp"
+#include "data_collector.hpp"           // DataCollector class, TrackingData struct
+#include "logger.hpp"                   // LOG_INFO, LOG_ERROR, LOG_DEBUG macros
+#include <iostream>                     // std::cout, std::cerr
+#include <iomanip>                      // std::put_time
+#include <sstream>                      // std::stringstream
+#include <chrono>                       // std::chrono::system_clock
+#include <filesystem>                   // std::filesystem
+#include <bsoncxx/builder/basic/document.hpp>  // bsoncxx::builder::basic::document
+#include <bsoncxx/builder/basic/kvp.hpp>      // bsoncxx::builder::basic::kvp
+#include <bsoncxx/builder/basic/array.hpp>    // bsoncxx::builder::basic::array
+#include <bsoncxx/types.hpp>            // bsoncxx::types::b_date, bsoncxx::types::b_binary
+#include <mongocxx/exception.hpp>       // mongocxx::exception
+#include <mongocxx/operation_exception.hpp>   // mongocxx::operation_exception
 
 using bsoncxx::builder::basic::document;
 using bsoncxx::builder::basic::array;
@@ -80,7 +83,8 @@ bool DataCollector::initialize() {
 }
 
 void DataCollector::addTrackingData(int object_id, const cv::Mat& frame, const cv::Rect& bounds,
-                                  const cv::Point& position, double confidence) {
+                                  const cv::Point& position, double confidence,
+                                  const std::string& classLabel, float classConfidence, int classId) {
     if (!enabled || confidence < minTrackingConfidence) return;
     
     auto now = std::chrono::system_clock::now();
@@ -95,6 +99,11 @@ void DataCollector::addTrackingData(int object_id, const cv::Mat& frame, const c
         // Save cropped image
         cv::Mat cropped = frame(bounds).clone();
         data.first_image = cropped;
+        
+        // Store classification data
+        data.classLabel = classLabel;
+        data.classConfidence = classConfidence;
+        data.classId = classId;
         
         trackingData[object_id] = data;
     }
@@ -181,7 +190,12 @@ bsoncxx::document::value DataCollector::createTrackingDocument(const TrackingDat
             kvp("height", data.initial_bounds.height)
         )),
         kvp("confidence", data.confidence),
-        kvp("trajectory", trajectory.view())
+        kvp("trajectory", trajectory.view()),
+        kvp("classification", make_document(
+            kvp("label", data.classLabel),
+            kvp("confidence", data.classConfidence),
+            kvp("class_id", data.classId)
+        ))
     );
     
     return doc;
@@ -248,6 +262,13 @@ void DataCollector::addLostObject(const TrackedObject& object) {
         data_builder.append(bsoncxx::builder::basic::kvp("first_seen", bsoncxx::types::b_date{object.firstSeen}));
         data_builder.append(bsoncxx::builder::basic::kvp("last_seen", bsoncxx::types::b_date{std::chrono::system_clock::now()}));
         data_builder.append(bsoncxx::builder::basic::kvp("confidence", object.confidence));
+        
+        // Add classification data
+        auto classification_doc = bsoncxx::builder::basic::document{};
+        classification_doc.append(bsoncxx::builder::basic::kvp("label", object.classLabel));
+        classification_doc.append(bsoncxx::builder::basic::kvp("confidence", object.classConfidence));
+        classification_doc.append(bsoncxx::builder::basic::kvp("class_id", object.classId));
+        data_builder.append(bsoncxx::builder::basic::kvp("classification", classification_doc));
         
         auto trajectory_array = bsoncxx::builder::basic::array{};
         for (const auto& p : object.trajectory) {

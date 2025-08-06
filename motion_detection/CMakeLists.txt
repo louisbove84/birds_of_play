@@ -40,12 +40,14 @@ find_library(UUID_LIBRARIES uuid)
 set(LIB_SOURCES
     src/motion_tracker.cpp
     src/data_collector.cpp
+    src/object_classifier.cpp
 )
 
 # Add header files
 set(HEADERS
     include/motion_tracker.hpp
     include/data_collector.hpp
+    include/object_classifier.hpp
 )
 
 # Add compiler flags
