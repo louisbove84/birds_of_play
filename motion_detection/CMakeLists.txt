@@ -10,11 +10,23 @@ find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(GTest REQUIRED)
 
+# Find MongoDB packages
+find_package(mongocxx REQUIRED)
+find_package(bsoncxx REQUIRED)
+
 # Set MongoDB paths for CMake based on platform
 if(APPLE)
     list(APPEND CMAKE_PREFIX_PATH 
-        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/mongocxx-4.1.0"
-        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.0/lib/cmake/bsoncxx-4.1.0"
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.1/lib/cmake/mongocxx-4.1.1"
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.1/lib/cmake/bsoncxx-4.1.1"
+        "/opt/homebrew/Cellar/mongo-c-driver/2.1.0/lib/cmake/libmongoc-1.0"
+        "/opt/homebrew/Cellar/mongo-c-driver/2.1.0/lib/cmake/libbson-1.0"
+    )
+    include_directories(
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.1/include/mongocxx/v_noabi"
+        "/opt/homebrew/Cellar/mongo-cxx-driver/4.1.1/include/bsoncxx/v_noabi"
+        "/opt/homebrew/Cellar/mongo-c-driver/2.1.0/include/libmongoc-1.0"
+        "/opt/homebrew/Cellar/mongo-c-driver/2.1.0/include/libbson-1.0"
     )
 elseif(UNIX AND NOT APPLE)
     # Linux paths - we installed to /usr/local
@@ -153,24 +165,55 @@ add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test)
 # Unit Testing
 # ==============================================================================
 if(BUILD_TESTING)
-    # Add the test executable
-    add_executable(BirdsOfPlay_test 
-        tests/motion_tracker_test.cpp
+    # Add motion_tracker_test_2 executable
+    add_executable(motion_tracker_test_2 
+        tests/motion_tracker_test_2.cpp
+        src/motion_tracker.cpp
+        src/data_collector.cpp
+        src/object_classifier.cpp
         src/logger.cpp
     )
 
-    # Link the necessary libraries to the test executable
-    target_link_libraries(BirdsOfPlay_test PRIVATE 
-        GTest::gtest_main 
-        spdlog::spdlog_header_only
+    # Link libraries for motion_tracker_test_2
+    target_link_libraries(motion_tracker_test_2 PRIVATE 
         ${OpenCV_LIBS}
-        mongocxx::mongocxx
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
         yaml-cpp
+        spdlog::spdlog_header_only
     )
 
-    # Add include directories for the test executable
-    target_include_directories(BirdsOfPlay_test PRIVATE
+    # Add include directories for motion_tracker_test_2
+    target_include_directories(motion_tracker_test_2 PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
     )
+
+    # Add diagnostic test executable (kept for statistical analysis)
+    add_executable(diagnostic_test 
+        tests/diagnostic_test.cpp
+        src/logger.cpp
+    )
+
+    # Link the necessary libraries to the diagnostic test executable
+    target_link_libraries(diagnostic_test PRIVATE 
+        ${OpenCV_LIBS}
+        spdlog::spdlog_header_only
+    )
+
+    # Add include directories for the diagnostic test executable
+    target_include_directories(diagnostic_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+    )
+
+    # Copy test files to build directory
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/config.yaml
+                  ${CMAKE_CURRENT_BINARY_DIR}/config.yaml COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image.jpg
+                  ${CMAKE_CURRENT_BINARY_DIR}/test_image.jpg COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image2.jpg
+                  ${CMAKE_CURRENT_BINARY_DIR}/test_image2.jpg COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/motion_mask.png
+                  ${CMAKE_CURRENT_BINARY_DIR}/motion_mask.png COPYONLY)
 endif() 

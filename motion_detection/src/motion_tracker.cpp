@@ -11,7 +11,6 @@ MotionTracker::MotionTracker(const std::string& configPath)
       nextObjectId(0),
       maxTrajectoryPoints(30),
       minTrajectoryLength(10),
-      thresholdValue(25.0),
       minContourArea(500),
       maxTrackingDistance(100.0),
       maxThreshold(255),
@@ -38,9 +37,8 @@ MotionTracker::MotionTracker(const std::string& configPath)
       motionHistoryDuration(0.0),
       
       // ===============================
-      // THRESHOLDING
+      // THRESHOLDING (Otsu only)
       // ===============================
-      thresholdType("binary"),
       
       // ===============================
       // MORPHOLOGICAL OPERATIONS
@@ -109,9 +107,7 @@ MotionTracker::MotionTracker(const std::string& configPath)
       cannyLowThreshold(50),
       cannyHighThreshold(150),
       
-      // Adaptive Thresholding
-      adaptiveBlockSize(11),
-      adaptiveC(2),
+
       
       // HSV Color Filtering
       hsvLower(0, 30, 60),
@@ -171,7 +167,7 @@ void MotionTracker::stop() {
 void MotionTracker::loadConfig(const std::string& configPath) {
     try {
         YAML::Node config = YAML::LoadFile(configPath);
-        if (config["threshold_value"]) thresholdValue = config["threshold_value"].as<double>();
+
         if (config["min_contour_area"]) minContourArea = config["min_contour_area"].as<int>();
         if (config["max_tracking_distance"]) maxTrackingDistance = config["max_tracking_distance"].as<double>();
         if (config["max_trajectory_points"]) maxTrajectoryPoints = config["max_trajectory_points"].as<size_t>();
@@ -197,9 +193,7 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["bilateral_d"]) bilateralD = config["bilateral_d"].as<int>();
         if (config["bilateral_sigma_color"]) bilateralSigmaColor = config["bilateral_sigma_color"].as<double>();
         if (config["bilateral_sigma_space"]) bilateralSigmaSpace = config["bilateral_sigma_space"].as<double>();
-        if (config["enable_adaptive_threshold"]) adaptiveBlockSize = config["enable_adaptive_threshold"].as<int>();
-        if (config["adaptive_block_size"]) adaptiveBlockSize = config["adaptive_block_size"].as<int>();
-        if (config["adaptive_c"]) adaptiveC = config["adaptive_c"].as<int>();
+
         
         // Processing mode
         if (config["processing_mode"]) processingMode = config["processing_mode"].as<std::string>();
@@ -251,8 +245,7 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         if (config["motion_history_duration"]) motionHistoryDuration = config["motion_history_duration"].as<double>();
         if (config["motion_history_fps"]) motionHistoryFps = config["motion_history_fps"].as<double>();
         
-        // Thresholding parameters
-        if (config["threshold_type"]) thresholdType = config["threshold_type"].as<std::string>();
+        // Thresholding: Always use Otsu (no configuration needed)
         
         // Morphological operations parameters
         if (config["enable_morphology"]) morphology = config["enable_morphology"].as<bool>();
@@ -282,7 +275,7 @@ void MotionTracker::loadConfig(const std::string& configPath) {
         LOG_INFO("=== CONFIG LOADED ===");
         LOG_INFO("min_trajectory_length: {}", minTrajectoryLength);
         LOG_INFO("min_contour_area: {}", minContourArea);
-        LOG_INFO("threshold_value: {}", thresholdValue);
+
         LOG_INFO("spatial_merging: {}", spatialMerging);
         LOG_INFO("motion_clustering: {}", motionClustering);
         LOG_INFO("enable_classification: {}", enableClassification);
@@ -562,17 +555,9 @@ cv::Mat MotionTracker::getSplitScreenVisualization(const cv::Mat& originalFrame)
         frameDiff = cv::Mat::zeros(processedFrame.size(), processedFrame.type());
     }
     
-    // Apply thresholding
+    // Apply Otsu thresholding (automatic optimal threshold selection)
     cv::Mat thresholded;
-    if (thresholdType == "binary") {
-        cv::threshold(frameDiff, thresholded, thresholdValue, maxThreshold, cv::THRESH_BINARY);
-    } else if (thresholdType == "adaptive") {
-        cv::adaptiveThreshold(frameDiff, thresholded, maxThreshold, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, adaptiveBlockSize, adaptiveC);
-    } else if (thresholdType == "otsu") {
-        cv::threshold(frameDiff, thresholded, 0, maxThreshold, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    } else {
-        thresholded = frameDiff;
-    }
+    cv::threshold(frameDiff, thresholded, 0, maxThreshold, cv::THRESH_BINARY | cv::THRESH_OTSU);
     
     // Apply morphological operations
     cv::Mat finalProcessed = thresholded.clone();
@@ -682,6 +667,197 @@ void MotionTracker::initializeBackgroundSubtractor() {
     }
 }
 
+#include "motion_tracker.hpp"
+#include <opencv2/opencv.hpp>
+#include <yaml-cpp/yaml.h>
+#include <random>
+
+cv::Mat MotionTracker::preprocessFrame(const cv::Mat& frame) {
+    cv::Mat processedFrame;
+    if (processingMode == "hsv") {
+        cv::Mat hsvFrame;
+        cv::cvtColor(frame, hsvFrame, cv::COLOR_BGR2HSV);
+        cv::inRange(hsvFrame, hsvLower, hsvUpper, processedFrame);
+    } else if (processingMode == "grayscale") {
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGR2GRAY);
+    } else if (processingMode == "rgb") {
+        processedFrame = frame.clone();
+    } else {
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGR2GRAY);
+    }
+    
+    if (contrastEnhancement) {
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(claheClipLimit, cv::Size(claheTileSize, claheTileSize));
+        clahe->apply(processedFrame, processedFrame);
+    }
+    
+    if (blurType == "gaussian") {
+        cv::GaussianBlur(processedFrame, processedFrame, cv::Size(gaussianBlurSize, gaussianBlurSize), 0);
+    } else if (blurType == "median") {
+        cv::medianBlur(processedFrame, processedFrame, medianBlurSize);
+    } else if (blurType == "bilateral") {
+        cv::Mat bilateralInput;
+        if (processedFrame.type() != CV_8UC1) {
+            processedFrame.convertTo(bilateralInput, CV_8UC1);
+        } else {
+            bilateralInput = processedFrame;
+        }
+        cv::bilateralFilter(bilateralInput, processedFrame, bilateralD, bilateralSigmaColor, bilateralSigmaSpace);
+    }
+    
+    return processedFrame;
+}
+
+cv::Mat MotionTracker::detectMotion(const cv::Mat& processedFrame, cv::Mat& frameDiff, cv::Mat& thresh) {
+    if (backgroundSubtraction && bgSubtractor.empty()) {
+        initializeBackgroundSubtractor();
+    }
+    
+    frameDiff = cv::Mat::zeros(processedFrame.size(), processedFrame.type());
+    if (!prevFrame.empty()) {
+        cv::absdiff(processedFrame, prevFrame, frameDiff);
+    }
+    
+    cv::Mat bgMask;
+    if (backgroundSubtraction && !bgSubtractor.empty()) {
+        bgSubtractor->apply(processedFrame, bgMask);
+    }
+    
+    cv::Mat motionMask;
+    if (backgroundSubtraction && !bgSubtractor.empty()) {
+        motionMask = bgMask.clone();
+        cv::Mat combinedMask;
+        cv::bitwise_or(motionMask, frameDiff, combinedMask);
+        motionMask = combinedMask;
+    } else {
+        motionMask = frameDiff.clone();
+    }
+    
+    // Always use Otsu thresholding
+    cv::threshold(motionMask, thresh, 0, maxThreshold, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    
+    return thresh;
+}
+
+cv::Mat MotionTracker::applyMorphologicalOps(const cv::Mat& thresh) {
+    cv::Mat processed = thresh.clone();
+    if (morphology) {
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(morphKernelSize, morphKernelSize));
+        if (morphClose) {
+            cv::morphologyEx(processed, processed, cv::MORPH_CLOSE, kernel);
+        }
+        if (morphOpen) {
+            cv::morphologyEx(processed, processed, cv::MORPH_OPEN, kernel);
+        }
+        if (dilation) {
+            cv::dilate(processed, processed, kernel, cv::Point(-1, -1), 1);
+        }
+        if (erosion) {
+            cv::erode(processed, processed, kernel, cv::Point(-1, -1), 1);
+        }
+    }
+    return processed;
+}
+
+std::vector<cv::Rect> MotionTracker::extractContours(const cv::Mat& processed) {
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(processed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    std::vector<cv::Rect> newBounds;
+    static int frameCount = 0;
+    frameCount++;
+    
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area < minContourArea) continue;
+        
+        std::vector<cv::Point> approxContour = contour;
+        if (contourApproximation) {
+            double epsilon = contourEpsilonFactor * cv::arcLength(contour, true);
+            cv::approxPolyDP(contour, approxContour, epsilon, true);
+        }
+        
+        cv::Rect bounds;
+        if (convexHull) {
+            std::vector<cv::Point> hull;
+            cv::convexHull(approxContour, hull);
+            double hullArea = cv::contourArea(hull);
+            double solidity = (hullArea > 0) ? area / hullArea : 0;
+            if (contourFiltering && solidity < minContourSolidity) continue;
+            bounds = cv::boundingRect(hull);
+        } else {
+            bounds = cv::boundingRect(approxContour);
+        }
+        
+        if (contourFiltering) {
+            double aspectRatio = static_cast<double>(bounds.width) / bounds.height;
+            if (aspectRatio > maxContourAspectRatio) continue;
+        }
+        
+        newBounds.push_back(bounds);
+    }
+    
+    if (frameCount % 30 == 0) {
+        LOG_DEBUG("Found {} contours, {} passed filtering", contours.size(), newBounds.size());
+    }
+    
+    return newBounds;
+}
+
+void MotionTracker::logTrackingResults() {
+    static int noObjectCount = 0;
+    if (!trackedObjects.empty()) {
+        std::vector<TrackedObject> filteredObjects;
+        for (const auto& obj : trackedObjects) {
+            LOG_DEBUG("Checking Object {}: trajectory.size()={}, minTrajectoryLength={}", 
+                      obj.id, obj.trajectory.size(), minTrajectoryLength);
+            if (obj.trajectory.size() >= minTrajectoryLength) {
+                filteredObjects.push_back(obj);
+            }
+        }
+        if (!filteredObjects.empty()) {
+            LOG_INFO("Tracking {} objects (min trajectory length: {}):", filteredObjects.size(), minTrajectoryLength);
+            for (const auto& obj : filteredObjects) {
+                LOG_INFO("  Object {}: confidence={}, trajectory points={}, bounds=({},{},{},{})", 
+                         obj.id, obj.confidence, obj.trajectory.size(), 
+                         obj.currentBounds.x, obj.currentBounds.y, obj.currentBounds.width, obj.currentBounds.height);
+            }
+        }
+    } else {
+        noObjectCount++;
+        if (noObjectCount % 30 == 0) {
+            LOG_INFO("No objects currently being tracked.");
+        }
+    }
+}
+
+void MotionTracker::setPrevFrame(const cv::Mat& frame) {
+    prevFrame = frame.clone();
+}
+
+void MotionTracker::processFrame() {
+    if (!cap.isOpened()) {
+        LOG_ERROR("Camera not initialized");
+        return;
+    }
+    
+    cv::Mat frame;
+    cap >> frame;
+    
+    if (frame.empty()) {
+        LOG_ERROR("Failed to capture frame");
+        return;
+    }
+    
+    // Process the captured frame using the overloaded version
+    MotionResult result = processFrame(frame);
+    
+    // Log results if motion detected
+    if (result.hasMotion) {
+        LOG_INFO("Motion detected with " + std::to_string(result.trackedObjects.size()) + " objects");
+    }
+}
+
 MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
     MotionResult result;
     result.hasMotion = false;
@@ -775,14 +951,9 @@ MotionResult MotionTracker::processFrame(const cv::Mat& frame) {
         motionMask = frameDiff.clone();
     }
     
-    // 8. Apply thresholding
+    // 8. Apply Otsu thresholding
     cv::Mat thresh;
-    if (thresholdType == "adaptive") {
-        cv::adaptiveThreshold(motionMask, thresh, maxThreshold, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
-                             cv::THRESH_BINARY, adaptiveBlockSize, adaptiveC);
-    } else {
-        cv::threshold(motionMask, thresh, thresholdValue, maxThreshold, cv::THRESH_BINARY);
-    }
+    cv::threshold(motionMask, thresh, 0, maxThreshold, cv::THRESH_BINARY | cv::THRESH_OTSU);
     
     // 9. Apply morphological operations
     cv::Mat processed = thresh.clone();
