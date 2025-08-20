@@ -41,6 +41,11 @@ public:
     int getMaxThreshold() const { return maxThreshold; }
     bool isBackgroundSubtractionEnabled() const { return backgroundSubtraction; }
     
+    // Debug visualization control
+    void enableVisualization(bool enable = true) { visualizationEnabled = enable; }
+    bool isVisualizationEnabled() const { return visualizationEnabled; }
+    void setVisualizationPath(const std::string& path) { visualizationPath = path; }
+    
     // Adaptive contour detection methods
     double calculateAdaptiveMinArea(const std::vector<std::vector<cv::Point>>& contours);
     double calculateAdaptiveMinSolidity(const std::vector<std::vector<cv::Point>>& contours);
@@ -63,7 +68,9 @@ private:
     // ===============================
     
     // Basic parameters
-    int minContourArea;
+    int minContourArea = 100;  // Default minimum contour area
+    double minContourSolidity = 0.2;  // Default minimum solidity
+    double maxContourAspectRatio = 5.0;  // Default maximum aspect ratio
     int maxThreshold;
     
     // INPUT COLOR PROCESSING
@@ -95,10 +102,24 @@ private:
     bool convexHull;
     bool contourApproximation;
     bool contourFiltering;
-    double maxContourAspectRatio;
-    double minContourSolidity;
     double contourEpsilonFactor;
     std::string contourDetectionMode;
+    
+    // Permissive mode settings
+    double permissiveMinArea;
+    double permissiveMinSolidity;
+    double permissiveMaxAspectRatio;
+    
+    // Adaptive calculation cache
+    int adaptiveUpdateInterval;  // frames between adaptive recalculation
+    int lastAdaptiveUpdate;     // frame count of last update
+    double cachedAdaptiveMinArea;
+    double cachedAdaptiveMinSolidity;
+    double cachedAdaptiveMaxAspectRatio;
+    
+    // Debug visualization control
+    bool visualizationEnabled = false;
+    std::string visualizationPath = "debug_output";
     
 
 };
