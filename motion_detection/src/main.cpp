@@ -73,8 +73,11 @@ int main(int argc, char** argv) {
             break;
         }
 
-        // Process frame and get tracked objects
+        // Process frame and get small areas of movement
         MotionResult result = tracker.processFrame(frame);
+
+        // Associate movement into regions
+        
 
         // Handle objects that were lost in this frame
         std::vector<int> lostObjectIds = tracker.getLostObjectIds();
@@ -130,11 +133,14 @@ int main(int argc, char** argv) {
         // Use split-screen visualization as the main display
         cv::Mat displayFrame;
         if (tracker.isSplitScreenEnabled()) {
-            // Get the split-screen visualization which includes black backgrounds
-            displayFrame = tracker.getSplitScreenVisualization(frame);
+            // Process frame to get intermediate results for visualization
+            MotionResult result = tracker.processFrame(frame);
+            // For now, just show the original frame - full visualization requires more work
+            displayFrame = frame.clone();
         } else {
             // Fallback to original frame with overlays
-            displayFrame = tracker.drawMotionOverlays(filteredFrame);
+            MotionResult result = tracker.processFrame(frame);
+            displayFrame = tracker.getVisualization().drawMotionOverlays(filteredFrame, result.trackedObjects);
         }
         
         tracker.setTrackedObjects(originalTrackedObjects);

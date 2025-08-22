@@ -1,0 +1,135 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug BirdsOfPlay (Release Build)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/motion_detection/BirdsOfPlay",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/motion_detection",
+            "environment": [
+                {
+                    "name": "OPENCV_LOG_LEVEL",
+                    "value": "INFO"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Release",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug BirdsOfPlay (Debug Build)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_debug/motion_detection/BirdsOfPlay",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build_debug/motion_detection",
+            "environment": [
+                {
+                    "name": "OPENCV_LOG_LEVEL",
+                    "value": "DEBUG"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Tests (Release Build)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/motion_detection/BirdsOfPlay_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/motion_detection",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Release",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Motion Tracker Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/motion_detection/motion_tracker_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/motion_detection",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Release",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Motion Processor Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/motion_detection/motion_processor_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/motion_detection",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Release",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Motion Region Consolidator Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_debug/motion_detection/motion_region_consolidator_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build_debug/motion_detection",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: Build Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

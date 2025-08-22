@@ -12,15 +12,13 @@
 #include <opencv2/imgproc.hpp>          // cv::resize, cv::threshold, cv::findContours
 #include <opencv2/highgui.hpp>          // cv::imshow, cv::waitKey, cv::destroyAllWindows
 #include <opencv2/videoio.hpp>          // cv::VideoCapture, cv::VideoWriter
-#include <opencv2/bgsegm.hpp>           // cv::createBackgroundSubtractorMOG2
-#include <opencv2/video.hpp>            // cv::BackgroundSubtractor
 #include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
 
 // Local includes
 #include "object_classifier.hpp"        // ObjectClassifier class, ClassificationResult struct
-
-// Maximum number of points to store in trajectory (moved to config.yaml)
-// const size_t MAX_TRAJECTORY_POINTS = 30;
+#include "motion_visualization.hpp"     // Visualization utilities
+#include "motion_processor.hpp"         // Frame processing pipeline
+#include "object_tracker.hpp"           // Object tracking and trajectories
 
 struct TrackedObject {
     int id;
@@ -53,60 +51,36 @@ struct TrackedObject {
 };
 
 struct MotionResult {
-    bool hasMotion;
-    std::vector<TrackedObject> trackedObjects;  // List of tracked objects with their paths
+    bool hasMotion = false;
+    std::vector<TrackedObject> trackedObjects;
+    
+    // Intermediate processing results for visualization
+    cv::Mat processedFrame;
+    cv::Mat frameDiff;
+    cv::Mat thresh;
+    cv::Mat processed;
 };
 
+/**
+ * @brief Main MotionTracker class that orchestrates frame processing and object tracking
+ */
 class MotionTracker {
 public:
+    // Constructor and destructor
     explicit MotionTracker(const std::string& configPath);
     ~MotionTracker();
 
+    // Initialization and control
     bool initialize(const std::string& videoSource);
-    bool initialize(int deviceIndex);
-    void processFrame();
+    bool initialize(int deviceIndex = 0);
     void stop();
-    MotionResult processFrame(const cv::Mat& frame);
-    
-    // New public methods
-    bool readFrame(cv::Mat& frame) {
-        if (!isRunning || !cap.isOpened()) return false;
-        return cap.read(frame);
-    }
-    static int getEscKey() { return ESC_KEY; }
-    
-    // Split-screen visualization method
-    cv::Mat createSplitScreenVisualization(const cv::Mat& originalFrame, const cv::Mat& processedFrame, 
-                                          const cv::Mat& frameDiff, const cv::Mat& thresholded, 
-                                          const cv::Mat& finalProcessed);
-    
-    // Get split-screen visualization for main display
-    cv::Mat getSplitScreenVisualization(const cv::Mat& originalFrame);
-    
-    // Check if split-screen is enabled
-    bool isSplitScreenEnabled() const { return splitScreen; }
-    
-    // Draw motion overlays on a single frame
-    cv::Mat drawMotionOverlays(const cv::Mat& frame);
-    
-    // Initialize background subtractor
-    void initializeBackgroundSubtractor();
+    bool isRunning() const { return running; }
 
-    size_t getMinTrajectoryLength() const { return minTrajectoryLength; }
-    const std::vector<TrackedObject>& getTrackedObjects() const { return trackedObjects; }
-    void setTrackedObjects(const std::vector<TrackedObject>& objs) { trackedObjects = objs; }
+    // Main processing methods
+    void processFrame(); // Process frame from camera
+    MotionResult processFrame(const cv::Mat& frame); // Process provided frame
     
-    // Get list of object IDs that were lost in the last frame
-    std::vector<int> getLostObjectIds() const { return lostObjectIds; }
-    void clearLostObjectIds() { lostObjectIds.clear(); }
-
-    // Getters for configuration values
-    const TrackedObject* findTrackedObjectById(int id) const;
-
-    // Getters for internal state
-    cv::VideoCapture& getCap() { return cap; }
-
-    // Frame processing methods (made public for testing)
+    // Access to individual processing steps (public for testing)
     cv::Mat preprocessFrame(const cv::Mat& frame);
     cv::Mat detectMotion(const cv::Mat& processedFrame, cv::Mat& frameDiff, cv::Mat& thresh);
     cv::Mat applyMorphologicalOps(const cv::Mat& thresh);
@@ -114,162 +88,41 @@ public:
     void logTrackingResults();
     void setPrevFrame(const cv::Mat& frame);
 
+    // Configuration getters
+    bool isSplitScreenEnabled() const;
+    const std::string& getSplitScreenWindowName() const;
+    MotionVisualization& getVisualization();
+    
+    // Access to tracked objects
+    const std::vector<TrackedObject>& getTrackedObjects() const;
+    const TrackedObject* findTrackedObjectById(int id) const;
+    void setTrackedObjects(const std::vector<TrackedObject>& objects);
+    void clearLostObjectIds();
+    const std::vector<int>& getLostObjectIds() const;
+    size_t getMinTrajectoryLength() const;
+    
+    // Camera access
+    cv::VideoCapture& getCap() { return cap; }
+
 private:
+    // Configuration loading
     void loadConfig(const std::string& configPath);
-    TrackedObject* findNearestObject(const cv::Rect& newBounds);
-    void updateTrajectories(std::vector<cv::Rect>& newBounds, const cv::Mat& currentFrame);
 
-    // Spatial merging and motion clustering methods
-    std::vector<cv::Rect> mergeSpatialOverlaps(const std::vector<cv::Rect>& bounds);
-    std::vector<cv::Rect> clusterByMotion(const std::vector<cv::Rect>& bounds);
-    double calculateOverlapRatio(const cv::Rect& rect1, const cv::Rect& rect2);
-    double calculateDistance(const cv::Rect& rect1, const cv::Rect& rect2);
-    cv::Point calculateMotionVector(const cv::Rect& current, const cv::Rect& previous);
-    double calculateCosineSimilarity(const cv::Point& vec1, const cv::Point& vec2);
-    cv::Rect findClosestPreviousRect(const cv::Rect& current, const std::vector<cv::Rect>& previous);
+    // Core components
+    MotionProcessor processor;      // Handles frame processing pipeline
+    ObjectTracker tracker;         // Handles object tracking and trajectories  
+    MotionVisualization visualization; // Handles visualization
     
-    // Object classification method
-    ClassificationResult classifyDetectedObject(const cv::Mat& frame, const cv::Rect& bounds);
-
+    // Camera and state
     cv::VideoCapture cap;
-    cv::Mat prevFrame;
-    cv::Mat currentFrame;
-    bool isRunning;
-    bool isFirstFrame;
-    std::vector<TrackedObject> trackedObjects;
-    int nextObjectId;
-    size_t maxTrajectoryPoints;  // Moved from const to configurable
-    size_t minTrajectoryLength;  // Minimum trajectory points required to record
-
-    // Motion history for clustering
-    std::deque<std::vector<cv::Rect>> previousBounds;
-
-    // Configurable parameters (all loaded from config.yaml)
-    int minContourArea;
-    double maxTrackingDistance;
-    int maxThreshold;
-    static const int ESC_KEY = 27;  // Keep this as const since it's a key code
-
-    // Smoothing parameters
-    double smoothingFactor;
-    double minTrackingConfidence;
+    bool running;
     
-    // ===============================
-    // INPUT COLOR PROCESSING
-    // ===============================
-    std::string processingMode;  // "grayscale", "hsv", "rgb", "ycrcb"
-    
-    // ===============================
-    // IMAGE PREPROCESSING
-    // ===============================
-    bool contrastEnhancement;
-    std::string blurType;  // "none", "gaussian", "median", "bilateral"
-    
-    // ===============================
-    // MOTION DETECTION METHODS
-    // ===============================
-    bool backgroundSubtraction;
-    std::string backgroundSubtractionMethod;  // "none", "MOG2", "PBAS"
-    std::string opticalFlowMode;  // "none", "farneback", "lucas-kanade"
-    double motionHistoryDuration;  // Seconds (0 = disabled)
-    
-    // ===============================
-    // THRESHOLDING (Otsu only)
-    // ===============================
-    
-    // ===============================
-    // MORPHOLOGICAL OPERATIONS
-    // ===============================
-    bool morphology;
-    int morphKernelSize;
-    bool morphClose;
-    bool morphOpen;
-    bool dilation;
-    bool erosion;
-    
-    // ===============================
-    // CONTOUR PROCESSING
-    // ===============================
-    bool convexHull;
-    bool contourApproximation;
-    bool contourFiltering;
-    double maxContourAspectRatio;
-    double minContourSolidity;
-    double contourEpsilonFactor;
-    
-    // ===============================
-    // OBJECT TRACKING
-    // ===============================
+    // Visualization configuration
     bool splitScreen;
     bool drawContours;
     bool dataCollection;
     bool saveOnMotion;
     std::string splitScreenWindowName;
-    
-    // Spatial Merging and Motion Clustering
-    bool spatialMerging;
-    double spatialMergeDistance;
-    double spatialMergeOverlapThreshold;
-    bool motionClustering;
-    double motionSimilarityThreshold;
-    int motionHistoryFrames;
-    
-    // ===============================
-    // ADVANCED PARAMETERS
-    // ===============================
-    
-    // Contrast Enhancement (CLAHE)
-    double claheClipLimit;
-    int claheTileSize;
-    
-    // Blur Parameters
-    int gaussianBlurSize;
-    int medianBlurSize;
-    int bilateralD;
-    double bilateralSigmaColor;
-    double bilateralSigmaSpace;
-    
-    // Background Subtraction (MOG2)
-    int backgroundHistory;
-    double backgroundThreshold;
-    bool backgroundDetectShadows;
-    
-    // Background Subtraction (PBAS)
-    int pbasHistory;
-    double pbasThreshold;
-    double pbasLearningRate;
-    bool pbasDetectShadows;
-    
-    // Background subtractor (can be MOG2 or PBAS)
-    cv::Ptr<cv::BackgroundSubtractor> bgSubtractor;
-    
-    // Edge Detection (Canny)
-    int cannyLowThreshold;
-    int cannyHighThreshold;
-    
-
-    
-    // HSV Color Filtering
-    cv::Scalar hsvLower;
-    cv::Scalar hsvUpper;
-    
-    // Motion History (for visualization)
-    cv::Mat motionHistory;
-    double motionHistoryFps;
-    
-    // Object Classifier
-    ObjectClassifier classifier;
-    bool enableClassification;
-    std::string modelPath;
-    std::string labelsPath;
-    
-    // Helper method for position smoothing
-    cv::Point smoothPosition(const cv::Point& newPos, const cv::Point& smoothedPos);
-
-
-
-    std::vector<int> lostObjectIds;
-    std::string generateUUID();
 };
 
-#endif // MOTION_TRACKER_HPP 
+#endif // MOTION_TRACKER_HPP
