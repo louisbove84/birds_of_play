@@ -1,88 +1,131 @@
 # =======================================
-# Minimal Cursor Rules - Next.js + React
+# Cursor Rules - Modern C++ Project
 # =======================================
 
 # ---- Technology Focus ----
 technologies:
-  - JavaScript
-  - TypeScript
-  - React
-  - Next.js
-  - Zustand
-  - Tailwind
-  - Shadcn UI
-  - Radix UI
-  - Stylus
+  - C++17/20
+  - CMake
+  - OpenCV
+  - ONNX Runtime
+  - spdlog
+  - Filesystem
+  - Threading
+  - YAML Config
 
 # ---- Code Style ----
 code_style:
-  - Use functional and declarative programming; avoid classes
-  - Descriptive variable/function names (camelCase)
-  - React components in PascalCase
-  - 2-space indentation, single quotes, no semicolons unless needed
-  - Keep functions small and single-purpose
-  - Avoid deeply nested logic
+  - Follow Modern C++ guidelines (C++17/20)
+  - Use RAII and smart pointers; avoid raw pointers
+  - Prefer references over pointers when possible
+  - Use const correctness consistently
+  - 4-space indentation
+  - snake_case for variables and functions
+  - PascalCase for classes and types
+  - UPPER_CASE for constants and macros
+  - Keep functions focused and under 50 lines
+  - Use auto when it aids readability
+  - Prefer range-based for loops
+  - Use structured bindings where appropriate
 
-# ---- React Best Practices ----
-react:
-  - Follow Rules of Hooks; use useState, useEffect, useContext, useReducer, useMemo, useCallback properly
-  - Prefer composition over inheritance
-  - Use React.memo and useCallback where appropriate
-  - Controlled components for forms; error boundaries for robustness
-  - Use Suspense and dynamic imports for code splitting
+# ---- Memory Management ----
+memory:
+  - Use smart pointers (unique_ptr, shared_ptr)
+  - Follow RAII principles
+  - Avoid manual memory management
+  - Use containers from STL
+  - Be explicit about ownership
+  - Use move semantics where appropriate
 
-# ---- State Management ----
-state_management:
-  - Use Zustand for global state
-  - Lift state for shared state; context for intermediate state
+# ---- Error Handling ----
+error_handling:
+  - Use exceptions for exceptional cases
+  - RAII for resource management
+  - Strong exception guarantees where possible
+  - Clear error messages with context
+  - Proper cleanup in destructors
+  - Use std::optional for nullable values
 
-# ---- Styling ----
-ui_styling:
-  - Tailwind for utility classes; Stylus modules for component-specific styles
-  - Component-specific styles: .module.styl, camelCase class names
-  - Import Stylus modules: import styles from './ComponentName.module.styl'
-  - Minimal global styles
-
-# ---- File Structure ----
-file_structure:
-  - Organize by feature/module
-  - Components in components/, reusable code in lib/
-  - Config files in config/ when needed
+# ---- Threading ----
+concurrency:
+  - Use std::thread, std::mutex, std::lock_guard
+  - Prefer high-level abstractions
+  - Be explicit about thread safety
+  - Use atomic for simple shared state
+  - Document thread safety requirements
+  - Avoid data races and deadlocks
 
 # ---- Performance ----
 performance:
-  - Favor server components and SSR; limit 'use client'
-  - Lazy-load non-critical components
-  - Optimize images (WebP, sizes, lazy-loading)
-  - Route-based code splitting
+  - Profile before optimizing
+  - Use constexpr where possible
+  - Consider cache coherency
+  - Minimize copying large objects
+  - Use references for large parameters
+  - Optimize hot paths only
+  - Use appropriate container types
+
+# ---- File Structure ----
+file_structure:
+  - Headers in include/
+  - Source in src/
+  - Tests in tests/
+  - One class per file
+  - Group related functionality
+  - Use header guards or #pragma once
+  - Minimize header dependencies
+
+# ---- CMake Best Practices ----
+cmake:
+  - Modern CMake practices
+  - Target-based approach
+  - Proper dependency management
+  - Version requirements
+  - Export compile commands
+  - Proper install rules
+  - Configure time checks
 
 # ---- Testing ----
 testing:
-  - Unit tests with Jest + React Testing Library
-  - Meaningful test names and clear assertions
-  - Run tests before committing
+  - Unit tests for core functionality
+  - Integration tests for systems
+  - Test error conditions
+  - Mock external dependencies
+  - Clear test names and structure
+  - One assertion per test
+  - Test edge cases
+
+# ---- Documentation ----
+documentation:
+  - Doxygen-style comments for public API
+  - Clear function contracts
+  - Document thread safety
+  - Document ownership semantics
+  - Keep README.md up to date
+  - Document build requirements
+  - Include usage examples
 
 # ---- Security ----
 security:
-  - Never commit secrets
-  - Sanitize all user inputs
-  - Avoid outdated dependencies
+  - Validate all inputs
+  - Secure error messages
+  - No buffer overflows
+  - Safe string handling
+  - Proper access control
+  - No hardcoded credentials
 
 # ---- Commit Messages ----
 commit_messages:
   - Subject <= 50 chars, imperative mood
   - No trailing period
   - Body <= 72 chars per line if needed
+  - Reference issues where applicable
 
 # ---- Collaboration ----
 collaboration:
-  - Pull latest changes before work
-  - Focus branches on single feature/topic
-  - Write clear PR descriptions
-  - Resolve merge conflicts carefully and test
-
-# ---- Documentation ----
-documentation:
-  - Keep concise, meaningful inline comments
-  - Public functions/components should have docstrings
-  - Update README.md for setup and usage
+  - Review code before committing
+  - Keep PRs focused and small
+  - Document breaking changes
+  - Update tests with changes
+  - Clear PR descriptions
+  - Address review comments

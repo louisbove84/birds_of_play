@@ -51,19 +51,30 @@ find_library(UUID_LIBRARIES uuid)
 # Add source files (excluding main.cpp)
 set(LIB_SOURCES
     src/motion_tracker.cpp
+    src/motion_processor.cpp
+    src/object_tracker.cpp
+    src/motion_visualization.cpp
     src/data_collector.cpp
     src/object_classifier.cpp
+    src/motion_region_consolidator.cpp
 )
 
 # Add header files
 set(HEADERS
     include/motion_tracker.hpp
+    include/motion_processor.hpp
+    include/object_tracker.hpp
+    include/motion_visualization.hpp
     include/data_collector.hpp
     include/object_classifier.hpp
+    include/motion_region_consolidator.hpp
 )
 
-# Add compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+# Compiler-specific flags (inherited from parent CMakeLists.txt)
+# Additional Clang-specific optimizations
+if(COMPILER_CLANG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing")
+endif()
 
 # Add spdlog and make its headers available globally
 add_subdirectory(libs/spdlog)
@@ -165,44 +176,84 @@ add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test)
 # Unit Testing
 # ==============================================================================
 if(BUILD_TESTING)
-    # Add motion_tracker_test_2 executable
-    add_executable(motion_tracker_test_2 
-        tests/motion_tracker_test_2.cpp
+    # Add motion_tracker_test executable
+    add_executable(motion_tracker_test 
+        tests/motion_tracker_test.cpp
         src/motion_tracker.cpp
+        src/motion_processor.cpp
+        src/object_tracker.cpp
+        src/motion_visualization.cpp
         src/data_collector.cpp
         src/object_classifier.cpp
+        src/motion_region_consolidator.cpp
         src/logger.cpp
     )
 
-    # Link libraries for motion_tracker_test_2
-    target_link_libraries(motion_tracker_test_2 PRIVATE 
+    # Link libraries for motion_tracker_test
+    target_link_libraries(motion_tracker_test PRIVATE 
         ${OpenCV_LIBS}
         mongo::mongocxx_shared
         mongo::bsoncxx_shared
         yaml-cpp
         spdlog::spdlog_header_only
+        GTest::gtest
+        GTest::gtest_main
     )
 
-    # Add include directories for motion_tracker_test_2
-    target_include_directories(motion_tracker_test_2 PRIVATE
+    # Add include directories for motion_tracker_test
+    target_include_directories(motion_tracker_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
     )
 
-    # Add diagnostic test executable (kept for statistical analysis)
-    add_executable(diagnostic_test 
-        tests/diagnostic_test.cpp
+    # Add motion_processor_test executable
+    add_executable(motion_processor_test 
+        tests/motion_processor_test.cpp
+        src/motion_processor.cpp
         src/logger.cpp
     )
 
-    # Link the necessary libraries to the diagnostic test executable
-    target_link_libraries(diagnostic_test PRIVATE 
-        ${OpenCV_LIBS}
-        spdlog::spdlog_header_only
+    # Add motion_region_consolidator_test executable
+    add_executable(motion_region_consolidator_test 
+        tests/motion_region_consolidator_test.cpp
+        src/motion_region_consolidator.cpp
+        src/motion_tracker.cpp
+        src/motion_processor.cpp
+        src/object_tracker.cpp
+        src/motion_visualization.cpp
+        src/data_collector.cpp
+        src/object_classifier.cpp
+        src/logger.cpp
     )
 
-    # Add include directories for the diagnostic test executable
-    target_include_directories(diagnostic_test PRIVATE
+    # Link libraries for motion_processor_test
+    target_link_libraries(motion_processor_test PRIVATE 
+        ${OpenCV_LIBS}
+        yaml-cpp
+        spdlog::spdlog_header_only
+        GTest::gtest
+        GTest::gtest_main
+    )
+
+    # Add include directories for motion_processor_test
+    target_include_directories(motion_processor_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+    )
+
+    # Link libraries for motion_region_consolidator_test
+    target_link_libraries(motion_region_consolidator_test PRIVATE 
+        ${OpenCV_LIBS}
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
+        yaml-cpp
+        spdlog::spdlog_header_only
+        GTest::gtest
+        GTest::gtest_main
+    )
+
+    # Add include directories for motion_region_consolidator_test
+    target_include_directories(motion_region_consolidator_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
     )
