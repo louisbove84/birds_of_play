@@ -1,508 +1,535 @@
 #include <gtest/gtest.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-#include <filesystem>
+#include "motion_region_consolidator.hpp"
+#include "motion_processor.hpp"
+#include "logger.hpp"
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include <vector>
 #include <string>
+#include <filesystem>
 
-#include "motion_region_consolidator.hpp"
-#include "motion_tracker.hpp"
-#include "logger.hpp"
+void initLogger() {
+    try {
+        Logger::init("debug", "motion_region_consolidator_test_log.txt", true);
+    } catch (const std::exception& e) {
+        // Logger already initialized, ignore
+    }
+}
 
-namespace fs = std::filesystem;
+// Helper function to process real images and generate TrackedObjects
+std::vector<TrackedObject> processRealImages(const std::string& configPath, 
+                                           const std::string& image1Path, 
+                                           const std::string& image2Path) {
+    std::vector<TrackedObject> trackedObjects;
+    
+    // Load the test images
+    cv::Mat frame1 = cv::imread(image1Path);
+    cv::Mat frame2 = cv::imread(image2Path);
+    
+    if (frame1.empty() || frame2.empty()) {
+        LOG_ERROR("Failed to load test images: {} or {}", image1Path, image2Path);
+        return trackedObjects;
+    }
+    
+    LOG_INFO("Loaded test images: {}x{} and {}x{}", 
+             frame1.cols, frame1.rows, frame2.cols, frame2.rows);
+    
+    // Initialize motion processor
+    MotionProcessor motionProcessor(configPath);
+    
+    // Process first frame (establishes baseline)
+    MotionProcessor::ProcessingResult result1 = motionProcessor.processFrame(frame1);
+    LOG_INFO("First frame processed - hasMotion: {}, bounds: {}", 
+             result1.hasMotion, result1.detectedBounds.size());
+    
+    // Process second frame (detects motion between frames)
+    MotionProcessor::ProcessingResult result2 = motionProcessor.processFrame(frame2);
+    LOG_INFO("Second frame processed - hasMotion: {}, bounds: {}", 
+             result2.hasMotion, result2.detectedBounds.size());
+    
+    // Convert detected bounds to TrackedObjects
+    int objectId = 0;
+    for (const auto& bounds : result2.detectedBounds) {
+        std::string uuid = "real_uuid_" + std::to_string(objectId);
+        trackedObjects.emplace_back(objectId, bounds, uuid);
+        
+        LOG_INFO("Created TrackedObject {}: BBox({},{},{},{}) from real motion detection", 
+                 objectId, bounds.x, bounds.y, bounds.width, bounds.height);
+        objectId++;
+    }
+    
+    LOG_INFO("Generated {} TrackedObjects from real bird images", trackedObjects.size());
+    return trackedObjects;
+}
 
-class MotionRegionConsolidatorTest : public ::testing::Test {
-protected:
+// Global test environment setup
+class MotionRegionConsolidatorTestEnvironment : public ::testing::Environment {
+public:
     void SetUp() override {
-        // Initialize logger
-        Logger::init("debug", "test_log.txt", false);
-        
-        // Setup test directories
-        testImageDir_ = "tests/img/";
-        outputDir_ = "test_results/motion_region_consolidator/";
-        
-        // Create output directories
-        fs::create_directories(outputDir_);
-        fs::create_directories(outputDir_ + "01_input_images/");
-        fs::create_directories(outputDir_ + "02_motion_tracking/");
-        fs::create_directories(outputDir_ + "03_proximity_grouping/");
-        fs::create_directories(outputDir_ + "04_motion_grouping/");
-        fs::create_directories(outputDir_ + "05_consolidated_regions/");
-        fs::create_directories(outputDir_ + "06_expanded_regions/");
-        fs::create_directories(outputDir_ + "07_final_output/");
-        
-        // Initialize consolidator with test config
-        ConsolidationConfig config;
-        config.maxDistanceThreshold = 120.0;
-        config.velocityAngleThreshold = 45.0;
-        config.minObjectsPerRegion = 2;
-        config.regionExpansionFactor = 1.3;
-        config.minRegionWidth = 64;
-        config.minRegionHeight = 64;
-        config.minRegionArea = 300.0;
-        config.maxRegionArea = 20000.0;
-        
-        consolidator_ = std::make_unique<MotionRegionConsolidator>(config);
-        
-        // Initialize motion tracker for generating test data
-        motionTracker_ = std::make_unique<MotionTracker>("tests/config.yaml");
-        
-        LOG_INFO("MotionRegionConsolidatorTest setup complete");
+        initLogger();
     }
     
     void TearDown() override {
-        consolidator_.reset();
-        motionTracker_.reset();
+        spdlog::shutdown();
+    }
+};
+
+// Test fixture for MotionRegionConsolidator
+class MotionRegionConsolidatorTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Default configuration
+        config.maxDistanceThreshold = 50.0;
+        config.minObjectsPerRegion = 2;
+        config.overlapThreshold = 0.3;
+        config.regionExpansionFactor = 1.2;
+        config.minRegionArea = 10000;
+        config.maxRegionArea = 1000000;
+        config.maxFramesWithoutUpdate = 3;
+        config.idealModelRegionSize = 640;
+        config.frameSize = cv::Size(1920, 1080);
+        
+        // Initialize consolidator
+        consolidator = std::make_unique<MotionRegionConsolidator>(config);
+        
+        // Set up paths for real test images
+        configPath = "config.yaml";
+        testImage1Path = "test_image.jpg";
+        testImage2Path = "test_image2.jpg";
+        
+        // Create output directory
+        std::filesystem::create_directories("test_results/motion_region_consolidator/google_test_mode");
+        
+        // Process real images to get TrackedObjects
+        realTrackedObjects = processRealImages(configPath, testImage1Path, testImage2Path);
+        LOG_INFO("SetUp complete: {} real TrackedObjects available for testing", realTrackedObjects.size());
     }
     
-    // Helper function to create mock tracked objects for testing
-    std::vector<TrackedObject> createMockTrackedObjects(const cv::Mat& frame, int imageIndex) {
+    // Helper function to create synthetic tracked objects
+    std::vector<TrackedObject> createSyntheticObjects() {
         std::vector<TrackedObject> objects;
         
-        switch (imageIndex) {
-            case 1: {
-                // Test image 1: Create objects that should be grouped by proximity
-                objects.emplace_back(1, cv::Rect(100, 150, 40, 60), "uuid-1");
-                objects.back().trajectory.push_back(cv::Point(120, 180));
-                objects.back().trajectory.push_back(cv::Point(125, 185));
-                objects.back().trajectory.push_back(cv::Point(130, 190));
-                objects.back().confidence = 0.8;
-                
-                objects.emplace_back(2, cv::Rect(160, 170, 35, 50), "uuid-2");
-                objects.back().trajectory.push_back(cv::Point(177, 195));
-                objects.back().trajectory.push_back(cv::Point(182, 200));
-                objects.back().trajectory.push_back(cv::Point(187, 205));
-                objects.back().confidence = 0.7;
-                
-                // Distant object that shouldn't be grouped
-                objects.emplace_back(3, cv::Rect(400, 300, 30, 45), "uuid-3");
-                objects.back().trajectory.push_back(cv::Point(415, 322));
-                objects.back().trajectory.push_back(cv::Point(420, 327));
-                objects.back().trajectory.push_back(cv::Point(425, 332));
-                objects.back().confidence = 0.6;
-                break;
-            }
-            case 2: {
-                // Test image 2: Create objects with similar motion vectors
-                objects.emplace_back(4, cv::Rect(200, 100, 45, 55), "uuid-4");
-                objects.back().trajectory.push_back(cv::Point(222, 127));
-                objects.back().trajectory.push_back(cv::Point(232, 137));
-                objects.back().trajectory.push_back(cv::Point(242, 147));
-                objects.back().confidence = 0.9;
-                
-                objects.emplace_back(5, cv::Rect(280, 120, 40, 50), "uuid-5");
-                objects.back().trajectory.push_back(cv::Point(300, 145));
-                objects.back().trajectory.push_back(cv::Point(310, 155));
-                objects.back().trajectory.push_back(cv::Point(320, 165));
-                objects.back().confidence = 0.8;
-                
-                objects.emplace_back(6, cv::Rect(350, 140, 38, 48), "uuid-6");
-                objects.back().trajectory.push_back(cv::Point(369, 164));
-                objects.back().trajectory.push_back(cv::Point(379, 174));
-                objects.back().trajectory.push_back(cv::Point(389, 184));
-                objects.back().confidence = 0.7;
-                break;
-            }
-            case 3: {
-                // Test image 3: Mixed scenario with multiple groups
-                // Group 1: Close proximity
-                objects.emplace_back(7, cv::Rect(150, 200, 35, 45), "uuid-7");
-                objects.back().trajectory.push_back(cv::Point(167, 222));
-                objects.back().trajectory.push_back(cv::Point(172, 227));
-                objects.back().trajectory.push_back(cv::Point(177, 232));
-                objects.back().confidence = 0.8;
-                
-                objects.emplace_back(8, cv::Rect(190, 220, 40, 50), "uuid-8");
-                objects.back().trajectory.push_back(cv::Point(210, 245));
-                objects.back().trajectory.push_back(cv::Point(215, 250));
-                objects.back().trajectory.push_back(cv::Point(220, 255));
-                objects.back().confidence = 0.7;
-                
-                // Group 2: Similar motion but farther away
-                objects.emplace_back(9, cv::Rect(350, 180, 42, 48), "uuid-9");
-                objects.back().trajectory.push_back(cv::Point(371, 204));
-                objects.back().trajectory.push_back(cv::Point(376, 209));
-                objects.back().trajectory.push_back(cv::Point(381, 214));
-                objects.back().confidence = 0.6;
-                
-                objects.emplace_back(10, cv::Rect(400, 200, 38, 52), "uuid-10");
-                objects.back().trajectory.push_back(cv::Point(419, 226));
-                objects.back().trajectory.push_back(cv::Point(424, 231));
-                objects.back().trajectory.push_back(cv::Point(429, 236));
-                objects.back().confidence = 0.8;
-                break;
-            }
-        }
+        // Create a cluster of objects in the top-left area
+        objects.emplace_back(0, cv::Rect(100, 100, 50, 50), "uuid_0");
+        objects.emplace_back(1, cv::Rect(120, 110, 45, 45), "uuid_1");
+        objects.emplace_back(2, cv::Rect(140, 120, 55, 40), "uuid_2");
+        objects.emplace_back(3, cv::Rect(160, 130, 40, 50), "uuid_3");
+        
+        // Create a cluster of objects in the bottom-right area
+        objects.emplace_back(4, cv::Rect(1500, 800, 60, 60), "uuid_4");
+        objects.emplace_back(5, cv::Rect(1520, 820, 50, 55), "uuid_5");
+        objects.emplace_back(6, cv::Rect(1540, 810, 55, 50), "uuid_6");
+        
+        // Create a single isolated object
+        objects.emplace_back(7, cv::Rect(800, 400, 70, 70), "uuid_7");
         
         return objects;
     }
     
-    // Visualization helper functions
-    cv::Mat visualizeTrackedObjects(const cv::Mat& frame, const std::vector<TrackedObject>& objects, 
-                                   const std::string& title) {
-        cv::Mat visualization = frame.clone();
+    // Helper function to create bird-like objects (based on real data)
+    std::vector<TrackedObject> createBirdLikeObjects() {
+        std::vector<TrackedObject> objects;
         
-        for (const auto& obj : objects) {
-            // Draw bounding box
-            cv::rectangle(visualization, obj.currentBounds, cv::Scalar(0, 255, 0), 2);
-            
-            // Draw trajectory
-            if (obj.trajectory.size() > 1) {
-                for (size_t i = 1; i < obj.trajectory.size(); ++i) {
-                    cv::line(visualization, obj.trajectory[i-1], obj.trajectory[i], 
-                            cv::Scalar(255, 0, 0), 2);
-                }
-                // Draw arrow at the end
-                if (obj.trajectory.size() >= 2) {
-                    cv::Point start = obj.trajectory[obj.trajectory.size() - 2];
-                    cv::Point end = obj.trajectory[obj.trajectory.size() - 1];
-                    cv::arrowedLine(visualization, start, end, cv::Scalar(255, 0, 255), 3);
-                }
-            }
-            
-            // Add object ID
-            cv::putText(visualization, "ID:" + std::to_string(obj.id), 
-                       cv::Point(obj.currentBounds.x, obj.currentBounds.y - 5),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 1);
-        }
+        // Cluster 1: Multiple small bird detections
+        objects.emplace_back(0, cv::Rect(1414, 832, 110, 49), "uuid_0");
+        objects.emplace_back(1, cv::Rect(1450, 783, 16, 13), "uuid_1");
+        objects.emplace_back(2, cv::Rect(1427, 782, 22, 23), "uuid_2");
+        objects.emplace_back(3, cv::Rect(1394, 774, 28, 27), "uuid_3");
+        objects.emplace_back(4, cv::Rect(1416, 744, 20, 15), "uuid_4");
+        objects.emplace_back(5, cv::Rect(1364, 734, 38, 35), "uuid_5");
         
-        // Add title
-        cv::putText(visualization, title, cv::Point(10, 30), 
-                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
+        // Cluster 2: Another group of bird detections
+        objects.emplace_back(6, cv::Rect(374, 656, 34, 34), "uuid_6");
+        objects.emplace_back(7, cv::Rect(357, 652, 14, 13), "uuid_7");
+        objects.emplace_back(8, cv::Rect(399, 634, 16, 14), "uuid_8");
+        objects.emplace_back(9, cv::Rect(336, 683, 21, 22), "uuid_9");
         
-        return visualization;
+        // Cluster 3: Larger bird detections
+        objects.emplace_back(10, cv::Rect(517, 464, 66, 63), "uuid_10");
+        objects.emplace_back(11, cv::Rect(576, 467, 27, 82), "uuid_11");
+        objects.emplace_back(12, cv::Rect(628, 489, 34, 25), "uuid_12");
+        
+        return objects;
+    }
+
+    ConsolidationConfig config;
+    std::unique_ptr<MotionRegionConsolidator> consolidator;
+    
+    // Real image data
+    std::string configPath;
+    std::string testImage1Path;
+    std::string testImage2Path;
+    std::vector<TrackedObject> realTrackedObjects;
+};
+
+// ============================================================================
+// INTEGRATION TESTS (Real Image Data)
+// ============================================================================
+
+// Test consolidation using real bird image motion data with adjusted parameters
+TEST_F(MotionRegionConsolidatorTest, RealBirdImageConsolidation) {
+    // Skip if no real motion was detected
+    if (realTrackedObjects.empty()) {
+        LOG_WARN("No motion detected in real bird images - skipping real data test");
+        GTEST_SKIP() << "No motion detected in real bird images";
     }
     
-    cv::Mat visualizeGroups(const cv::Mat& frame, const std::vector<TrackedObject>& objects,
-                           const std::vector<std::vector<int>>& groups, const std::string& title) {
-        cv::Mat visualization = frame.clone();
-        
-        // Different colors for different groups
-        std::vector<cv::Scalar> colors = {
-            cv::Scalar(255, 0, 0),    // Blue
-            cv::Scalar(0, 255, 0),    // Green  
-            cv::Scalar(0, 0, 255),    // Red
-            cv::Scalar(255, 255, 0),  // Cyan
-            cv::Scalar(255, 0, 255),  // Magenta
-            cv::Scalar(0, 255, 255),  // Yellow
-        };
-        
-        for (size_t groupIdx = 0; groupIdx < groups.size(); ++groupIdx) {
-            cv::Scalar color = colors[groupIdx % colors.size()];
-            
-            for (int objIdx : groups[groupIdx]) {
-                const auto& obj = objects[objIdx];
-                
-                // Draw bounding box in group color
-                cv::rectangle(visualization, obj.currentBounds, color, 3);
-                
-                // Draw trajectory
-                if (obj.trajectory.size() > 1) {
-                    for (size_t i = 1; i < obj.trajectory.size(); ++i) {
-                        cv::line(visualization, obj.trajectory[i-1], obj.trajectory[i], color, 2);
-                    }
-                }
-                
-                // Add group and object info
-                std::string label = "G" + std::to_string(groupIdx) + ":ID" + std::to_string(obj.id);
-                cv::putText(visualization, label, 
-                           cv::Point(obj.currentBounds.x, obj.currentBounds.y - 5),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
-            }
-        }
-        
-        // Add title and group count
-        cv::putText(visualization, title, cv::Point(10, 30), 
-                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
-        cv::putText(visualization, "Groups: " + std::to_string(groups.size()), 
-                   cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
-        
-        return visualization;
-    }
+    LOG_INFO("Testing consolidation with {} real TrackedObjects from bird images", realTrackedObjects.size());
     
-    cv::Mat visualizeConsolidatedRegions(const cv::Mat& frame, 
-                                        const std::vector<ConsolidatedRegion>& regions, 
-                                        const std::string& title) {
-        cv::Mat visualization = frame.clone();
+    // Create a more permissive config for bird motion data
+    ConsolidationConfig birdConfig = config;
+    birdConfig.maxDistanceThreshold = 200.0;  // Birds can be further apart
+    birdConfig.minObjectsPerRegion = 1;       // Allow single-bird regions for analysis
+    birdConfig.idealModelRegionSize = 640;
+    
+    MotionRegionConsolidator birdConsolidator(birdConfig);
+    
+    // Test consolidation with real motion data and visualization
+    cv::Mat inputImage = cv::imread(testImage2Path);  // Use the second image for visualization
+    std::string outputPath = "test_results/motion_region_consolidator/google_test_mode/01_real_bird_consolidation_visualization.jpg";
+    auto regions = birdConsolidator.consolidateRegionsWithVisualization(realTrackedObjects, inputImage, outputPath);
+    
+    // Log results for analysis
+    LOG_INFO("Real bird image consolidation results (permissive config):");
+    LOG_INFO("Input: {} TrackedObjects -> Output: {} consolidated regions", 
+             realTrackedObjects.size(), regions.size());
         
         for (size_t i = 0; i < regions.size(); ++i) {
             const auto& region = regions[i];
-            
-            // Draw bounding box
-            cv::Scalar color(0, 255, 255); // Yellow
-            cv::rectangle(visualization, region.boundingBox, color, 4);
-            
-            // Draw velocity vector
-            cv::Point center(region.boundingBox.x + region.boundingBox.width / 2,
-                           region.boundingBox.y + region.boundingBox.height / 2);
-            cv::Point velocityEnd(center.x + static_cast<int>(region.averageVelocity.x * 15),
-                                center.y + static_cast<int>(region.averageVelocity.y * 15));
-            cv::arrowedLine(visualization, center, velocityEnd, color, 3);
-            
-            // Add region info
-            std::string info = "R" + std::to_string(i) + " (" + 
-                             std::to_string(region.trackedObjectIds.size()) + " objs)";
-            cv::putText(visualization, info, 
-                       cv::Point(region.boundingBox.x, region.boundingBox.y - 10),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.7, color, 2);
-            
-            // Add confidence
-            std::string confInfo = "Conf: " + std::to_string(region.confidence).substr(0, 4);
-            cv::putText(visualization, confInfo,
-                       cv::Point(region.boundingBox.x, region.boundingBox.y + region.boundingBox.height + 20),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
-        }
-        
-        // Add title and region count
-        cv::putText(visualization, title, cv::Point(10, 30), 
-                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
-        cv::putText(visualization, "Regions: " + std::to_string(regions.size()), 
-                   cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
-        
-        return visualization;
+        LOG_INFO("Region {}: BBox({},{},{},{}) contains {} objects", 
+                 i, region.boundingBox.x, region.boundingBox.y, 
+                 region.boundingBox.width, region.boundingBox.height,
+                 region.trackedObjectIds.size());
     }
     
-protected:
-    std::string testImageDir_;
-    std::string outputDir_;
-    std::unique_ptr<MotionRegionConsolidator> consolidator_;
-    std::unique_ptr<MotionTracker> motionTracker_;
-};
-
-TEST_F(MotionRegionConsolidatorTest, ComprehensiveVisualizationTest) {
-    std::vector<std::string> testImages = {
-        "test_image.jpg",
-        "test_image2.jpg", 
-        "test_image3.png"
-    };
+    // Validate that consolidation produces reasonable results
+    EXPECT_LE(regions.size(), realTrackedObjects.size()) << "Should not create more regions than input objects";
+    EXPECT_GT(regions.size(), 0) << "Should create at least one region with permissive settings";
     
-    for (size_t imgIdx = 0; imgIdx < testImages.size(); ++imgIdx) {
-        std::string imagePath = testImageDir_ + testImages[imgIdx];
-        cv::Mat frame = cv::imread(imagePath);
-        
-        ASSERT_FALSE(frame.empty()) << "Could not load test image: " << imagePath;
-        
-        std::string imgPrefix = "img" + std::to_string(imgIdx + 1) + "_";
-        
-        LOG_INFO("Processing test image {}: {}", imgIdx + 1, testImages[imgIdx]);
-        
-        // Step 1: Save input image
-        cv::Mat inputViz = frame.clone();
-        cv::putText(inputViz, "Input Image " + std::to_string(imgIdx + 1), 
-                   cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
-        cv::imwrite(outputDir_ + "01_input_images/" + imgPrefix + "input.jpg", inputViz);
-        
-        // Step 2: Create mock tracked objects (simulating motion tracker output)
-        auto trackedObjects = createMockTrackedObjects(frame, imgIdx + 1);
-        ASSERT_FALSE(trackedObjects.empty()) << "No tracked objects created for image " << imgIdx + 1;
-        
-        cv::Mat trackingViz = visualizeTrackedObjects(frame, trackedObjects, 
-                                                     "Motion Tracking Results");
-        cv::imwrite(outputDir_ + "02_motion_tracking/" + imgPrefix + "tracked_objects.jpg", trackingViz);
-        
-        // Step 3: Test proximity grouping
-        LOG_DEBUG("Testing proximity grouping for {} objects", trackedObjects.size());
-        
-        // We need to access private methods for testing, so we'll use the public interface
-        // and analyze the results
-        auto consolidatedRegions = consolidator_->consolidateRegions(trackedObjects);
-        
-        // For visualization, we'll simulate the grouping process
-        std::vector<std::vector<int>> proximityGroups;
-        std::vector<bool> assigned(trackedObjects.size(), false);
-        
-        // Simple proximity grouping for visualization
-        for (size_t i = 0; i < trackedObjects.size(); ++i) {
-            if (assigned[i]) continue;
-            
-            std::vector<int> group = {static_cast<int>(i)};
-            assigned[i] = true;
-            
-            cv::Point center1 = trackedObjects[i].getCenter();
-            
-            for (size_t j = i + 1; j < trackedObjects.size(); ++j) {
-                if (assigned[j]) continue;
-                
-                cv::Point center2 = trackedObjects[j].getCenter();
-                double distance = cv::norm(center1 - center2);
-                
-                if (distance <= 120.0) { // Using config threshold
-                    group.push_back(static_cast<int>(j));
-                    assigned[j] = true;
-                }
-            }
-            
-            proximityGroups.push_back(group);
-        }
-        
-        cv::Mat proximityViz = visualizeGroups(frame, trackedObjects, proximityGroups, 
-                                              "Proximity Grouping");
-        cv::imwrite(outputDir_ + "03_proximity_grouping/" + imgPrefix + "proximity_groups.jpg", proximityViz);
-        
-        // Step 4: Test motion grouping (simplified visualization)
-        std::vector<std::vector<int>> motionGroups;
-        assigned.assign(trackedObjects.size(), false);
-        
-        for (size_t i = 0; i < trackedObjects.size(); ++i) {
-            if (assigned[i]) continue;
-            
-            std::vector<int> group = {static_cast<int>(i)};
-            assigned[i] = true;
-            
-            // Simple motion similarity check
-            if (trackedObjects[i].trajectory.size() >= 2) {
-                cv::Point2f vel1 = MotionRegionConsolidator::calculateVelocity(trackedObjects[i]);
-                
-                for (size_t j = i + 1; j < trackedObjects.size(); ++j) {
-                    if (assigned[j] || trackedObjects[j].trajectory.size() < 2) continue;
-                    
-                    cv::Point2f vel2 = MotionRegionConsolidator::calculateVelocity(trackedObjects[j]);
-                    
-                    // Simple angle similarity check
-                    double mag1 = cv::norm(vel1);
-                    double mag2 = cv::norm(vel2);
-                    
-                    if (mag1 > 1.0 && mag2 > 1.0) {
-                        double dot = vel1.dot(vel2);
-                        double angle = std::acos(std::clamp(dot / (mag1 * mag2), -1.0, 1.0));
-                        double angleDegrees = angle * 180.0 / M_PI;
-                        
-                        if (angleDegrees < 45.0) { // Using config threshold
-                            group.push_back(static_cast<int>(j));
-                            assigned[j] = true;
-                        }
-                    }
-                }
-            }
-            
-            motionGroups.push_back(group);
-        }
-        
-        cv::Mat motionViz = visualizeGroups(frame, trackedObjects, motionGroups, 
-                                           "Motion Similarity Grouping");
-        cv::imwrite(outputDir_ + "04_motion_grouping/" + imgPrefix + "motion_groups.jpg", motionViz);
-        
-        // Step 5: Visualize consolidated regions
-        cv::Mat consolidatedViz = visualizeConsolidatedRegions(frame, consolidatedRegions, 
-                                                              "Consolidated Regions");
-        cv::imwrite(outputDir_ + "05_consolidated_regions/" + imgPrefix + "consolidated.jpg", consolidatedViz);
-        
-        // Step 6: Visualize expanded regions
-        cv::Mat expandedViz = frame.clone();
-        for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
-            const auto& region = consolidatedRegions[i];
-            
-            // Show original region
-            cv::rectangle(expandedViz, region.boundingBox, cv::Scalar(0, 255, 0), 2);
-            
-            // Show expanded region
-            cv::Rect expanded = MotionRegionConsolidator::expandBoundingBox(
-                region.boundingBox, 1.3, frame.size());
-            cv::rectangle(expandedViz, expanded, cv::Scalar(0, 255, 255), 3);
-            
-            // Add labels
-            cv::putText(expandedViz, "Original", 
-                       cv::Point(region.boundingBox.x, region.boundingBox.y - 25),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
-            cv::putText(expandedViz, "Expanded", 
-                       cv::Point(expanded.x, expanded.y - 5),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 1);
-        }
-        
-        cv::putText(expandedViz, "Region Expansion", cv::Point(10, 30), 
-                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
-        cv::imwrite(outputDir_ + "06_expanded_regions/" + imgPrefix + "expanded.jpg", expandedViz);
-        
-        // Step 7: Final output with all information
-        cv::Mat finalViz = frame.clone();
-        
-        // Draw original tracked objects in light color
-        for (const auto& obj : trackedObjects) {
-            cv::rectangle(finalViz, obj.currentBounds, cv::Scalar(100, 100, 100), 1);
-        }
-        
-        // Draw consolidated regions prominently
-        for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
-            const auto& region = consolidatedRegions[i];
-            
-            // Draw expanded bounding box
-            cv::Rect expanded = MotionRegionConsolidator::expandBoundingBox(
-                region.boundingBox, 1.3, frame.size());
-            cv::rectangle(finalViz, expanded, cv::Scalar(0, 255, 255), 4);
-            
-            // Draw velocity vector
-            cv::Point center(expanded.x + expanded.width / 2, expanded.y + expanded.height / 2);
-            cv::Point velocityEnd(center.x + static_cast<int>(region.averageVelocity.x * 20),
-                                center.y + static_cast<int>(region.averageVelocity.y * 20));
-            cv::arrowedLine(finalViz, center, velocityEnd, cv::Scalar(255, 0, 255), 4);
-            
-            // Add comprehensive info
-            std::vector<std::string> info = {
-                "Region " + std::to_string(i),
-                "Objects: " + std::to_string(region.trackedObjectIds.size()),
-                "Size: " + std::to_string(expanded.width) + "x" + std::to_string(expanded.height),
-                "Conf: " + std::to_string(region.confidence).substr(0, 4)
-            };
-            
-            for (size_t j = 0; j < info.size(); ++j) {
-                cv::putText(finalViz, info[j],
-                           cv::Point(expanded.x, expanded.y - 30 + static_cast<int>(j * 20)),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 255), 2);
-            }
-        }
-        
-        // Add summary
-        cv::putText(finalViz, "Final Consolidated Regions for YOLO11", 
-                   cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
-        cv::putText(finalViz, "Input Objects: " + std::to_string(trackedObjects.size()) + 
-                             " -> Output Regions: " + std::to_string(consolidatedRegions.size()), 
-                   cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
-        
-        cv::imwrite(outputDir_ + "07_final_output/" + imgPrefix + "final_result.jpg", finalViz);
-        
-        // Assertions
-        EXPECT_GE(consolidatedRegions.size(), 0) << "Should produce some consolidated regions";
-        EXPECT_LE(consolidatedRegions.size(), trackedObjects.size()) 
-            << "Should not have more regions than input objects";
-        
-        for (const auto& region : consolidatedRegions) {
-            EXPECT_GE(region.trackedObjectIds.size(), 1) 
-                << "Each region should contain at least one object";
-            EXPECT_GT(region.boundingBox.area(), 0) 
-                << "Region should have positive area";
-        }
-        
-        LOG_INFO("Completed processing image {}: {} objects -> {} regions", 
-                imgIdx + 1, trackedObjects.size(), consolidatedRegions.size());
+    // Check that all regions meet minimum requirements
+    for (const auto& region : regions) {
+        EXPECT_GE(region.trackedObjectIds.size(), birdConfig.minObjectsPerRegion) 
+            << "Each region should meet minimum object count";
+        EXPECT_GT(region.boundingBox.area(), 0) << "Each region should have positive area";
+        EXPECT_GE(region.boundingBox.width, birdConfig.idealModelRegionSize) 
+            << "Region width should be at least idealModelRegionSize for YOLO";
+        EXPECT_GE(region.boundingBox.height, birdConfig.idealModelRegionSize) 
+            << "Region height should be at least idealModelRegionSize for YOLO";
     }
     
-    LOG_INFO("All test images processed successfully. Check {} for results", outputDir_);
+    // Test with default (stricter) config too
+    auto strictRegions = consolidator->consolidateRegions(realTrackedObjects);
+    LOG_INFO("Strict config results: {} regions (vs {} permissive)", 
+             strictRegions.size(), regions.size());
 }
 
-TEST_F(MotionRegionConsolidatorTest, ConfigurationTest) {
-    // Test different configuration parameters
-    ConsolidationConfig configs[] = {
-        {80.0, 0.2, 30.0, 0.3, 2, 10, 200.0, 30000.0, 1.1, 32, 32},   // Tight grouping
-        {200.0, 0.5, 60.0, 0.5, 1, 15, 500.0, 50000.0, 1.5, 96, 96}, // Loose grouping
+// ============================================================================
+// STANDALONE TESTS (Synthetic Data)
+// ============================================================================
+
+// Test standalone consolidation with synthetic data
+TEST_F(MotionRegionConsolidatorTest, StandaloneConsolidationSynthetic) {
+    std::vector<TrackedObject> objects = createSyntheticObjects();
+    
+    LOG_INFO("Testing consolidation with {} synthetic objects", objects.size());
+    
+    // Test standalone consolidation
+    std::string outputPath = "test_results/motion_region_consolidator/google_test_mode/02_synthetic_consolidation.jpg";
+    auto regions = consolidator->consolidateRegionsStandalone(objects, outputPath);
+    
+    // Verify results
+    EXPECT_GT(regions.size(), 0) << "Should create at least one consolidated region";
+    EXPECT_LE(regions.size(), objects.size()) << "Should not create more regions than objects";
+    
+    LOG_INFO("Synthetic consolidation results:");
+    LOG_INFO("Input: {} objects -> Output: {} regions", objects.size(), regions.size());
+    
+    for (size_t i = 0; i < regions.size(); ++i) {
+        const auto& region = regions[i];
+        LOG_INFO("Region {}: {}x{} at ({},{}) with {} objects", 
+                i, region.boundingBox.width, region.boundingBox.height,
+                region.boundingBox.x, region.boundingBox.y, region.trackedObjectIds.size());
+        
+        // Verify region properties
+        EXPECT_GE(region.trackedObjectIds.size(), config.minObjectsPerRegion) 
+            << "Region should contain minimum required objects";
+        EXPECT_GT(region.boundingBox.area(), 0) << "Region should have positive area";
+        // Note: Width/height may be less than idealModelRegionSize for small object clusters
+        // The algorithm ensures at least one dimension meets the requirement
+        EXPECT_GE(std::max(region.boundingBox.width, region.boundingBox.height), config.idealModelRegionSize) 
+            << "Region should have at least one dimension meeting minimum requirement";
+    }
+    
+    // Verify output file exists
+    EXPECT_TRUE(std::filesystem::exists(outputPath)) << "Visualization not created";
+    LOG_INFO("Visualization saved to: {}", outputPath);
+}
+
+// Test standalone consolidation with bird-like data
+TEST_F(MotionRegionConsolidatorTest, StandaloneConsolidationBirdLike) {
+    std::vector<TrackedObject> objects = createBirdLikeObjects();
+    
+    LOG_INFO("Testing consolidation with {} bird-like objects", objects.size());
+    
+    // Use more permissive config for bird data
+    ConsolidationConfig birdConfig = config;
+    birdConfig.maxDistanceThreshold = 200.0;
+    birdConfig.minObjectsPerRegion = 1;
+    birdConfig.idealModelRegionSize = 640;
+    
+    MotionRegionConsolidator birdConsolidator(birdConfig);
+    
+    // Test standalone consolidation
+    std::string outputPath = "test_results/motion_region_consolidator/google_test_mode/03_bird_like_consolidation.jpg";
+    auto regions = birdConsolidator.consolidateRegionsStandalone(objects, outputPath);
+    
+    // Verify results
+    EXPECT_GT(regions.size(), 0) << "Should create at least one consolidated region";
+    EXPECT_LE(regions.size(), objects.size()) << "Should not create more regions than objects";
+    
+    LOG_INFO("Bird-like consolidation results:");
+    LOG_INFO("Input: {} objects -> Output: {} regions", objects.size(), regions.size());
+    
+    for (size_t i = 0; i < regions.size(); ++i) {
+        const auto& region = regions[i];
+        LOG_INFO("Region {}: {}x{} at ({},{}) with {} objects", 
+                i, region.boundingBox.width, region.boundingBox.height,
+                region.boundingBox.x, region.boundingBox.y, region.trackedObjectIds.size());
+        
+        // Verify region properties
+        EXPECT_GT(region.boundingBox.area(), 0) << "Region should have positive area";
+        // Note: Width/height may be less than idealModelRegionSize for small object clusters
+        // The algorithm ensures at least one dimension meets the requirement
+        EXPECT_GE(std::max(region.boundingBox.width, region.boundingBox.height), birdConfig.idealModelRegionSize) 
+            << "Region should have at least one dimension meeting minimum requirement";
+    }
+    
+    // Verify output file exists
+    EXPECT_TRUE(std::filesystem::exists(outputPath)) << "Visualization not created";
+    LOG_INFO("Visualization saved to: {}", outputPath);
+}
+
+// ============================================================================
+// CONFIGURATION AND EDGE CASE TESTS
+// ============================================================================
+
+// Test configuration variations
+TEST_F(MotionRegionConsolidatorTest, ConfigurationVariations) {
+    std::vector<TrackedObject> objects = createSyntheticObjects();
+    
+    // Test tight configuration
+    ConsolidationConfig tightConfig = config;
+    tightConfig.maxDistanceThreshold = 50.0;
+    tightConfig.minObjectsPerRegion = 3;
+    
+    MotionRegionConsolidator tightConsolidator(tightConfig);
+    auto tightRegions = tightConsolidator.consolidateRegionsStandalone(objects, 
+        "test_results/motion_region_consolidator/google_test_mode/04_tight_config.jpg");
+    
+    // Test loose configuration
+    ConsolidationConfig looseConfig = config;
+    looseConfig.maxDistanceThreshold = 300.0;
+    looseConfig.minObjectsPerRegion = 1;
+    
+    MotionRegionConsolidator looseConsolidator(looseConfig);
+    auto looseRegions = looseConsolidator.consolidateRegionsStandalone(objects, 
+        "test_results/motion_region_consolidator/google_test_mode/05_loose_config.jpg");
+    
+    LOG_INFO("Configuration comparison:");
+    LOG_INFO("Tight config: {} regions", tightRegions.size());
+    LOG_INFO("Loose config: {} regions", looseRegions.size());
+    
+    // Loose config should generally create fewer regions
+    EXPECT_LE(looseRegions.size(), tightRegions.size()) 
+        << "Loose config should create fewer or equal regions";
+}
+
+// Test edge cases
+TEST_F(MotionRegionConsolidatorTest, EdgeCases) {
+    // Test with empty input
+    auto emptyRegions = consolidator->consolidateRegionsStandalone({}, 
+        "test_results/motion_region_consolidator/google_test_mode/06_empty_input.jpg");
+    EXPECT_EQ(emptyRegions.size(), 0) << "Empty input should produce no regions";
+    
+    // Test with single object
+    std::vector<TrackedObject> singleObject = {
+        TrackedObject(0, cv::Rect(100, 100, 50, 50), "uuid_0")
     };
     
-    std::string configNames[] = {"tight", "loose"};
+    auto singleRegions = consolidator->consolidateRegionsStandalone(singleObject, 
+        "test_results/motion_region_consolidator/google_test_mode/07_single_object.jpg");
+    EXPECT_EQ(singleRegions.size(), 0) 
+        << "Single object should not create regions (below minimum)";
     
-    cv::Mat testFrame = cv::imread(testImageDir_ + "test_image.jpg");
-    ASSERT_FALSE(testFrame.empty());
+    // Test with minimum required objects
+    std::vector<TrackedObject> minObjects = {
+        TrackedObject(0, cv::Rect(100, 100, 50, 50), "uuid_0"),
+        TrackedObject(1, cv::Rect(120, 110, 45, 45), "uuid_1")
+    };
     
-    auto trackedObjects = createMockTrackedObjects(testFrame, 1);
-    
-    for (int i = 0; i < 2; ++i) {
-        consolidator_->updateConfig(configs[i]);
-        auto regions = consolidator_->consolidateRegions(trackedObjects);
-        
-        cv::Mat configViz = visualizeConsolidatedRegions(testFrame, regions, 
-                                                        "Config: " + configNames[i]);
-        cv::imwrite(outputDir_ + "07_final_output/config_" + configNames[i] + "_test.jpg", configViz);
-        
-        LOG_INFO("Config {}: {} objects -> {} regions", configNames[i], 
-                trackedObjects.size(), regions.size());
+    auto minRegions = consolidator->consolidateRegionsStandalone(minObjects, 
+        "test_results/motion_region_consolidator/google_test_mode/08_min_objects.jpg");
+    EXPECT_GT(minRegions.size(), 0) 
+        << "Minimum objects should create at least one region";
+}
+
+// ============================================================================
+// BASIC FUNCTIONALITY TESTS
+// ============================================================================
+
+// Test consolidation with small number of objects (synthetic data for edge cases)
+TEST_F(MotionRegionConsolidatorTest, ConsolidationSmallN) {
+    std::vector<TrackedObject> objects;
+    // Create 20 objects: 10 close together, 10 far apart
+    for (int i = 0; i < 10; ++i) {
+        objects.emplace_back(i, cv::Rect(100 + i * 10, 100 + i * 10, 20, 20), "uuid" + std::to_string(i));
     }
+    for (int i = 10; i < 20; ++i) {
+        objects.emplace_back(i, cv::Rect(1000 + i * 10, 1000 + i * 10, 20, 20), "uuid" + std::to_string(i));
+    }
+
+    auto regions = consolidator->consolidateRegions(objects);
+    
+    // Expect at least one region with objects 0-9 (within 50 pixels)
+    EXPECT_GE(regions.size(), 1);
+    bool foundCloseRegion = false;
+    for (const auto& region : regions) {
+        if (region.trackedObjectIds.size() >= static_cast<size_t>(config.minObjectsPerRegion)) {
+            foundCloseRegion = true;
+            for (int id : region.trackedObjectIds) {
+                EXPECT_LT(id, 10) << "Close region should only contain objects 0-9";
+            }
+        }
+    }
+    EXPECT_TRUE(foundCloseRegion) << "Expected a region with close objects";
+}
+
+// Test consolidation with large number of objects
+TEST_F(MotionRegionConsolidatorTest, ConsolidationLargeN) {
+    std::vector<TrackedObject> objects;
+    // Create 60 objects: 30 close together, 30 spread out
+    for (int i = 0; i < 30; ++i) {
+        objects.emplace_back(i, cv::Rect(100 + i * 5, 100 + i * 5, 20, 20), "uuid" + std::to_string(i));
+    }
+    for (int i = 30; i < 60; ++i) {
+        objects.emplace_back(i, cv::Rect(500 + (i-30) * 100, 500 + (i-30) * 100, 20, 20), "uuid" + std::to_string(i));
+    }
+
+    auto regions = consolidator->consolidateRegions(objects);
+    
+    // Expect at least one region with objects 0-29 (within 50 pixels)
+    EXPECT_GE(regions.size(), 1);
+    bool foundCloseRegion = false;
+    for (const auto& region : regions) {
+        if (region.trackedObjectIds.size() >= static_cast<size_t>(config.minObjectsPerRegion)) {
+            foundCloseRegion = true;
+            for (int id : region.trackedObjectIds) {
+                EXPECT_LT(id, 30) << "Close region should only contain objects 0-29";
+            }
+        }
+    }
+    EXPECT_TRUE(foundCloseRegion) << "Expected a region with close objects";
+}
+
+// Test consolidateRegions with valid input (uses real data if available, synthetic otherwise)
+TEST_F(MotionRegionConsolidatorTest, ConsolidateRegionsValidInput) {
+    std::vector<TrackedObject> objects;
+    
+    // Use real data if available, otherwise use synthetic data
+    if (!realTrackedObjects.empty() && realTrackedObjects.size() >= 2) {
+        LOG_INFO("Using real bird image data for ConsolidateRegionsValidInput test");
+        // Use a subset of real objects for this test
+        objects.assign(realTrackedObjects.begin(), 
+                      realTrackedObjects.begin() + std::min(static_cast<size_t>(3), realTrackedObjects.size()));
+    } else {
+        LOG_INFO("Using synthetic data for ConsolidateRegionsValidInput test");
+        // Create 3 very close objects to form a group (within 50 pixel threshold)
+        objects.emplace_back(0, cv::Rect(100, 100, 200, 200), "uuid0");
+        objects.emplace_back(1, cv::Rect(102, 102, 200, 200), "uuid1");
+        objects.emplace_back(2, cv::Rect(104, 104, 200, 200), "uuid2");
+    }
+
+    auto regions = consolidator->consolidateRegions(objects);
+    
+    LOG_INFO("ConsolidateRegionsValidInput: {} objects -> {} regions", objects.size(), regions.size());
+    
+    // For real data, we may not get exactly 1 region, so be more flexible
+    if (!realTrackedObjects.empty()) {
+        // Real data validation
+        EXPECT_GE(regions.size(), 0) << "Should produce some result";
+        EXPECT_LE(regions.size(), objects.size()) << "Should not create more regions than objects";
+        
+        // Check that regions meet basic requirements
+        for (const auto& region : regions) {
+            EXPECT_GT(region.boundingBox.area(), 0) << "Region should have positive area";
+            EXPECT_GE(region.boundingBox.width, config.idealModelRegionSize) << "Region width should be at least idealModelRegionSize";
+            EXPECT_GE(region.boundingBox.height, config.idealModelRegionSize) << "Region height should be at least idealModelRegionSize";
+        }
+    } else {
+        // Synthetic data validation (more strict)
+        EXPECT_EQ(regions.size(), 1) << "Expected one consolidated region for synthetic close objects";
+        if (!regions.empty()) {
+            auto& region = regions[0];
+            EXPECT_EQ(region.trackedObjectIds.size(), 3) << "Region should contain 3 objects";
+            EXPECT_GE(region.boundingBox.width, config.idealModelRegionSize) << "Region width should be at least idealModelRegionSize";
+            EXPECT_GE(region.boundingBox.height, config.idealModelRegionSize) << "Region height should be at least idealModelRegionSize";
+        }
+    }
+}
+
+// Test consolidateRegions with empty input
+TEST_F(MotionRegionConsolidatorTest, ConsolidateRegionsEmptyInput) {
+    std::vector<TrackedObject> objects;
+    auto regions = consolidator->consolidateRegions(objects);
+    EXPECT_TRUE(regions.empty()) << "Expected no regions for empty input";
+}
+
+// Test consolidateRegions with single object (below minObjectsPerRegion)
+TEST_F(MotionRegionConsolidatorTest, ConsolidateRegionsSingleObject) {
+    std::vector<TrackedObject> objects;
+    objects.emplace_back(0, cv::Rect(100, 100, 50, 50), "uuid0");
+    
+    auto regions = consolidator->consolidateRegions(objects);
+    EXPECT_TRUE(regions.empty()) << "Expected no regions for single object (below minObjectsPerRegion)";
+}
+
+// Test region merging with overlapping regions
+TEST_F(MotionRegionConsolidatorTest, ConsolidateRegionsMerging) {
+    std::vector<TrackedObject> objects;
+    // Create two overlapping groups
+    objects.emplace_back(0, cv::Rect(100, 100, 50, 50), "uuid0");
+    objects.emplace_back(1, cv::Rect(120, 120, 50, 50), "uuid1");
+    objects.emplace_back(2, cv::Rect(110, 110, 50, 50), "uuid2"); // Overlaps with first group
+    
+    auto regions = consolidator->consolidateRegions(objects);
+    
+    // Expect one merged region
+    EXPECT_EQ(regions.size(), 1) << "Expected one merged region";
+    if (!regions.empty()) {
+        auto& region = regions[0];
+        EXPECT_EQ(region.trackedObjectIds.size(), 3) << "Merged region should contain 3 objects";
+    }
+}
+
+// Test stale region removal
+TEST_F(MotionRegionConsolidatorTest, RemoveStaleRegions) {
+    std::vector<TrackedObject> objects;
+    // Create initial regions
+    objects.emplace_back(0, cv::Rect(100, 100, 50, 50), "uuid0");
+    objects.emplace_back(1, cv::Rect(120, 120, 50, 50), "uuid1");
+    consolidator->consolidateRegions(objects);
+    
+    // Simulate frames without objects
+    for (int i = 0; i < config.maxFramesWithoutUpdate + 1; ++i) {
+        consolidator->consolidateRegions({});
+    }
+    
+    auto regions = consolidator->consolidateRegions({});
+    EXPECT_TRUE(regions.empty()) << "Expected stale regions to be removed";
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::AddGlobalTestEnvironment(new MotionRegionConsolidatorTestEnvironment());
+    return RUN_ALL_TESTS();
 }

@@ -2,11 +2,113 @@
 #include "logger.hpp"
 #include <algorithm>
 #include <cmath>
-#include <numeric>
+#include <map>
+#include <vector>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 MotionRegionConsolidator::MotionRegionConsolidator(const ConsolidationConfig& config)
     : config_(config), frameCounter_(0) {
     LOG_INFO("MotionRegionConsolidator initialized with config");
+}
+
+std::vector<std::vector<int>> MotionRegionConsolidator::groupByProximityPairwise(
+    const std::vector<TrackedObject>& objects) {
+    std::vector<std::vector<int>> groups;
+    const size_t n = objects.size();
+    std::vector<bool> assigned(n, false);
+
+    for (size_t i = 0; i < n; ++i) {
+        if (assigned[i]) continue;
+        
+        std::vector<int> group = {static_cast<int>(i)};
+        assigned[i] = true;
+        
+        for (size_t j = i + 1; j < n; ++j) {
+            if (assigned[j]) continue;
+            
+            double distance = calculateSpatialDistance(objects[i], objects[j]);
+            if (distance <= config_.maxDistanceThreshold) {
+                group.push_back(static_cast<int>(j));
+                assigned[j] = true;
+            }
+        }
+        
+        if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
+            groups.push_back(group);
+        }
+    }
+    
+    LOG_DEBUG("Used pairwise proximity grouping (O(n²)) for {} objects, created {} groups", n, groups.size());
+    return groups;
+}
+
+std::vector<std::vector<int>> MotionRegionConsolidator::groupByProximityGrid(
+    const std::vector<TrackedObject>& objects) {
+    std::vector<std::vector<int>> groups;
+    const size_t n = objects.size();
+    std::map<std::pair<int, int>, std::vector<int>> grid;
+    double cellSize = config_.gridCellSize;
+    
+    // Assign objects to grid cells
+    for (size_t i = 0; i < n; ++i) {
+        cv::Point center = objects[i].getCenter();
+        int row = static_cast<int>(center.y / cellSize);
+        int col = static_cast<int>(center.x / cellSize);
+        grid[{row, col}].push_back(static_cast<int>(i));
+    }
+    
+    std::vector<bool> assigned(n, false);
+    
+    // Process each cell and its neighbors
+    for (const auto& cell : grid) {
+        const auto& cellIndices = cell.second;
+        for (int i : cellIndices) {
+            if (assigned[i]) continue;
+            
+            std::vector<int> group = {i};
+            assigned[i] = true;
+            
+            // Check objects in the same and neighboring cells
+            for (int dr = -1; dr <= 1; ++dr) {
+                for (int dc = -1; dc <= 1; ++dc) {
+                    auto neighborCell = grid.find({cell.first.first + dr, cell.first.second + dc});
+                    if (neighborCell == grid.end()) continue;
+                    
+                    for (int j : neighborCell->second) {
+                        if (assigned[j] || i == j) continue;
+                        
+                        double distance = calculateSpatialDistance(objects[i], objects[j]);
+                        if (distance <= config_.maxDistanceThreshold) {
+                            group.push_back(j);
+                            assigned[j] = true;
+                        }
+                    }
+                }
+            }
+            
+            if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
+                groups.push_back(group);
+            }
+        }
+    }
+    
+    LOG_DEBUG("Used grid-based proximity grouping for {} objects, created {} groups with cell size {}", 
+              n, groups.size(), cellSize);
+    return groups;
+}
+
+std::vector<std::vector<int>> MotionRegionConsolidator::groupObjectsByProximity(
+    const std::vector<TrackedObject>& objects) {
+    const size_t n = objects.size();
+    
+    // Use pairwise O(n²) for small n (<50) to avoid grid overhead
+    if (n < 50) {
+        return groupByProximityPairwise(objects);
+    }
+    // Use grid-based approach for larger n
+    return groupByProximityGrid(objects);
 }
 
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
@@ -21,24 +123,14 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
     
     LOG_DEBUG("Consolidating {} tracked objects", trackedObjects.size());
     
-    // Step 1: Group objects by spatial proximity
+    // Step 1: Group objects by spatial proximity only
     auto proximityGroups = groupObjectsByProximity(trackedObjects);
     
-    // Step 2: Further refine groups by motion similarity
+    // Step 2: Use proximity groups directly
     std::vector<std::vector<int>> finalGroups;
     for (const auto& group : proximityGroups) {
         if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-            auto motionGroups = groupObjectsByMotion(trackedObjects);
-            // Intersect proximity and motion groups
-            for (const auto& motionGroup : motionGroups) {
-                std::vector<int> intersection;
-                std::set_intersection(group.begin(), group.end(),
-                                    motionGroup.begin(), motionGroup.end(),
-                                    std::back_inserter(intersection));
-                if (intersection.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-                    finalGroups.push_back(intersection);
-                }
-            }
+            finalGroups.push_back(group);
         }
     }
     
@@ -70,66 +162,6 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
     return consolidatedRegions_;
 }
 
-std::vector<std::vector<int>> MotionRegionConsolidator::groupObjectsByProximity(
-    const std::vector<TrackedObject>& objects) {
-    
-    std::vector<std::vector<int>> groups;
-    std::vector<bool> assigned(objects.size(), false);
-    
-    for (size_t i = 0; i < objects.size(); ++i) {
-        if (assigned[i]) continue;
-        
-        std::vector<int> group = {static_cast<int>(i)};
-        assigned[i] = true;
-        
-        // Find all objects within distance threshold
-        for (size_t j = i + 1; j < objects.size(); ++j) {
-            if (assigned[j]) continue;
-            
-            double distance = calculateSpatialDistance(objects[i], objects[j]);
-            if (distance <= config_.maxDistanceThreshold) {
-                group.push_back(static_cast<int>(j));
-                assigned[j] = true;
-            }
-        }
-        
-        if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-            groups.push_back(group);
-        }
-    }
-    
-    return groups;
-}
-
-std::vector<std::vector<int>> MotionRegionConsolidator::groupObjectsByMotion(
-    const std::vector<TrackedObject>& objects) {
-    
-    std::vector<std::vector<int>> groups;
-    std::vector<bool> assigned(objects.size(), false);
-    
-    for (size_t i = 0; i < objects.size(); ++i) {
-        if (assigned[i]) continue;
-        
-        std::vector<int> group = {static_cast<int>(i)};
-        assigned[i] = true;
-        
-        // Find all objects with similar motion
-        for (size_t j = i + 1; j < objects.size(); ++j) {
-            if (assigned[j]) continue;
-            
-            double similarity = calculateMotionSimilarity(objects[i], objects[j]);
-            if (similarity > 0.7) { // High similarity threshold
-                group.push_back(static_cast<int>(j));
-                assigned[j] = true;
-            }
-        }
-        
-        groups.push_back(group);
-    }
-    
-    return groups;
-}
-
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::createConsolidatedRegions(
     const std::vector<TrackedObject>& objects,
     const std::vector<std::vector<int>>& groups) {
@@ -140,28 +172,38 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::createConsolidatedRegi
         if (group.empty()) continue;
         
         cv::Rect bbox = calculateBoundingBox(objects, group);
-        cv::Point2f avgVelocity = calculateAverageVelocity(objects, group);
-        double confidence = calculateRegionConfidence(objects, group);
         
         // Expand bounding box for better YOLO detection
-        bbox = expandBoundingBox(bbox, config_.regionExpansionFactor, cv::Size(1920, 1080));
+        bbox = expandBoundingBox(bbox, config_.regionExpansionFactor, config_.frameSize);
         
-        // Ensure minimum size for YOLO
-        if (bbox.width < config_.minRegionWidth) {
-            int expand = (config_.minRegionWidth - bbox.width) / 2;
-            bbox.x -= expand;
-            bbox.width = config_.minRegionWidth;
+        // Adjust to ideal model region size, preserving aspect ratio
+        double aspectRatio = static_cast<double>(bbox.width) / bbox.height;
+        int idealSize = config_.idealModelRegionSize;
+        int newWidth, newHeight;
+        if (aspectRatio >= 1.0) {
+            newWidth = idealSize;
+            newHeight = static_cast<int>(idealSize / aspectRatio);
+        } else {
+            newHeight = idealSize;
+            newWidth = static_cast<int>(idealSize * aspectRatio);
         }
-        if (bbox.height < config_.minRegionHeight) {
-            int expand = (config_.minRegionHeight - bbox.height) / 2;
-            bbox.y -= expand;
-            bbox.height = config_.minRegionHeight;
-        }
+        
+        // Center the adjusted box
+        int expandX = (newWidth - bbox.width) / 2;
+        int expandY = (newHeight - bbox.height) / 2;
+        bbox.x -= expandX;
+        bbox.y -= expandY;
+        bbox.width = newWidth;
+        bbox.height = newHeight;
+        
+        // Clamp to frame boundaries
+        bbox.x = std::max(0, std::min(bbox.x, config_.frameSize.width - bbox.width));
+        bbox.y = std::max(0, std::min(bbox.y, config_.frameSize.height - bbox.height));
         
         // Check area constraints
         double area = bbox.width * bbox.height;
         if (area >= config_.minRegionArea && area <= config_.maxRegionArea) {
-            regions.emplace_back(bbox, group, avgVelocity, confidence);
+            regions.emplace_back(bbox, group);
             LOG_DEBUG("Created consolidated region: {}x{} at ({},{}) with {} objects",
                      bbox.width, bbox.height, bbox.x, bbox.y, group.size());
         }
@@ -178,7 +220,7 @@ void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedOb
         std::vector<int> updatedIds;
         for (int id : region.trackedObjectIds) {
             auto it = std::find_if(objects.begin(), objects.end(),
-                                 [id](const TrackedObject& obj) { return obj.id == id; });
+                                   [id](const TrackedObject& obj) { return obj.id == id; });
             if (it != objects.end()) {
                 updatedIds.push_back(id);
             }
@@ -188,10 +230,8 @@ void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedOb
             region.trackedObjectIds = updatedIds;
             region.framesSinceLastUpdate = 0;
             
-            // Recalculate bounding box and velocity
+            // Recalculate bounding box
             region.boundingBox = calculateBoundingBox(objects, updatedIds);
-            region.averageVelocity = calculateAverageVelocity(objects, updatedIds);
-            region.confidence = calculateRegionConfidence(objects, updatedIds);
         }
     }
 }
@@ -199,9 +239,9 @@ void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedOb
 void MotionRegionConsolidator::removeStaleRegions() {
     consolidatedRegions_.erase(
         std::remove_if(consolidatedRegions_.begin(), consolidatedRegions_.end(),
-                      [this](const ConsolidatedRegion& region) {
-                          return region.framesSinceLastUpdate > config_.maxFramesWithoutUpdate;
-                      }),
+                       [this](const ConsolidatedRegion& region) {
+                           return region.framesSinceLastUpdate > config_.maxFramesWithoutUpdate;
+                       }),
         consolidatedRegions_.end());
 }
 
@@ -216,19 +256,7 @@ ConsolidatedRegion MotionRegionConsolidator::mergeRegions(
     mergedIds.insert(mergedIds.end(), region2.trackedObjectIds.begin(), 
                     region2.trackedObjectIds.end());
     
-    // Average velocities weighted by confidence
-    double totalConfidence = region1.confidence + region2.confidence;
-    cv::Point2f mergedVelocity;
-    if (totalConfidence > 0) {
-        mergedVelocity.x = (region1.averageVelocity.x * region1.confidence + 
-                           region2.averageVelocity.x * region2.confidence) / totalConfidence;
-        mergedVelocity.y = (region1.averageVelocity.y * region1.confidence + 
-                           region2.averageVelocity.y * region2.confidence) / totalConfidence;
-    }
-    
-    double mergedConfidence = totalConfidence / 2.0;
-    
-    ConsolidatedRegion merged(mergedBox, mergedIds, mergedVelocity, mergedConfidence);
+    ConsolidatedRegion merged(mergedBox, mergedIds);
     merged.framesSinceLastUpdate = std::min(region1.framesSinceLastUpdate, 
                                            region2.framesSinceLastUpdate);
     
@@ -245,37 +273,6 @@ double MotionRegionConsolidator::calculateSpatialDistance(
     double dy = center1.y - center2.y;
     
     return std::sqrt(dx * dx + dy * dy);
-}
-
-double MotionRegionConsolidator::calculateMotionSimilarity(
-    const TrackedObject& obj1, const TrackedObject& obj2) const {
-    
-    if (obj1.trajectory.size() < 2 || obj2.trajectory.size() < 2) {
-        return 0.0; // No motion data available
-    }
-    
-    cv::Point2f vel1 = calculateVelocity(obj1);
-    cv::Point2f vel2 = calculateVelocity(obj2);
-    
-    // Calculate magnitude similarity
-    double mag1 = std::sqrt(vel1.x * vel1.x + vel1.y * vel1.y);
-    double mag2 = std::sqrt(vel2.x * vel2.x + vel2.y * vel2.y);
-    
-    if (mag1 == 0.0 || mag2 == 0.0) {
-        return (mag1 == 0.0 && mag2 == 0.0) ? 1.0 : 0.0;
-    }
-    
-    double magRatio = std::min(mag1, mag2) / std::max(mag1, mag2);
-    
-    // Calculate angle similarity
-    double dot = vel1.x * vel2.x + vel1.y * vel2.y;
-    double angle = std::acos(std::clamp(dot / (mag1 * mag2), -1.0, 1.0));
-    double angleDegrees = angle * 180.0 / M_PI;
-    
-    double angleSimilarity = 1.0 - (angleDegrees / 180.0);
-    
-    // Combine similarities
-    return (magRatio + angleSimilarity) / 2.0;
 }
 
 bool MotionRegionConsolidator::areRegionsOverlapping(
@@ -307,46 +304,6 @@ cv::Rect MotionRegionConsolidator::calculateBoundingBox(
     return combinedBox;
 }
 
-cv::Point2f MotionRegionConsolidator::calculateAverageVelocity(
-    const std::vector<TrackedObject>& objects, const std::vector<int>& indices) const {
-    
-    if (indices.empty()) {
-        return cv::Point2f(0, 0);
-    }
-    
-    cv::Point2f totalVelocity(0, 0);
-    int validObjects = 0;
-    
-    for (int idx : indices) {
-        cv::Point2f velocity = calculateVelocity(objects[idx]);
-        if (velocity.x != 0.0f || velocity.y != 0.0f) {
-            totalVelocity += velocity;
-            validObjects++;
-        }
-    }
-    
-    if (validObjects > 0) {
-        return cv::Point2f(totalVelocity.x / validObjects, totalVelocity.y / validObjects);
-    }
-    
-    return cv::Point2f(0, 0);
-}
-
-double MotionRegionConsolidator::calculateRegionConfidence(
-    const std::vector<TrackedObject>& objects, const std::vector<int>& indices) const {
-    
-    if (indices.empty()) {
-        return 0.0;
-    }
-    
-    double totalConfidence = 0.0;
-    for (int idx : indices) {
-        totalConfidence += objects[idx].confidence;
-    }
-    
-    return totalConfidence / indices.size();
-}
-
 cv::Rect MotionRegionConsolidator::expandBoundingBox(
     const cv::Rect& bbox, double expansionFactor, const cv::Size& frameSize) {
     
@@ -363,27 +320,162 @@ cv::Rect MotionRegionConsolidator::expandBoundingBox(
     return expanded;
 }
 
-cv::Point2f MotionRegionConsolidator::calculateVelocity(const TrackedObject& obj) {
-    if (obj.trajectory.size() < 2) {
-        return cv::Point2f(0, 0);
-    }
-    
-    // Use last few points for velocity calculation
-    size_t numPoints = std::min(obj.trajectory.size(), static_cast<size_t>(5));
-    cv::Point2f velocity(0, 0);
-    
-    for (size_t i = obj.trajectory.size() - numPoints; i < obj.trajectory.size() - 1; ++i) {
-        velocity.x += obj.trajectory[i + 1].x - obj.trajectory[i].x;
-        velocity.y += obj.trajectory[i + 1].y - obj.trajectory[i].y;
-    }
-    
-    velocity.x /= (numPoints - 1);
-    velocity.y /= (numPoints - 1);
-    
-    return velocity;
-}
-
 void MotionRegionConsolidator::updateConfig(const ConsolidationConfig& config) {
     config_ = config;
     LOG_INFO("MotionRegionConsolidator config updated");
 }
+
+// ============================================================================
+// VISUALIZATION METHODS
+// ============================================================================
+
+std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegionsWithVisualization(
+    const std::vector<TrackedObject>& trackedObjects,
+    const cv::Mat& inputImage,
+    const std::string& outputImagePath) {
+    
+    // Perform normal consolidation
+    std::vector<ConsolidatedRegion> regions = consolidateRegions(trackedObjects);
+    
+    // Create visualization if input image is provided
+    if (!inputImage.empty()) {
+        cv::Mat visualization = createVisualization(trackedObjects, regions, inputImage);
+        
+        // Save visualization if output path is provided
+        if (!outputImagePath.empty()) {
+            if (cv::imwrite(outputImagePath, visualization)) {
+                LOG_INFO("Saved consolidation visualization to: {}", outputImagePath);
+            } else {
+                LOG_ERROR("Failed to save visualization to: {}", outputImagePath);
+            }
+        }
+    }
+    
+    return regions;
+}
+
+std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegionsStandalone(
+    const std::vector<TrackedObject>& trackedObjects,
+    const std::string& outputImagePath) {
+    
+    // Perform normal consolidation
+    std::vector<ConsolidatedRegion> regions = consolidateRegions(trackedObjects);
+    
+    // Create a synthetic visualization image if no input image provided
+    cv::Mat syntheticImage = cv::Mat::zeros(cv::Size(1920, 1080), CV_8UC3);
+    
+    // Draw a background grid to show the frame
+    for (int i = 0; i < syntheticImage.cols; i += 100) {
+        cv::line(syntheticImage, cv::Point(i, 0), cv::Point(i, syntheticImage.rows), 
+                cv::Scalar(50, 50, 50), 1);
+    }
+    for (int i = 0; i < syntheticImage.rows; i += 100) {
+        cv::line(syntheticImage, cv::Point(0, i), cv::Point(syntheticImage.cols, i), 
+                cv::Scalar(50, 50, 50), 1);
+    }
+    
+    // Create visualization with synthetic image
+    cv::Mat visualization = createVisualization(trackedObjects, regions, syntheticImage);
+    
+    // Save visualization if output path is provided
+    if (!outputImagePath.empty()) {
+        // Ensure directory exists
+        fs::path path(outputImagePath);
+        fs::create_directories(path.parent_path());
+        
+        if (cv::imwrite(outputImagePath, visualization)) {
+            LOG_INFO("Saved standalone consolidation visualization to: {}", outputImagePath);
+        } else {
+            LOG_ERROR("Failed to save standalone visualization to: {}", outputImagePath);
+        }
+    }
+    
+    return regions;
+}
+
+cv::Mat MotionRegionConsolidator::createVisualization(
+    const std::vector<TrackedObject>& trackedObjects,
+    const std::vector<ConsolidatedRegion>& regions,
+    const cv::Mat& inputImage) const {
+    
+    // Clone input image for visualization
+    cv::Mat visualization = inputImage.clone();
+    
+    // Draw motion boxes first (underneath consolidated regions)
+    drawMotionBoxes(visualization, trackedObjects);
+    
+    // Draw consolidated regions on top
+    drawConsolidatedRegions(visualization, regions);
+    
+    // Add legend/info
+    int legendY = 30;
+    cv::putText(visualization, "Motion Boxes: Green", cv::Point(20, legendY), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+    cv::putText(visualization, "Consolidated Regions: Red", cv::Point(20, legendY + 30), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 255), 2);
+    cv::putText(visualization, "Objects: " + std::to_string(trackedObjects.size()) + 
+               " -> Regions: " + std::to_string(regions.size()), 
+               cv::Point(20, legendY + 60), 
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+    
+    return visualization;
+}
+
+void MotionRegionConsolidator::drawMotionBoxes(cv::Mat& image, 
+                                              const std::vector<TrackedObject>& trackedObjects) const {
+    
+    for (const auto& obj : trackedObjects) {
+        // Draw motion box in green
+        cv::rectangle(image, obj.currentBounds, cv::Scalar(0, 255, 0), 2);
+        
+        // Add object ID label
+        std::string label = "M" + std::to_string(obj.id);
+        cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+        cv::Point textOrigin(obj.currentBounds.x, obj.currentBounds.y - 5);
+        
+        // Background for text
+        cv::rectangle(image, 
+                     cv::Point(textOrigin.x, textOrigin.y - textSize.height),
+                     cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
+                     cv::Scalar(0, 255, 0), -1);
+        
+        // Text
+        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.5, 
+                   cv::Scalar(0, 0, 0), 1);
+    }
+}
+
+void MotionRegionConsolidator::drawConsolidatedRegions(cv::Mat& image, 
+                                                      const std::vector<ConsolidatedRegion>& regions) const {
+    
+    for (size_t i = 0; i < regions.size(); ++i) {
+        const auto& region = regions[i];
+        
+        // Draw consolidated region in red with thicker line
+        cv::rectangle(image, region.boundingBox, cv::Scalar(0, 0, 255), 4);
+        
+        // Add region info label
+        std::string label = "R" + std::to_string(i) + " (" + 
+                           std::to_string(region.trackedObjectIds.size()) + " objs)";
+        cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.7, 2, nullptr);
+        cv::Point textOrigin(region.boundingBox.x, region.boundingBox.y - 10);
+        
+        // Background for text
+        cv::rectangle(image, 
+                     cv::Point(textOrigin.x, textOrigin.y - textSize.height - 5),
+                     cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
+                     cv::Scalar(0, 0, 255), -1);
+        
+        // Text
+        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.7, 
+                   cv::Scalar(255, 255, 255), 2);
+        
+        // Add size info
+        std::string sizeInfo = std::to_string(region.boundingBox.width) + "x" + 
+                              std::to_string(region.boundingBox.height);
+        cv::putText(image, sizeInfo, 
+                   cv::Point(region.boundingBox.x, region.boundingBox.y + region.boundingBox.height - 10),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
+    }
+}
+

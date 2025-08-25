@@ -114,7 +114,7 @@ To use the Motion Region Consolidator in your main application:
 1. Include the header: `#include "motion_region_consolidator.hpp"`
 2. Create consolidator: `MotionRegionConsolidator consolidator(config)`
 3. Process results: `auto regions = consolidator.consolidateRegions(trackedObjects)`
-4. Extract regions for YOLO: Use the example integration code in `motion_region_consolidator_example.cpp`
+4. Extract regions for YOLO: Use the integration code in `main.cpp` where consolidated regions are passed to YOLO11
 
 The test results provide visual verification that the consolidation algorithm correctly:
 - Groups nearby motion areas

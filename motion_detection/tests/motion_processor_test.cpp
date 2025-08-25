@@ -1,3 +1,4 @@
+#include <gtest/gtest.h>
 #include "motion_processor.hpp"
 #include "logger.hpp"
 #include <opencv2/opencv.hpp>
@@ -5,6 +6,14 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+
+void initLogger() {
+    try {
+        Logger::init("debug", "motion_processor_test_log.txt", true);
+    } catch (const std::exception& e) {
+        // Logger already initialized, ignore
+    }
+}
 
 /**
  * Motion Processor Test Suite
@@ -23,10 +32,6 @@
  * - Enable only during testing/debugging when visual feedback is needed
  */
 
-void initLogger() {
-    Logger::init("debug", "test_log.txt", true);
-}
-
 /**
  * Creates a test directory and configures the processor for visualization
  * @param processor The MotionProcessor instance to configure
@@ -38,6 +43,10 @@ void setupTestVisualization(MotionProcessor& processor, const std::string& testN
     processor.enableVisualization(true);
     processor.setVisualizationPath(testPath);
 }
+
+// ============================================================================
+// MANUAL TESTING FUNCTIONS (Legacy)
+// ============================================================================
 
 // Test preprocessFrame
 void testPreprocessFrame() {
@@ -227,39 +236,256 @@ void testConfigurationGetters() {
     std::cout << "Background subtraction enabled: " << (bgSub ? "Yes" : "No") << std::endl;
 }
 
-int main() {
-    std::cout << "Running MotionProcessor tests..." << std::endl;
-    initLogger();
+// ============================================================================
+// GOOGLE TEST FRAMEWORK TESTS
+// ============================================================================
+
+class MotionProcessorTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Initialize logger
+        initLogger();
+        
+        // Set up test paths
+        configPath = "config.yaml";
+        testImage1Path = "test_image.jpg";
+        testImage2Path = "test_image2.jpg";
+        
+        // Create output directory
+        outputDir = "test_results/motion_processor/06_google_test_mode";
+        std::filesystem::create_directories(outputDir);
+        
+        // Initialize motion processor
+        motionProcessor = std::make_unique<MotionProcessor>(configPath);
+        motionProcessor->enableVisualization(true);
+        motionProcessor->setVisualizationPath(outputDir);
+    }
     
-    testPreprocessFrame();
-    std::cout << "testPreprocessFrame passed" << std::endl;
+    void TearDown() override {
+        spdlog::shutdown();
+    }
     
-    testDetectMotion();
-    std::cout << "testDetectMotion passed" << std::endl;
+    std::string configPath;
+    std::string testImage1Path;
+    std::string testImage2Path;
+    std::string outputDir;
+    std::unique_ptr<MotionProcessor> motionProcessor;
+};
+
+// Test standalone motion processing with visualization
+TEST_F(MotionProcessorTest, StandaloneProcessingWithVisualization) {
+    // Load test images
+    cv::Mat frame1 = cv::imread(testImage1Path);
+    cv::Mat frame2 = cv::imread(testImage2Path);
     
-    testApplyMorphologicalOps();
-    std::cout << "testApplyMorphologicalOps passed" << std::endl;
+    ASSERT_FALSE(frame1.empty()) << "Failed to load " << testImage1Path;
+    ASSERT_FALSE(frame2.empty()) << "Failed to load " << testImage2Path;
     
-    testExtractContours();
-    std::cout << "testExtractContours passed" << std::endl;
+    LOG_INFO("Processing frame 1 (baseline)");
+    MotionProcessor::ProcessingResult result1 = motionProcessor->processFrame(frame1);
     
-    testCompleteProcessingPipeline();
-    std::cout << "testCompleteProcessingPipeline passed" << std::endl;
+    // Save visualization for first frame
+    std::string outputPath1 = outputDir + "/01_baseline_frame_processing.jpg";
+    motionProcessor->saveProcessingVisualization(result1, outputPath1);
     
-    testFrameManagement();
-    std::cout << "testFrameManagement passed" << std::endl;
+    LOG_INFO("Processing frame 2 (motion detection)");
+    MotionProcessor::ProcessingResult result2 = motionProcessor->processFrame(frame2);
     
-    testConfigurationGetters();
-    std::cout << "testConfigurationGetters passed" << std::endl;
+    // Save visualization for second frame
+    std::string outputPath2 = outputDir + "/02_motion_detection_processing.jpg";
+    motionProcessor->saveProcessingVisualization(result2, outputPath2);
     
-    std::cout << "All tests passed!" << std::endl;
-    std::cout << "\n📷 Visual Output Summary:" << std::endl;
-    std::cout << "  📁 test_results/motion_processor/" << std::endl;
-    std::cout << "    ├── 01_preprocess_frame/     - Original and preprocessed frames" << std::endl;
-    std::cout << "    ├── 02_detect_motion/        - Motion detection sequence" << std::endl;
-    std::cout << "    ├── 03_morphological_ops/    - Before/after morphological operations" << std::endl;
-    std::cout << "    ├── 04_extract_contours/     - Contour detection with bounding boxes" << std::endl;
-    std::cout << "    └── 05_complete_pipeline/    - End-to-end processing pipeline" << std::endl;
-    std::cout << "\n✨ All MotionProcessor functions comprehensively tested!" << std::endl;
-    return 0;
+    // Verify results
+    EXPECT_FALSE(result1.hasMotion) << "First frame should not have motion";
+    EXPECT_TRUE(result2.hasMotion) << "Second frame should have motion";
+    EXPECT_GT(result2.detectedBounds.size(), 0) << "Should detect motion regions";
+    
+    LOG_INFO("Motion detection results:");
+    LOG_INFO("Frame 1 - Motion: {}, Regions: {}", result1.hasMotion, result1.detectedBounds.size());
+    LOG_INFO("Frame 2 - Motion: {}, Regions: {}", result2.hasMotion, result2.detectedBounds.size());
+    LOG_INFO("Visualizations saved to: {} and {}", outputPath1, outputPath2);
+    
+    // Verify output files exist
+    EXPECT_TRUE(std::filesystem::exists(outputPath1)) << "Frame 1 visualization not created";
+    EXPECT_TRUE(std::filesystem::exists(outputPath2)) << "Frame 2 visualization not created";
+}
+
+// Test individual processing steps
+TEST_F(MotionProcessorTest, IndividualProcessingSteps) {
+    cv::Mat frame1 = cv::imread(testImage1Path);
+    cv::Mat frame2 = cv::imread(testImage2Path);
+    ASSERT_FALSE(frame1.empty()) << "Failed to load test image 1";
+    ASSERT_FALSE(frame2.empty()) << "Failed to load test image 2";
+    
+    // Test preprocessing
+    cv::Mat processed1 = motionProcessor->preprocessFrame(frame1);
+    cv::Mat processed2 = motionProcessor->preprocessFrame(frame2);
+    EXPECT_FALSE(processed1.empty()) << "Preprocessing frame 1 failed";
+    EXPECT_FALSE(processed2.empty()) << "Preprocessing frame 2 failed";
+    
+    // Set up motion detection by setting previous frame
+    motionProcessor->setPrevFrame(processed1);
+    motionProcessor->setFirstFrame(false);
+    
+    // Test motion detection
+    cv::Mat frameDiff, thresh;
+    cv::Mat motionResult = motionProcessor->detectMotion(processed2, frameDiff, thresh);
+    EXPECT_FALSE(motionResult.empty()) << "Motion detection failed";
+    
+    // Test morphological operations
+    cv::Mat morphResult = motionProcessor->applyMorphologicalOps(thresh);
+    EXPECT_FALSE(morphResult.empty()) << "Morphological operations failed";
+    
+    // Test contour extraction
+    std::vector<cv::Rect> contours = motionProcessor->extractContours(morphResult);
+    EXPECT_GT(contours.size(), 0) << "Should extract contours";
+    
+    LOG_INFO("Individual processing steps completed successfully");
+    LOG_INFO("Contours extracted: {}", contours.size());
+}
+
+// Test configuration parameters
+TEST_F(MotionProcessorTest, ConfigurationParameters) {
+    EXPECT_GT(motionProcessor->getMinContourArea(), 0) << "Min contour area should be positive";
+    EXPECT_GT(motionProcessor->getMaxThreshold(), 0) << "Max threshold should be positive";
+    EXPECT_FALSE(motionProcessor->isBackgroundSubtractionEnabled()) << "Background subtraction should be disabled by default";
+    
+    LOG_INFO("Configuration parameters verified");
+    LOG_INFO("Min contour area: {}", motionProcessor->getMinContourArea());
+    LOG_INFO("Max threshold: {}", motionProcessor->getMaxThreshold());
+}
+
+// Test frame management
+TEST_F(MotionProcessorTest, FrameManagement) {
+    cv::Mat testFrame = cv::Mat::ones(100, 100, CV_8UC1) * 128;
+    
+    // Test initial state
+    EXPECT_TRUE(motionProcessor->isFirstFrame()) << "Should start with first frame flag";
+    
+    // Set previous frame
+    motionProcessor->setPrevFrame(testFrame);
+    
+    // Test setFirstFrame
+    motionProcessor->setFirstFrame(false);
+    EXPECT_FALSE(motionProcessor->isFirstFrame()) << "First frame flag should be false";
+    
+    motionProcessor->setFirstFrame(true);
+    EXPECT_TRUE(motionProcessor->isFirstFrame()) << "First frame flag should be true";
+    
+    LOG_INFO("Frame management functions work correctly");
+}
+
+// Test complete processing pipeline with Google Test
+TEST_F(MotionProcessorTest, CompleteProcessingPipeline) {
+    cv::Mat frame1 = cv::imread(testImage1Path);
+    cv::Mat frame2 = cv::imread(testImage2Path);
+    
+    ASSERT_FALSE(frame1.empty()) << "Failed to load " << testImage1Path;
+    ASSERT_FALSE(frame2.empty()) << "Failed to load " << testImage2Path;
+    
+    // Process first frame (should return empty result due to firstFrame flag)
+    MotionProcessor::ProcessingResult result1 = motionProcessor->processFrame(frame1);
+    EXPECT_FALSE(result1.processedFrame.empty()) << "First frame should be processed";
+    EXPECT_TRUE(result1.detectedBounds.empty()) << "First frame should have no detected bounds";
+    EXPECT_FALSE(result1.hasMotion) << "First frame should have no motion";
+    
+    // Process second frame (should detect motion)
+    MotionProcessor::ProcessingResult result2 = motionProcessor->processFrame(frame2);
+    EXPECT_FALSE(result2.processedFrame.empty()) << "Second frame should be processed";
+    EXPECT_FALSE(result2.frameDiff.empty()) << "Frame difference should be computed";
+    EXPECT_FALSE(result2.thresh.empty()) << "Threshold should be computed";
+    EXPECT_FALSE(result2.morphological.empty()) << "Morphological processing should be done";
+    
+    LOG_INFO("Motion detected: {}", result2.hasMotion ? "Yes" : "No");
+    LOG_INFO("Detected bounds: {}", result2.detectedBounds.size());
+    
+    // Save complete pipeline results
+    cv::imwrite(outputDir + "/03_frame1_original.jpg", frame1);
+    cv::imwrite(outputDir + "/04_frame2_original.jpg", frame2);
+    cv::imwrite(outputDir + "/05_frame1_preprocessed.jpg", result1.processedFrame);
+    cv::imwrite(outputDir + "/06_frame2_preprocessed.jpg", result2.processedFrame);
+    
+    if (!result2.frameDiff.empty()) {
+        cv::imwrite(outputDir + "/07_frame_difference.jpg", result2.frameDiff);
+    }
+    if (!result2.thresh.empty()) {
+        cv::imwrite(outputDir + "/08_threshold_mask.jpg", result2.thresh);
+    }
+    if (!result2.morphological.empty()) {
+        cv::imwrite(outputDir + "/09_morphological_cleaned.jpg", result2.morphological);
+    }
+    
+    // Create visualization with detected bounds if any
+    if (!result2.detectedBounds.empty()) {
+        cv::Mat boundsViz = frame2.clone();
+        for (const auto& rect : result2.detectedBounds) {
+            cv::rectangle(boundsViz, rect, cv::Scalar(0, 255, 0), 2);
+        }
+        cv::imwrite(outputDir + "/10_final_detected_bounds.jpg", boundsViz);
+    }
+    
+    LOG_INFO("Complete pipeline results saved to: {}", outputDir);
+}
+
+// Global test environment setup
+class MotionProcessorTestEnvironment : public ::testing::Environment {
+public:
+    void SetUp() override {
+        initLogger();
+    }
+    
+    void TearDown() override {
+        spdlog::shutdown();
+    }
+};
+
+// ============================================================================
+// MAIN FUNCTION - SUPPORTS BOTH MANUAL AND GOOGLE TEST MODES
+// ============================================================================
+
+int main(int argc, char** argv) {
+    // Check if running in Google Test mode
+    if (argc > 1 && std::string(argv[1]) == "--gtest") {
+        // Google Test mode
+        ::testing::InitGoogleTest(&argc, argv);
+        ::testing::AddGlobalTestEnvironment(new MotionProcessorTestEnvironment());
+        return RUN_ALL_TESTS();
+    } else {
+        // Manual test mode (legacy)
+        std::cout << "Running MotionProcessor manual tests..." << std::endl;
+        initLogger();
+        
+        testPreprocessFrame();
+        std::cout << "testPreprocessFrame passed" << std::endl;
+        
+        testDetectMotion();
+        std::cout << "testDetectMotion passed" << std::endl;
+        
+        testApplyMorphologicalOps();
+        std::cout << "testApplyMorphologicalOps passed" << std::endl;
+        
+        testExtractContours();
+        std::cout << "testExtractContours passed" << std::endl;
+        
+        testCompleteProcessingPipeline();
+        std::cout << "testCompleteProcessingPipeline passed" << std::endl;
+        
+        testFrameManagement();
+        std::cout << "testFrameManagement passed" << std::endl;
+        
+        testConfigurationGetters();
+        std::cout << "testConfigurationGetters passed" << std::endl;
+        
+        std::cout << "All manual tests passed!" << std::endl;
+        std::cout << "\n📷 Visual Output Summary:" << std::endl;
+        std::cout << "  📁 test_results/motion_processor/" << std::endl;
+        std::cout << "    ├── 01_preprocess_frame/     - Original and preprocessed frames" << std::endl;
+        std::cout << "    ├── 02_detect_motion/        - Motion detection sequence" << std::endl;
+        std::cout << "    ├── 03_morphological_ops/    - Before/after morphological operations" << std::endl;
+        std::cout << "    ├── 04_extract_contours/     - Contour detection with bounding boxes" << std::endl;
+        std::cout << "    └── 05_complete_pipeline/    - End-to-end processing pipeline" << std::endl;
+        std::cout << "\n✨ All MotionProcessor functions comprehensively tested!" << std::endl;
+        std::cout << "\n💡 To run Google Test mode: ./motion_processor_test --gtest" << std::endl;
+        return 0;
+    }
 }

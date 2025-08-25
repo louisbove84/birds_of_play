@@ -50,9 +50,7 @@ find_library(UUID_LIBRARIES uuid)
 
 # Add source files (excluding main.cpp)
 set(LIB_SOURCES
-    src/motion_tracker.cpp
     src/motion_processor.cpp
-    src/object_tracker.cpp
     src/motion_visualization.cpp
     src/data_collector.cpp
     src/object_classifier.cpp
@@ -61,7 +59,6 @@ set(LIB_SOURCES
 
 # Add header files
 set(HEADERS
-    include/motion_tracker.hpp
     include/motion_processor.hpp
     include/object_tracker.hpp
     include/motion_visualization.hpp
@@ -147,7 +144,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.yaml
 # Enable testing
 enable_testing()
 
-add_executable(${PROJECT_NAME}_test tests/motion_tracker_test.cpp ${LIB_SOURCES} src/logger.cpp)
+add_executable(${PROJECT_NAME}_test tests/motion_processor_test.cpp ${LIB_SOURCES} src/logger.cpp)
 target_include_directories(${PROJECT_NAME}_test 
     PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -176,35 +173,6 @@ add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test)
 # Unit Testing
 # ==============================================================================
 if(BUILD_TESTING)
-    # Add motion_tracker_test executable
-    add_executable(motion_tracker_test 
-        tests/motion_tracker_test.cpp
-        src/motion_tracker.cpp
-        src/motion_processor.cpp
-        src/object_tracker.cpp
-        src/motion_visualization.cpp
-        src/data_collector.cpp
-        src/object_classifier.cpp
-        src/motion_region_consolidator.cpp
-        src/logger.cpp
-    )
-
-    # Link libraries for motion_tracker_test
-    target_link_libraries(motion_tracker_test PRIVATE 
-        ${OpenCV_LIBS}
-        mongo::mongocxx_shared
-        mongo::bsoncxx_shared
-        yaml-cpp
-        spdlog::spdlog_header_only
-        GTest::gtest
-        GTest::gtest_main
-    )
-
-    # Add include directories for motion_tracker_test
-    target_include_directories(motion_tracker_test PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
-    )
 
     # Add motion_processor_test executable
     add_executable(motion_processor_test 
@@ -217,14 +185,16 @@ if(BUILD_TESTING)
     add_executable(motion_region_consolidator_test 
         tests/motion_region_consolidator_test.cpp
         src/motion_region_consolidator.cpp
-        src/motion_tracker.cpp
         src/motion_processor.cpp
-        src/object_tracker.cpp
         src/motion_visualization.cpp
         src/data_collector.cpp
         src/object_classifier.cpp
         src/logger.cpp
     )
+
+
+
+
 
     # Link libraries for motion_processor_test
     target_link_libraries(motion_processor_test PRIVATE 
@@ -258,6 +228,10 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
     )
 
+
+
+
+
     # Copy test files to build directory
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/config.yaml
                   ${CMAKE_CURRENT_BINARY_DIR}/config.yaml COPYONLY)
@@ -265,6 +239,96 @@ if(BUILD_TESTING)
                   ${CMAKE_CURRENT_BINARY_DIR}/test_image.jpg COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image2.jpg
                   ${CMAKE_CURRENT_BINARY_DIR}/test_image2.jpg COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image3.png
+                  ${CMAKE_CURRENT_BINARY_DIR}/test_image3.png COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/motion_mask.png
                   ${CMAKE_CURRENT_BINARY_DIR}/motion_mask.png COPYONLY)
+
+    # ============================================================================
+    # CONVENIENCE TARGETS FOR DEVELOPMENT
+    # ============================================================================
+    
+    # Clean and rebuild everything
+    add_custom_target(clean-rebuild
+        COMMAND ${CMAKE_COMMAND} --build . --target clean
+        COMMAND ${CMAKE_COMMAND} --build . --parallel
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Cleaning and rebuilding all targets"
+        USES_TERMINAL
+    )
+    
+    # Run all tests
+    add_custom_target(run-all-tests
+        COMMAND ./motion_processor_test --gtest
+        COMMAND ./motion_region_consolidator_test
+        DEPENDS motion_processor_test motion_region_consolidator_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Running all test executables"
+        USES_TERMINAL
+    )
+    
+    # Clean, rebuild, and run all tests
+    add_custom_target(test-all
+        COMMAND ${CMAKE_COMMAND} --build . --target clean
+        COMMAND ${CMAKE_COMMAND} --build . --parallel
+        COMMAND ./motion_processor_test --gtest
+        COMMAND ./motion_region_consolidator_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Clean rebuild and run all tests"
+        USES_TERMINAL
+    )
+    
+    # Run motion processor tests only
+    add_custom_target(test-motion-processor
+        COMMAND ./motion_processor_test --gtest
+        DEPENDS motion_processor_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Running motion processor tests"
+        USES_TERMINAL
+    )
+    
+    # Run motion region consolidator tests only
+    add_custom_target(test-motion-consolidator
+        COMMAND ./motion_region_consolidator_test
+        DEPENDS motion_region_consolidator_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Running motion region consolidator tests"
+        USES_TERMINAL
+    )
+    
+    # Clean build directory completely (removes build_debug folder)
+    add_custom_target(clean-all
+        COMMAND ${CMAKE_COMMAND} -E echo "Removing entire build directory..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Removing entire build directory"
+        USES_TERMINAL
+    )
+    
+    # Fresh start: remove build directory and recreate it
+    add_custom_target(fresh-build
+        COMMAND ${CMAKE_COMMAND} -E echo "Starting fresh build..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -S ${CMAKE_CURRENT_SOURCE_DIR} -B ${CMAKE_CURRENT_BINARY_DIR} -DBUILD_TESTING=ON
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --parallel
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Fresh build from scratch"
+        USES_TERMINAL
+    )
+    
+    # Fresh build and test
+    add_custom_target(fresh-test
+        COMMAND ${CMAKE_COMMAND} -E echo "Starting fresh build and test..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -S ${CMAKE_CURRENT_SOURCE_DIR} -B ${CMAKE_CURRENT_BINARY_DIR} -DBUILD_TESTING=ON
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --parallel
+        COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_BINARY_DIR} ./motion_processor_test --gtest
+        COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_BINARY_DIR} ./motion_region_consolidator_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Fresh build and run all tests"
+        USES_TERMINAL
+    )
+
 endif() 

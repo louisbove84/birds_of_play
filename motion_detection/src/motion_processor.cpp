@@ -1,6 +1,9 @@
 #include "motion_processor.hpp"
 #include "logger.hpp"
 #include <yaml-cpp/yaml.h>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 MotionProcessor::MotionProcessor(const std::string& configPath) 
     : firstFrame(true),
@@ -74,6 +77,9 @@ MotionProcessor::ProcessingResult MotionProcessor::processFrame(const cv::Mat& f
         return result;
     }
     
+    // Store the original frame for downstream processing
+    result.originalFrame = frame.clone();
+    
     // Step 1: Preprocess the frame
     // Convert to grayscale, apply blur for noise reduction,
     // and optionally enhance contrast
@@ -112,10 +118,168 @@ MotionProcessor::ProcessingResult MotionProcessor::processFrame(const cv::Mat& f
     // Update motion detection status
     result.hasMotion = !result.detectedBounds.empty();
     
+    // Output overall motion detection summary
+    if (result.hasMotion) {
+        LOG_INFO("=== MOTION DETECTION SUMMARY ===");
+        LOG_INFO("Motion detected: {} regions", result.detectedBounds.size());
+        LOG_INFO("Frame size: {}x{}", result.processedFrame.cols, result.processedFrame.rows);
+        LOG_INFO("Processing mode: {}", processingMode);
+        LOG_INFO("Background subtraction: {}", backgroundSubtraction ? "enabled" : "disabled");
+        LOG_INFO("=== END MOTION DETECTION SUMMARY ===");
+    }
+    
     // Store current frame for next comparison
     setPrevFrame(result.processedFrame);
     
     return result;
+}
+
+// ============================================================================
+// VISUALIZATION METHODS
+// ============================================================================
+
+void MotionProcessor::saveProcessingVisualization(const ProcessingResult& result, const std::string& outputPath) {
+    if (result.originalFrame.empty()) {
+        LOG_WARN("Cannot create visualization: original frame is empty");
+        return;
+    }
+    
+    cv::Mat visualization = createProcessingVisualization(result);
+    
+    std::string finalPath = outputPath.empty() ? 
+        visualizationPath + "/motion_processor_output.jpg" : outputPath;
+    
+    // Ensure directory exists
+    fs::path path(finalPath);
+    fs::create_directories(path.parent_path());
+    
+    if (cv::imwrite(finalPath, visualization)) {
+        LOG_INFO("Saved MotionProcessor visualization to: {}", finalPath);
+    } else {
+        LOG_ERROR("Failed to save MotionProcessor visualization to: {}", finalPath);
+    }
+}
+
+cv::Mat MotionProcessor::createProcessingVisualization(const ProcessingResult& result) const {
+    // Create a comprehensive visualization showing all processing steps
+    cv::Mat visualization;
+    
+    // Create a 2x3 grid layout for all processing steps
+    std::vector<cv::Mat> steps;
+    
+    // Step 1: Original frame
+    cv::Mat originalWithBoxes = result.originalFrame.clone();
+    drawMotionBoxes(originalWithBoxes, result.detectedBounds);
+    steps.push_back(originalWithBoxes);
+    
+    // Step 2: Processed frame (grayscale/blurred)
+    cv::Mat processedDisplay;
+    if (result.processedFrame.channels() == 1) {
+        cv::cvtColor(result.processedFrame, processedDisplay, cv::COLOR_GRAY2BGR);
+    } else {
+        processedDisplay = result.processedFrame.clone();
+    }
+    steps.push_back(processedDisplay);
+    
+    // Step 3: Frame difference
+    cv::Mat diffDisplay;
+    if (!result.frameDiff.empty()) {
+        cv::cvtColor(result.frameDiff, diffDisplay, cv::COLOR_GRAY2BGR);
+    } else {
+        diffDisplay = cv::Mat::zeros(result.originalFrame.size(), CV_8UC3);
+    }
+    steps.push_back(diffDisplay);
+    
+    // Step 4: Threshold
+    cv::Mat threshDisplay;
+    if (!result.thresh.empty()) {
+        cv::cvtColor(result.thresh, threshDisplay, cv::COLOR_GRAY2BGR);
+    } else {
+        threshDisplay = cv::Mat::zeros(result.originalFrame.size(), CV_8UC3);
+    }
+    steps.push_back(threshDisplay);
+    
+    // Step 5: Morphological operations
+    cv::Mat morphDisplay;
+    if (!result.morphological.empty()) {
+        cv::cvtColor(result.morphological, morphDisplay, cv::COLOR_GRAY2BGR);
+    } else {
+        morphDisplay = cv::Mat::zeros(result.originalFrame.size(), CV_8UC3);
+    }
+    steps.push_back(morphDisplay);
+    
+    // Step 6: Final result (original with motion boxes)
+    cv::Mat finalResult = result.originalFrame.clone();
+    drawMotionBoxes(finalResult, result.detectedBounds);
+    steps.push_back(finalResult);
+    
+    // Create grid layout
+    int cols = 3;
+    int rows = 2;
+    int cellWidth = result.originalFrame.cols / cols;
+    int cellHeight = result.originalFrame.rows / rows;
+    
+    visualization = cv::Mat(cellHeight * rows, cellWidth * cols, CV_8UC3);
+    
+    std::vector<std::string> labels = {
+        "Original + Motion Boxes", "Processed Frame", "Frame Difference",
+        "Threshold", "Morphological", "Final Result"
+    };
+    
+    for (int i = 0; i < steps.size(); ++i) {
+        int row = i / cols;
+        int col = i % cols;
+        
+        cv::Mat cell = visualization(cv::Rect(col * cellWidth, row * cellHeight, cellWidth, cellHeight));
+        
+        // Resize step to fit cell
+        cv::Mat resizedStep;
+        cv::resize(steps[i], resizedStep, cv::Size(cellWidth, cellHeight));
+        resizedStep.copyTo(cell);
+        
+        // Add label
+        cv::putText(visualization, labels[i], 
+                   cv::Point(col * cellWidth + 10, row * cellHeight + 30),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
+    }
+    
+    // Add summary info
+    std::string summary = "Motion Detected: " + std::to_string(result.detectedBounds.size()) + 
+                         " regions | Has Motion: " + (result.hasMotion ? "YES" : "NO");
+    cv::putText(visualization, summary, cv::Point(10, visualization.rows - 20),
+               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+    
+    return visualization;
+}
+
+void MotionProcessor::drawMotionBoxes(cv::Mat& image, const std::vector<cv::Rect>& detectedBounds) const {
+    for (size_t i = 0; i < detectedBounds.size(); ++i) {
+        const auto& bounds = detectedBounds[i];
+        
+        // Draw motion box in bright green
+        cv::rectangle(image, bounds, cv::Scalar(0, 255, 0), 2);
+        
+        // Add motion box ID label
+        std::string label = "M" + std::to_string(i);
+        cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+        cv::Point textOrigin(bounds.x, bounds.y - 5);
+        
+        // Background for text
+        cv::rectangle(image, 
+                     cv::Point(textOrigin.x, textOrigin.y - textSize.height),
+                     cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
+                     cv::Scalar(0, 255, 0), -1);
+        
+        // Text
+        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.5, 
+                   cv::Scalar(0, 0, 0), 1);
+        
+        // Add size info
+        std::string sizeInfo = std::to_string(bounds.width) + "x" + std::to_string(bounds.height);
+        cv::putText(image, sizeInfo, 
+                   cv::Point(bounds.x, bounds.y + bounds.height - 5),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
+    }
 }
 
 // ============================================================================
@@ -441,6 +605,26 @@ std::vector<cv::Rect> MotionProcessor::extractContours(const cv::Mat& processed)
             cv::putText(debugViz, label, cv::Point(bounds.x, bounds.y - 5), 
                        cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
         }
+    }
+    
+    // Output motion boxes metadata for motion_region_consolidator
+    if (!newBounds.empty()) {
+        LOG_INFO("=== MOTION BOXES METADATA (Frame {}) ===", frameCount);
+        LOG_INFO("Detected {} motion regions", newBounds.size());
+        
+        for (size_t i = 0; i < newBounds.size(); ++i) {
+            const cv::Rect& bounds = newBounds[i];
+            double area = bounds.width * bounds.height;
+            double aspectRatio = static_cast<double>(bounds.width) / bounds.height;
+            cv::Point center(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+            
+            LOG_INFO("Motion Box {}: BBox({},{},{},{}) | Center({},{}) | Area: {:.0f} | Aspect: {:.2f}", 
+                    i,
+                    bounds.x, bounds.y, bounds.width, bounds.height,
+                    center.x, center.y,
+                    area, aspectRatio);
+        }
+        LOG_INFO("=== END MOTION BOXES METADATA ===");
     }
     
     // Save debug visualization if enabled

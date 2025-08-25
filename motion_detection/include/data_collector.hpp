@@ -8,7 +8,7 @@
 #include <chrono>                       // std::chrono::system_clock
 #include <uuid/uuid.h>                  // uuid_t, uuid_generate, uuid_unparse_lower
 #include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
-#include "motion_tracker.hpp"           // TrackedObject struct
+#include "object_tracker.hpp"           // TrackedObject struct
 #include <bsoncxx/v_noabi/bsoncxx/builder/basic/document.hpp>  // bsoncxx::builder::basic::document
 #include <bsoncxx/v_noabi/bsoncxx/types.hpp>            // bsoncxx::types::b_date, bsoncxx::types::b_binary
 #include <mongocxx/v_noabi/mongocxx/client.hpp>          // mongocxx::client
