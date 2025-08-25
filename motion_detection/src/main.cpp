@@ -1,10 +1,12 @@
-#include "motion_tracker.hpp"           // MotionTracker class, TrackedObject struct
+#include "motion_processor.hpp"         // MotionProcessor class
+#include "motion_region_consolidator.hpp" // MotionRegionConsolidator class
 #include "data_collector.hpp"           // DataCollector class, MongoDB integration
 #include "logger.hpp"                   // LOG_INFO, LOG_ERROR, LOG_DEBUG macros
 #include <opencv2/opencv.hpp>           // cv::Mat, cv::VideoCapture, cv::imshow, etc.
 #include <iostream>                     // std::cout, std::cerr, std::endl
 #include <filesystem>                   // std::filesystem (fs::path, fs::create_directories)
 #include <string>                       // std::string
+#include <ctime>                        // std::time for timestamp
 #include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
 namespace fs = std::filesystem;         // Shorthand for std::filesystem
 
@@ -39,13 +41,15 @@ int main(int argc, char** argv) {
     Logger::init(logLevel, logFilePath, logToFile);
     LOG_INFO("Logger initialized at {}", logFilePath);
 
-    // Initialize motion tracker and data collector
-    MotionTracker tracker(config_path.string());
+    // Initialize motion processor, motion region consolidator, and data collector
+    MotionProcessor motionProcessor(config_path.string());
+    MotionRegionConsolidator regionConsolidator;
     DataCollector collector(config_path.string());
     
-    // Initialize motion tracker with camera
-    if (!tracker.initialize(0)) {
-        LOG_CRITICAL("Error: Could not initialize motion tracker with camera.");
+    // Initialize camera
+    cv::VideoCapture cap(0);
+    if (!cap.isOpened()) {
+        LOG_CRITICAL("Error: Could not open camera.");
         return -1;
     }
     
@@ -56,12 +60,7 @@ int main(int argc, char** argv) {
     LOG_INFO("Motion tracking system initialized successfully!");
     LOG_INFO("Press 'q' or ESC to quit.");
 
-    cv::VideoCapture cap; // Define cap here
-    if (!tracker.getCap().isOpened()) {
-        LOG_CRITICAL("Camera is not open after tracker initialization.");
-        return -1;
-    }
-    cap = tracker.getCap(); // Get the already-opened capture from the tracker
+
 
     cv::Mat frame;
     char key = 0;
@@ -73,77 +72,61 @@ int main(int argc, char** argv) {
             break;
         }
 
-        // Process frame and get small areas of movement
-        MotionResult result = tracker.processFrame(frame);
-
-        // Associate movement into regions
+        // Process frame using motion processor
+        MotionProcessor::ProcessingResult processingResult = motionProcessor.processFrame(frame);
         
-
-        // Handle objects that were lost in this frame
-        std::vector<int> lostObjectIds = tracker.getLostObjectIds();
-        for (int lostId : lostObjectIds) {
-            collector.handleObjectLost(lostId);
-        }
-
-        // NEED TO PASS TRACKED REGOIN TO YOLO11
-
-        // Update data collection for each tracked object
-        if (result.hasMotion) {
-            for (const auto& obj : result.trackedObjects) { 
-                if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
-                    collector.addTrackingData(
-                        obj.id,
-                        frame,
-                        obj.currentBounds,
-                        obj.trajectory.back(),  // Current position is the last point in trajectory
-                        obj.confidence,
-                        obj.classLabel,
-                        obj.classConfidence,
-                        obj.classId
-                    );
-                }
-            }
-        }
-
-        // Update data collection for lost objects
-        for (const auto& id : tracker.getLostObjectIds()) {
-            LOG_DEBUG("Object {} lost. Forwarding to data collector.", id);
-            // We need the full object, not just the ID. This requires a small change in MotionTracker.
-            // For now, let's assume a function getLostObjectById exists.
-            // This will be fixed in the next step.
-            const auto* obj = tracker.findTrackedObjectById(id);
-            if (obj) {
-                collector.addLostObject(*obj);
-            }
-        }
-        tracker.clearLostObjectIds();
-
-        // Draw enhanced motion overlays (only for objects with sufficient trajectory length)
-        cv::Mat filteredFrame = frame.clone();
-        std::vector<TrackedObject> filteredObjects;
-        for (const auto& obj : result.trackedObjects) {
-            if (obj.trajectory.size() >= tracker.getMinTrajectoryLength()) {
-                filteredObjects.push_back(obj);
-            }
-        }
-        // Temporarily replace trackedObjects for overlay drawing
-        auto originalTrackedObjects = tracker.getTrackedObjects();
-        tracker.setTrackedObjects(filteredObjects);
+        // Create simple TrackedObjects from detected bounds for region consolidation
+        std::vector<TrackedObject> trackedObjects;
+        static int nextId = 0; // Simple ID assignment
         
-        // Use split-screen visualization as the main display
-        cv::Mat displayFrame;
-        if (tracker.isSplitScreenEnabled()) {
-            // Process frame to get intermediate results for visualization
-            MotionResult result = tracker.processFrame(frame);
-            // For now, just show the original frame - full visualization requires more work
-            displayFrame = frame.clone();
-        } else {
-            // Fallback to original frame with overlays
-            MotionResult result = tracker.processFrame(frame);
-            displayFrame = tracker.getVisualization().drawMotionOverlays(filteredFrame, result.trackedObjects);
+        for (const auto& bounds : processingResult.detectedBounds) {
+            int currentId = nextId++;
+            trackedObjects.emplace_back(currentId, bounds, "uuid_" + std::to_string(currentId));
         }
         
-        tracker.setTrackedObjects(originalTrackedObjects);
+        // Consolidate motion regions for YOLO input with visualization
+        std::vector<ConsolidatedRegion> consolidatedRegions;
+        if (!trackedObjects.empty()) {
+            // Use the original frame from motion processor for visualization
+            std::string visualizationPath = "motion_consolidation_frame_" + std::to_string(static_cast<int>(std::time(nullptr))) + ".jpg";
+            consolidatedRegions = regionConsolidator.consolidateRegionsWithVisualization(
+                trackedObjects, processingResult.originalFrame, visualizationPath);
+            
+            LOG_INFO("Motion detected: {} objects -> {} consolidated regions", 
+                     trackedObjects.size(), consolidatedRegions.size());
+                     
+            // TODO: Pass consolidated regions to YOLO11 for object detection
+            for (const auto& region : consolidatedRegions) {
+                LOG_DEBUG("Consolidated region: {}x{} at ({},{}) with {} objects",
+                         region.boundingBox.width, region.boundingBox.height,
+                         region.boundingBox.x, region.boundingBox.y,
+                         region.trackedObjectIds.size());
+            }
+        }
+        
+        // Simple visualization - draw detected motion bounds
+        cv::Mat displayFrame = frame.clone();
+        for (size_t i = 0; i < processingResult.detectedBounds.size(); ++i) {
+            const auto& bounds = processingResult.detectedBounds[i];
+            cv::Scalar color = getColor(i);
+            cv::rectangle(displayFrame, bounds, color, 2);
+            
+            // Add motion info
+            std::string info = "Motion:" + std::to_string(i);
+            cv::putText(displayFrame, info, cv::Point(bounds.x, bounds.y - 10),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+        }
+        
+        // Draw consolidated regions
+        for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
+            const auto& region = consolidatedRegions[i];
+            cv::Scalar regionColor = cv::Scalar(255, 255, 255); // White for consolidated regions
+            cv::rectangle(displayFrame, region.boundingBox, regionColor, 3);
+            
+            std::string regionInfo = "Region:" + std::to_string(i) + " (" + std::to_string(region.trackedObjectIds.size()) + " objs)";
+            cv::putText(displayFrame, regionInfo, cv::Point(region.boundingBox.x, region.boundingBox.y - 30),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
+        }
 
         // Show the frame with overlays
         cv::imshow("Motion Tracking", displayFrame);

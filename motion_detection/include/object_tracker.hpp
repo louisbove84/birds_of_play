@@ -4,10 +4,39 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <chrono>
 #include "object_classifier.hpp"
 
-// Forward declaration
-struct TrackedObject;
+// TrackedObject struct definition
+struct TrackedObject {
+    int id;
+    cv::Rect currentBounds;
+    std::deque<cv::Point> trajectory; // Using deque for efficient pop_front
+    cv::Point smoothedCenter;
+    double confidence;
+    int framesWithoutDetection;
+    std::chrono::system_clock::time_point firstSeen;
+    std::string uuid;
+    cv::Mat initialFrame;
+    
+    // Classification results
+    std::string classLabel;
+    float classConfidence;
+    int classId;
+
+    cv::Point getCenter() const {
+        return cv::Point(currentBounds.x + currentBounds.width / 2,
+                         currentBounds.y + currentBounds.height / 2);
+    }
+
+    TrackedObject(int obj_id, const cv::Rect& bounds, std::string new_uuid) : 
+        id(obj_id), currentBounds(bounds), confidence(1.0), 
+        framesWithoutDetection(0), firstSeen(std::chrono::system_clock::now()), uuid(new_uuid),
+        classLabel("unknown"), classConfidence(0.0f), classId(-1) {
+        smoothedCenter = getCenter();
+        trajectory.push_back(smoothedCenter);
+    }
+};
 
 /**
  * @brief Object tracking class - handles object tracking, trajectories, 

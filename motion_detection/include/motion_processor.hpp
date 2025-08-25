@@ -11,6 +11,7 @@
 class MotionProcessor {
 public:
     struct ProcessingResult {
+        cv::Mat originalFrame;      // Original input image for downstream processing
         cv::Mat processedFrame;
         cv::Mat frameDiff;
         cv::Mat thresh;
@@ -45,6 +46,9 @@ public:
     void enableVisualization(bool enable = true) { visualizationEnabled = enable; }
     bool isVisualizationEnabled() const { return visualizationEnabled; }
     void setVisualizationPath(const std::string& path) { visualizationPath = path; }
+    
+    // Standalone visualization method
+    void saveProcessingVisualization(const ProcessingResult& result, const std::string& outputPath = "");
     
     // Adaptive contour detection methods
     double calculateAdaptiveMinArea(const std::vector<std::vector<cv::Point>>& contours);
@@ -120,6 +124,10 @@ private:
     // Debug visualization control
     bool visualizationEnabled = false;
     std::string visualizationPath = "debug_output";
+    
+    // Visualization helper methods
+    cv::Mat createProcessingVisualization(const ProcessingResult& result) const;
+    void drawMotionBoxes(cv::Mat& image, const std::vector<cv::Rect>& detectedBounds) const;
     
 
 };

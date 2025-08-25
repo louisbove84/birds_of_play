@@ -118,6 +118,8 @@ security:
 commit_messages:
   - Subject <= 50 chars, imperative mood
   - No trailing period
+  - Keep messages concise and focused
+  - Use conventional commits format (feat:, fix:, docs:, etc.)
   - Body <= 72 chars per line if needed
   - Reference issues where applicable
 
