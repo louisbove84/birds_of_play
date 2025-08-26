@@ -104,6 +104,7 @@ documentation:
   - Keep README.md up to date
   - Document build requirements
   - Include usage examples
+  - Do not make summary documents, just write the code.
 
 # ---- Security ----
 security:
