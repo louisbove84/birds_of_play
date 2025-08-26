@@ -94,11 +94,11 @@ protected:
         
         // Set up paths for real test images
         configPath = "config.yaml";
-        testImage1Path = "test_image.jpg";
-        testImage2Path = "test_image2.jpg";
+        testImage1Path = "1/test_image.jpg";
+        testImage2Path = "1/test_image2.jpg";
         
         // Create output directory
-        std::filesystem::create_directories("test_results/motion_region_consolidator/google_test_mode");
+        std::filesystem::create_directories("test_results/motion_region_consolidator");
         
         // Process real images to get TrackedObjects
         realTrackedObjects = processRealImages(configPath, testImage1Path, testImage2Path);

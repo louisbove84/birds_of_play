@@ -738,49 +738,51 @@ void MotionProcessor::loadConfig(const std::string& configPath) {
     try {
         YAML::Node config = YAML::LoadFile(configPath);
 
-        if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
-        if (config["gaussian_blur_size"]) gaussianBlurSize = config["gaussian_blur_size"].as<int>();
-        if (config["morphology_kernel_size"]) morphKernelSize = config["morphology_kernel_size"].as<int>();
-        if (config["enable_morphology"]) morphology = config["enable_morphology"].as<bool>();
-        if (config["enable_dilation"]) dilation = config["enable_dilation"].as<bool>();
-        if (config["enable_morph_close"]) morphClose = config["enable_morph_close"].as<bool>();
-        if (config["enable_morph_open"]) morphOpen = config["enable_morph_open"].as<bool>();
-        if (config["enable_erosion"]) erosion = config["enable_erosion"].as<bool>();
-        if (config["enable_contrast_enhancement"]) contrastEnhancement = config["enable_contrast_enhancement"].as<bool>();
+        // ===============================
+        // IMAGE PROCESSING
+        // ===============================
+        if (config["processing_mode"]) processingMode = config["processing_mode"].as<std::string>();
+        
+        // Image Preprocessing
+        if (config["contrast_enhancement"]) contrastEnhancement = config["contrast_enhancement"].as<bool>();
         if (config["clahe_clip_limit"]) claheClipLimit = config["clahe_clip_limit"].as<double>();
         if (config["clahe_tile_size"]) claheTileSize = config["clahe_tile_size"].as<int>();
-        if (config["enable_median_blur"]) medianBlurSize = config["enable_median_blur"].as<int>();
+        
+        // Blur Parameters
+        if (config["gaussian_blur_size"]) gaussianBlurSize = config["gaussian_blur_size"].as<int>();
         if (config["median_blur_size"]) medianBlurSize = config["median_blur_size"].as<int>();
-        if (config["enable_bilateral_filter"]) bilateralD = config["enable_bilateral_filter"].as<int>();
         if (config["bilateral_d"]) bilateralD = config["bilateral_d"].as<int>();
         if (config["bilateral_sigma_color"]) bilateralSigmaColor = config["bilateral_sigma_color"].as<double>();
         if (config["bilateral_sigma_space"]) bilateralSigmaSpace = config["bilateral_sigma_space"].as<double>();
 
-        // Processing mode
-        if (config["processing_mode"]) processingMode = config["processing_mode"].as<std::string>();
-        
-        // Background Subtraction
-        if (config["enable_background_subtraction"]) backgroundSubtraction = config["enable_background_subtraction"].as<bool>();
-        
-        // Convex Hull parameters
-        if (config["convex_hull"]) convexHull = config["convex_hull"].as<bool>();
-        
+        // ===============================
+        // MOTION DETECTION
+        // ===============================
+        if (config["background_subtraction"]) backgroundSubtraction = config["background_subtraction"].as<bool>();
+        if (config["max_threshold"]) maxThreshold = config["max_threshold"].as<int>();
 
-        
-        // Contour Processing parameters
+        // ===============================
+        // MORPHOLOGICAL OPERATIONS
+        // ===============================
+        if (config["morphology"]) morphology = config["morphology"].as<bool>();
+        if (config["morph_kernel_size"]) morphKernelSize = config["morph_kernel_size"].as<int>();
+        if (config["morph_close"]) morphClose = config["morph_close"].as<bool>();
+        if (config["morph_open"]) morphOpen = config["morph_open"].as<bool>();
+        if (config["dilation"]) dilation = config["dilation"].as<bool>();
+        if (config["erosion"]) erosion = config["erosion"].as<bool>();
+
+        // ===============================
+        // CONTOUR PROCESSING
+        // ===============================
+        if (config["convex_hull"]) convexHull = config["convex_hull"].as<bool>();
         if (config["contour_approximation"]) contourApproximation = config["contour_approximation"].as<bool>();
         if (config["contour_epsilon_factor"]) contourEpsilonFactor = config["contour_epsilon_factor"].as<double>();
         if (config["contour_filtering"]) contourFiltering = config["contour_filtering"].as<bool>();
 
-        if (config["contour_detection_mode"]) contourDetectionMode = config["contour_detection_mode"].as<std::string>();
-        
-        // Permissive mode settings
-        if (config["permissive_min_area"]) permissiveMinArea = config["permissive_min_area"].as<double>();
-        if (config["permissive_min_solidity"]) permissiveMinSolidity = config["permissive_min_solidity"].as<double>();
-        if (config["permissive_max_aspect_ratio"]) permissiveMaxAspectRatio = config["permissive_max_aspect_ratio"].as<double>();
-        
-        // Adaptive calculation settings
-        if (config["adaptive_update_interval"]) adaptiveUpdateInterval = config["adaptive_update_interval"].as<int>();
+        // Contour Filtering Parameters
+        if (config["min_contour_area"]) minContourArea = config["min_contour_area"].as<int>();
+        if (config["max_contour_aspect_ratio"]) maxContourAspectRatio = config["max_contour_aspect_ratio"].as<double>();
+        if (config["min_contour_solidity"]) minContourSolidity = config["min_contour_solidity"].as<double>();
         
         LOG_INFO("MotionProcessor config loaded: min_contour_area={}, background_subtraction={}", 
                  minContourArea, backgroundSubtraction);

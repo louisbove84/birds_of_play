@@ -1,33 +1,67 @@
 # ===============================
-# MOTION DETECTION CONFIGURATION
+# TEST CONFIGURATION
 # ===============================
+# Simplified config for testing with permissive settings
 
-# Basic Processing
-processing_mode: grayscale
+# ===============================
+# LOGGING (Required)
+# ===============================
+logging:
+  log_level: "debug"
+  log_to_file: false
+  log_file_path: "test.log"
+
+# ===============================
+# IMAGE PROCESSING
+# ===============================
+processing_mode: "grayscale"
 max_threshold: 255
 
-# Motion Detection
-enable_background_subtraction: false
+# Image Preprocessing (minimal for tests)
+contrast_enhancement: false
+clahe_clip_limit: 2.0
+clahe_tile_size: 8
+gaussian_blur_size: 5
+median_blur_size: 5
+bilateral_d: 15
+bilateral_sigma_color: 75
+bilateral_sigma_space: 75
 
-# Morphological Operations
+# ===============================
+# MOTION DETECTION
+# ===============================
+background_subtraction: false
+
+# ===============================
+# MORPHOLOGICAL OPERATIONS
+# ===============================
 morphology: true
 morph_kernel_size: 5
 morph_close: true
 morph_open: true
 dilation: true
-erosion: true
+erosion: false
 
-# Contour Detection
-contour_detection_mode: adaptive  # "adaptive" or "permissive"
-contour_approximation: true
-contour_filtering: true
-contour_epsilon_factor: 0.02
+# ===============================
+# CONTOUR PROCESSING (Permissive for Tests)
+# ===============================
 convex_hull: true
+contour_approximation: true
+contour_epsilon_factor: 0.02
+contour_filtering: true
 
-# Permissive Mode Parameters
-permissive_min_area: 50          # Very low minimum area
-permissive_min_solidity: 0.1     # Accept most shapes
-permissive_max_aspect_ratio: 10.0 # Allow very elongated shapes
+# Test-friendly contour filtering (more permissive)
+min_contour_area: 50             # Lower threshold for tests
+max_contour_aspect_ratio: 10.0   # Allow elongated shapes
+min_contour_solidity: 0.1        # Accept most shapes
 
-# Adaptive Mode Parameters
-adaptive_update_interval: 150     # Recalculate every 150 frames (5 seconds at 30fps)
+# ===============================
+# DATA COLLECTION (Disabled for Tests)
+# ===============================
+data_collection: false
+cleanup_old_data: true
+image_format: "png"
+min_tracking_confidence: 0.5
+mongodb_uri: "mongodb://localhost:27017"
+database_name: "birds_of_play_test"
+collection_prefix: "test_tracking"

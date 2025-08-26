@@ -52,7 +52,7 @@ void setupTestVisualization(MotionProcessor& processor, const std::string& testN
 void testPreprocessFrame() {
     MotionProcessor processor("config.yaml");
     setupTestVisualization(processor, "01_preprocess_frame");
-    cv::Mat frame = cv::imread("test_image.jpg");
+    cv::Mat frame = cv::imread("1/test_image.jpg");
     assert(!frame.empty() && "Failed to load test_image.jpg");
 
     cv::Mat processed = processor.preprocessFrame(frame);
@@ -70,8 +70,8 @@ void testPreprocessFrame() {
 void testDetectMotion() {
     MotionProcessor processor("config.yaml");
     setupTestVisualization(processor, "02_detect_motion");
-    cv::Mat frame1 = cv::imread("test_image.jpg");
-    cv::Mat frame2 = cv::imread("test_image2.jpg");
+    cv::Mat frame1 = cv::imread("1/test_image.jpg");
+    cv::Mat frame2 = cv::imread("1/test_image2.jpg");
     assert(!frame1.empty() && !frame2.empty() && "Failed to load test images");
 
     cv::Mat processed1 = processor.preprocessFrame(frame1);
@@ -151,8 +151,8 @@ void testExtractContours() {
 void testCompleteProcessingPipeline() {
     MotionProcessor processor("config.yaml");
     setupTestVisualization(processor, "05_complete_pipeline");
-    cv::Mat frame1 = cv::imread("test_image.jpg");
-    cv::Mat frame2 = cv::imread("test_image2.jpg");
+    cv::Mat frame1 = cv::imread("1/test_image.jpg");
+    cv::Mat frame2 = cv::imread("1/test_image2.jpg");
     assert(!frame1.empty() && !frame2.empty() && "Failed to load test images");
     
     // Process first frame (should return empty result due to firstFrame flag)
@@ -248,8 +248,8 @@ protected:
         
         // Set up test paths
         configPath = "config.yaml";
-        testImage1Path = "test_image.jpg";
-        testImage2Path = "test_image2.jpg";
+        testImage1Path = "1/test_image.jpg";
+        testImage2Path = "1/test_image2.jpg";
         
         // Create output directory
         outputDir = "test_results/motion_processor/06_google_test_mode";

@@ -192,6 +192,17 @@ if(BUILD_TESTING)
         src/logger.cpp
     )
 
+    # Add integration_test executable
+    add_executable(integration_test 
+        tests/integration_test.cpp
+        src/motion_region_consolidator.cpp
+        src/motion_processor.cpp
+        src/motion_visualization.cpp
+        src/data_collector.cpp
+        src/object_classifier.cpp
+        src/logger.cpp
+    )
+
 
 
 
@@ -228,21 +239,37 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
     )
 
+    # Link libraries for integration_test
+    target_link_libraries(integration_test PRIVATE 
+        ${OpenCV_LIBS}
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
+        yaml-cpp
+        spdlog::spdlog_header_only
+        GTest::gtest
+        GTest::gtest_main
+    )
+
+    # Add include directories for integration_test
+    target_include_directories(integration_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+    )
 
 
 
 
-    # Copy test files to build directory
+
+    # Copy test config to build directory
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/config.yaml
                   ${CMAKE_CURRENT_BINARY_DIR}/config.yaml COPYONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image.jpg
-                  ${CMAKE_CURRENT_BINARY_DIR}/test_image.jpg COPYONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image2.jpg
-                  ${CMAKE_CURRENT_BINARY_DIR}/test_image2.jpg COPYONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/test_image3.png
-                  ${CMAKE_CURRENT_BINARY_DIR}/test_image3.png COPYONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/img/motion_mask.png
-                  ${CMAKE_CURRENT_BINARY_DIR}/motion_mask.png COPYONLY)
+    
+    # Copy all test images from subdirectories recursively
+    file(GLOB_RECURSE TEST_IMAGES "${CMAKE_CURRENT_SOURCE_DIR}/tests/img/*.jpg" "${CMAKE_CURRENT_SOURCE_DIR}/tests/img/*.png" "${CMAKE_CURRENT_SOURCE_DIR}/tests/img/*.jpeg")
+    foreach(TEST_IMAGE ${TEST_IMAGES})
+        file(RELATIVE_PATH REL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tests/img" ${TEST_IMAGE})
+        configure_file(${TEST_IMAGE} ${CMAKE_CURRENT_BINARY_DIR}/tests/img/${REL_PATH} COPYONLY)
+    endforeach()
 
     # ============================================================================
     # CONVENIENCE TARGETS FOR DEVELOPMENT
@@ -261,7 +288,8 @@ if(BUILD_TESTING)
     add_custom_target(run-all-tests
         COMMAND ./motion_processor_test --gtest
         COMMAND ./motion_region_consolidator_test
-        DEPENDS motion_processor_test motion_region_consolidator_test
+        COMMAND ./integration_test
+        DEPENDS motion_processor_test motion_region_consolidator_test integration_test
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Running all test executables"
         USES_TERMINAL
@@ -273,6 +301,7 @@ if(BUILD_TESTING)
         COMMAND ${CMAKE_COMMAND} --build . --parallel
         COMMAND ./motion_processor_test --gtest
         COMMAND ./motion_region_consolidator_test
+        COMMAND ./integration_test
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Clean rebuild and run all tests"
         USES_TERMINAL
@@ -293,6 +322,15 @@ if(BUILD_TESTING)
         DEPENDS motion_region_consolidator_test
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Running motion region consolidator tests"
+        USES_TERMINAL
+    )
+    
+    # Run integration tests only
+    add_custom_target(test-integration
+        COMMAND ./integration_test
+        DEPENDS integration_test
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Running integration tests"
         USES_TERMINAL
     )
     
@@ -326,6 +364,7 @@ if(BUILD_TESTING)
         COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --parallel
         COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_BINARY_DIR} ./motion_processor_test --gtest
         COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_BINARY_DIR} ./motion_region_consolidator_test
+        COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_BINARY_DIR} ./integration_test
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Fresh build and run all tests"
         USES_TERMINAL

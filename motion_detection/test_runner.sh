@@ -25,6 +25,7 @@ print_usage() {
     echo "  test-all        - Clean, rebuild, and run all tests (faster than fresh-test)"
     echo "  test-motion     - Run only motion processor tests"
     echo "  test-consolidator - Run only motion region consolidator tests"
+    echo "  test-integration - Run only integration tests"
     echo "  clean-rebuild   - Clean and rebuild without running tests"
     echo "  run-tests       - Run all tests (assumes already built)"
     echo "  clean-all       - Remove entire build directory"
@@ -68,6 +69,7 @@ case $COMMAND in
         echo -e "${GREEN}Running all tests...${NC}"
         ./motion_processor_test --gtest
         ./motion_region_consolidator_test
+        ./integration_test
         echo -e "${GREEN}✅ Fresh build and test completed successfully!${NC}"
         ;;
         
@@ -119,6 +121,17 @@ case $COMMAND in
         cd "$BUILD_DIR"
         make test-motion-consolidator
         echo -e "${GREEN}✅ Motion region consolidator tests completed!${NC}"
+        ;;
+        
+    "test-integration")
+        echo -e "${GREEN}🎯 Testing integration pipeline...${NC}"
+        if [ ! -d "$BUILD_DIR" ]; then
+            echo -e "${RED}Build directory not found. Run 'fresh-build' first.${NC}"
+            exit 1
+        fi
+        cd "$BUILD_DIR"
+        make test-integration
+        echo -e "${GREEN}✅ Integration tests completed!${NC}"
         ;;
         
     "clean-rebuild")
