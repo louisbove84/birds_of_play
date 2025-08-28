@@ -25,3 +25,38 @@ enable_testing()
 
 # Add motion_detection subdirectory (contains all the actual code and tests)
 add_subdirectory(motion_detection)
+
+# Find required packages for main executable
+find_package(OpenCV REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
+
+
+# Add Homebrew include path for macOS (Apple Silicon)
+if(EXISTS "/opt/homebrew/include")
+    include_directories(/opt/homebrew/include)
+endif()
+
+# Add Homebrew lib path for macOS (Apple Silicon)
+if(EXISTS "/opt/homebrew/lib")
+    link_directories(/opt/homebrew/lib)
+endif()
+
+# Create main executable using the motion detection library
+add_executable(birds_of_play main.cpp)
+
+# Link against the motion detection library
+target_link_libraries(birds_of_play
+    PRIVATE
+        BirdsOfPlay_lib
+        ${OpenCV_LIBS}
+        yaml-cpp
+)
+
+# Include directories for main executable
+target_include_directories(birds_of_play
+    PRIVATE
+        motion_detection/include
+        ${OpenCV_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIR}
+)

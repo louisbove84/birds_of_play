@@ -105,6 +105,10 @@ documentation:
   - Document build requirements
   - Include usage examples
   - Do not make summary documents, just write the code.
+  - DO NOT create new .md files unless absolutely necessary
+  - DO NOT create new .sh files unless absolutely necessary
+  - Prefer updating existing README.md over creating new documentation files
+  - Use inline code comments over separate documentation files
 
 # ---- Security ----
 security:
