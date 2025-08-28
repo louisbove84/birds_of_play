@@ -1,0 +1,69 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive  # Include spdlog submodule
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libopencv-dev \
+          libgtest-dev \
+          libyaml-cpp-dev \
+          pkg-config
+        
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+        fi
+
+    - name: Configure CMake
+      run: |
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+              -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
+              -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic" \
+              -DBUILD_TESTING=ON \
+              ..
+
+    - name: Build
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run tests
+      run: |
+        cd build
+        make test-all
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ matrix.compiler }}-${{ matrix.build_type }}
+        path: build/
+        retention-days: 7
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.compiler }}-${{ matrix.build_type }}
+        path: build/test_results/
+        retention-days: 30
