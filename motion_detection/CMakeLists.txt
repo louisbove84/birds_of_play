@@ -48,23 +48,21 @@ find_package(bsoncxx REQUIRED)
 # Add uuid library
 find_library(UUID_LIBRARIES uuid)
 
-# Add source files (excluding main.cpp)
+# Add source files for motion detection library
 set(LIB_SOURCES
     src/motion_processor.cpp
     src/motion_visualization.cpp
-    src/data_collector.cpp
-    src/object_classifier.cpp
     src/motion_region_consolidator.cpp
+    src/motion_pipeline.cpp
 )
 
-# Add header files
+# Add header files for motion detection library
 set(HEADERS
     include/motion_processor.hpp
-    include/object_tracker.hpp
     include/motion_visualization.hpp
-    include/data_collector.hpp
-    include/object_classifier.hpp
     include/motion_region_consolidator.hpp
+    include/motion_pipeline.hpp
+    include/tracked_object.hpp
 )
 
 # Compiler-specific flags (inherited from parent CMakeLists.txt)
@@ -108,33 +106,36 @@ else()
     set(EXTRA_LIBS m)
 endif()
 
-# Create main executable
-add_executable(${PROJECT_NAME} ${LIB_SOURCES} src/main.cpp src/logger.cpp ${HEADERS})
+# Create motion detection library (no main executable here - main is in parent directory)
+# Note: Main executable is now in birds_of_play/main.cpp
+add_library(${PROJECT_NAME}_lib STATIC ${LIB_SOURCES} src/logger.cpp ${HEADERS})
 
-# Include directories
-target_include_directories(${PROJECT_NAME} 
-    PRIVATE 
+# Include directories for library
+target_include_directories(${PROJECT_NAME}_lib 
+    PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+    PRIVATE 
         ${OpenCV_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIR}
         ${UUID_INCLUDE_DIRS}
         ${MONGOCXX_INCLUDE_DIRS}
         ${BSONCXX_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
 )
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
+# Link libraries for library
+target_link_libraries(${PROJECT_NAME}_lib
+    PUBLIC
         ${OpenCV_LIBS}
         yaml-cpp
+        spdlog::spdlog_header_only
+    PRIVATE
         ${UUID_LIBRARIES}
         mongo::mongocxx_shared
         mongo::bsoncxx_shared
         ${EXTRA_LIBS}
         stdc++
         m
-        spdlog::spdlog_header_only
 )
 
 # Copy config file to build directory
@@ -187,8 +188,6 @@ if(BUILD_TESTING)
         src/motion_region_consolidator.cpp
         src/motion_processor.cpp
         src/motion_visualization.cpp
-        src/data_collector.cpp
-        src/object_classifier.cpp
         src/logger.cpp
     )
 
@@ -198,9 +197,8 @@ if(BUILD_TESTING)
         src/motion_region_consolidator.cpp
         src/motion_processor.cpp
         src/motion_visualization.cpp
-        src/data_collector.cpp
-        src/object_classifier.cpp
         src/logger.cpp
+        src/motion_pipeline.cpp
     )
 
 

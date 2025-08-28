@@ -4,7 +4,7 @@
  */
 
 #include "motion_visualization.hpp"
-#include "object_tracker.hpp" // For TrackedObject definition
+#include "tracked_object.hpp" // For TrackedObject definition
 #include "logger.hpp"
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>

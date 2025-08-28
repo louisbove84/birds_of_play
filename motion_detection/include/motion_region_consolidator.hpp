@@ -5,7 +5,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include "object_tracker.hpp" // For TrackedObject
+#include "tracked_object.hpp" // For TrackedObject
 
 /**
  * @brief Consolidated motion region containing multiple tracked objects

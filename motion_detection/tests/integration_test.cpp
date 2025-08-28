@@ -9,8 +9,11 @@
 
 #include "motion_processor.hpp"
 #include "motion_region_consolidator.hpp"
-#include "object_tracker.hpp"
+#include "tracked_object.hpp"
 #include "logger.hpp"
+#include "motion_pipeline.hpp"
+
+
 
 namespace fs = std::filesystem;
 
@@ -85,18 +88,16 @@ protected:
         LOG_INFO("Found {} test images for integration testing", testImages.size());
     }
     
-    // Helper function to process real images and generate TrackedObjects (adapted from motion_region_consolidator_test.cpp)
-    std::vector<TrackedObject> processRealImages(const std::string& image1Path, 
-                                               const std::string& image2Path) {
-        std::vector<TrackedObject> trackedObjects;
+    void processImagePairWithBothComponents(const std::string& image1Path, const std::string& image2Path, const std::string& pairName) {
+        LOG_INFO("Processing image pair: {} (using two-frame motion detection)", pairName);
         
-        // Load the test images
+        // Load images
         cv::Mat frame1 = cv::imread(image1Path);
         cv::Mat frame2 = cv::imread(image2Path);
         
         if (frame1.empty() || frame2.empty()) {
             LOG_ERROR("Failed to load test images: {} or {}", image1Path, image2Path);
-            return trackedObjects;
+            return;
         }
         
         LOG_INFO("Loaded test images: {}x{} and {}x{}", 
@@ -105,63 +106,22 @@ protected:
         // Reset motion processor for clean processing
         motionProcessor->setPrevFrame(cv::Mat());
         
-        // Process first frame (establishes baseline)
-        MotionProcessor::ProcessingResult result1 = motionProcessor->processFrame(frame1);
-        LOG_INFO("First frame processed - hasMotion: {}, bounds: {}", 
-                 result1.hasMotion, result1.detectedBounds.size());
+        // Process baseline frame
+        processFrameAndConsolidate(*motionProcessor, *regionConsolidator, frame1);
         
-        // Process second frame (detects motion between frames)
-        MotionProcessor::ProcessingResult result2 = motionProcessor->processFrame(frame2);
-        LOG_INFO("Second frame processed - hasMotion: {}, bounds: {}", 
-                 result2.hasMotion, result2.detectedBounds.size());
-        
-        // Convert detected bounds to TrackedObjects
-        int objectId = 0;
-        for (const auto& bounds : result2.detectedBounds) {
-            trackedObjects.emplace_back(objectId, bounds, "uuid_" + std::to_string(objectId));
-            objectId++;
-        }
-        
-        LOG_INFO("Generated {} TrackedObjects from motion detection", trackedObjects.size());
-        return trackedObjects;
-    }
-    
-    void processImagePairWithBothComponents(const std::string& image1Path, const std::string& image2Path, const std::string& pairName) {
-        LOG_INFO("Processing image pair: {} (using two-frame motion detection)", pairName);
-        
-        // Use processRealImages to get proper motion detection between two frames
-        std::vector<TrackedObject> trackedObjects = processRealImages(image1Path, image2Path);
-        
-        // Load second image for visualization (the one with detected motion)
-        cv::Mat frame2 = cv::imread(image2Path);
-        if (frame2.empty()) {
-            LOG_ERROR("Failed to load second image for visualization: {}", image2Path);
-            return;
-        }
-        
-        // Step 1: Save MotionProcessor visualization (using the two-frame processing result)
-        // We need to reprocess to get the ProcessingResult for visualization
-        motionProcessor->setPrevFrame(cv::Mat());
-        cv::Mat frame1 = cv::imread(image1Path);
-        if (!frame1.empty()) {
-            motionProcessor->processFrame(frame1);  // Baseline frame
-            auto result2 = motionProcessor->processFrame(frame2);  // Motion detection frame
-            
-            std::string motionProcessorOutput = "test_results/integration_test/1_motion_processor_visualizations/" + 
-                                               pairName + "_motion_processing.jpg";
-            motionProcessor->saveProcessingVisualization(result2, motionProcessorOutput);
-        }
-        
-        // Step 2: Process with MotionRegionConsolidator and save its visualization
+        // Process motion detection frame with visualization
+        std::string motionProcessorOutput = "test_results/integration_test/1_motion_processor_visualizations/" + 
+                                           pairName + "_motion_processing.jpg";
         std::string consolidationOutput = "test_results/integration_test/2_consolidation_visualizations/" + 
                                          pairName + "_consolidation.jpg";
         
-        // Use MotionRegionConsolidator's consolidateRegionsWithVisualization method
-        auto regions = regionConsolidator->consolidateRegionsWithVisualization(
-            trackedObjects, frame2, consolidationOutput);
+        auto [result, regions] = processFrameAndConsolidate(*motionProcessor, *regionConsolidator, frame2, consolidationOutput);
+        
+        // Save MotionProcessor visualization separately
+        motionProcessor->saveProcessingVisualization(result, motionProcessorOutput);
         
         LOG_INFO("Completed {}: {} motion objects -> {} consolidated regions", 
-                pairName, trackedObjects.size(), regions.size());
+                pairName, result.detectedBounds.size(), regions.size());
     }
     
     std::unique_ptr<MotionProcessor> motionProcessor;
@@ -181,8 +141,8 @@ public:
     }
 };
 
-TEST_F(IntegrationTest, ProcessAllTestImages) {
-    LOG_INFO("=== STARTING INTEGRATION TEST ===");
+TEST_F(IntegrationTest, ProcessAllImagePairsWithFullPipeline) {
+    LOG_INFO("=== STARTING COMPREHENSIVE INTEGRATION TEST ===");
     LOG_INFO("Processing {} test images with both MotionProcessor and MotionRegionConsolidator", testImages.size());
     
     EXPECT_GT(testImages.size(), 0) << "No test images found";
@@ -210,16 +170,16 @@ TEST_F(IntegrationTest, ProcessAllTestImages) {
         } 
     }
     
-    LOG_INFO("=== INTEGRATION TEST COMPLETED ===");
+    LOG_INFO("=== COMPREHENSIVE INTEGRATION TEST COMPLETED ===");
     LOG_INFO("Generated visualizations in:");
     LOG_INFO("  - Motion Processing: test_results/integration_test/1_motion_processor_visualizations/");
     LOG_INFO("  - Consolidation: test_results/integration_test/2_consolidation_visualizations/");
 }
 
-TEST_F(IntegrationTest, VerifyOutputFiles) {
-    // Process a few image pairs and verify output files are created
+TEST_F(IntegrationTest, QuickFileCreationValidation) {
+    // Process a few image pairs and verify output files are created correctly
     int processedCount = 0;
-    const int maxToProcess = 2; // Limit for this test
+    const int maxToProcess = 2; // Limit for quick validation test
     
     // Group images by directory for pair processing
     std::map<std::string, std::vector<std::pair<std::string, std::string>>> imagesByDir;
