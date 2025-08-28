@@ -24,7 +24,7 @@ endif()
 enable_testing()
 
 # Add motion_detection subdirectory (contains all the actual code and tests)
-add_subdirectory(motion_detection)
+add_subdirectory(src/motion_detection)
 
 # Find required packages for main executable
 find_package(OpenCV REQUIRED)
@@ -43,7 +43,7 @@ if(EXISTS "/opt/homebrew/lib")
 endif()
 
 # Create main executable using the motion detection library
-add_executable(birds_of_play main.cpp)
+add_executable(birds_of_play src/main.cpp)
 
 # Link against the motion detection library
 target_link_libraries(birds_of_play
@@ -56,7 +56,7 @@ target_link_libraries(birds_of_play
 # Include directories for main executable
 target_include_directories(birds_of_play
     PRIVATE
-        motion_detection/include
+        src/motion_detection/include
         ${OpenCV_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIR}
 )
