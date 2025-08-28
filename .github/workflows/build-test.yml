@@ -36,12 +36,26 @@ jobs:
 
     - name: Configure and Build
       run: |
+        echo "=== Debug Info ==="
+        pwd
+        ls -la
+        echo "=== Source Directory ==="
+        ls -la src/ || echo "src/ not found"
+        echo "=== Motion Detection Directory ==="
+        ls -la src/motion_detection/ || echo "motion_detection/ not found"
+        echo "=== Submodules ==="
+        git submodule status
+        echo ""
+        
         mkdir build && cd build
+        echo "=== CMake Configuration ==="
         cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
               -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
               -DBUILD_TESTING=ON \
-              ..
-        make -j$(nproc)
+              .. || echo "CMake failed"
+        
+        echo "=== Build ==="
+        make -j$(nproc) || echo "Make failed"
 
     - name: Run Basic Tests
       run: |
