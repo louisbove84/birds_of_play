@@ -42,9 +42,10 @@ This document explains how to use the Python bindings for the Birds of Play moti
 The project uses modern Python packaging with `pyproject.toml`:
 
 - **`pyproject.toml`**: Project configuration and dependencies
+- **`src/main.py`**: Main application entry point (Python orchestrator)
+- **`src/main.cpp`**: C++ motion detection executable
 - **`src/motion_detection/src/python_bindings.cpp`**: Python bindings source
 - **`build/src/motion_detection/birds_of_play_python.*.so`**: Built Python module
-- **`example_python_usage.py`**: C++ motion detection demo launcher
 
 ## Usage
 
@@ -198,13 +199,26 @@ morph_close: true
 
 ## Testing
 
-Run the C++ motion detection demo:
+Run the main application:
 
 ```bash
-python example_python_usage.py
+# Live webcam detection (default)
+python src/main.py --webcam
+
+# Process video file
+python src/main.py --video input.mp4
+
+# With MongoDB logging
+python src/main.py --webcam --mongo
+
+# Use Python bindings instead of C++ executable
+python src/main.py --python-bindings --webcam
+
+# Custom configuration
+python src/main.py --config custom.yaml --webcam
 ```
 
-This will launch the full C++ motion detection system with webcam support.
+This will launch the full motion detection system with your chosen configuration.
 
 ## Troubleshooting
 
@@ -237,10 +251,12 @@ This will launch the full C++ motion detection system with webcam support.
 
 ## Examples
 
-See `example_python_usage.py` for a complete demonstration including:
+See `src/main.py` for a complete demonstration including:
 - Live webcam motion detection
 - Video file processing
 - Real-time motion tracking and region consolidation
+- MongoDB integration for data logging
+- Command-line interface with multiple modes
 
 ## Contributing
 

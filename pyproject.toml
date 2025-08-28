@@ -25,6 +25,7 @@ dependencies = [
     "pybind11>=3.0.0",
     "numpy>=1.21.0",
     "opencv-python>=4.5.0",
+    "pymongo>=4.0.0",
 ]
 
 [project.optional-dependencies]
