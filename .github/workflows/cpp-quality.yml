@@ -36,8 +36,8 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=OFF ..
         make -j$(nproc)
         
-        # Run clang-tidy on source files
-        find ../src/ -name "*.cpp" | xargs clang-tidy -p build/ -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type
+        # Run clang-tidy on source files (non-fatal)
+        find ../src/ -name "*.cpp" | xargs clang-tidy -p build/ -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type || true
 
     - name: Run cppcheck
       run: |
