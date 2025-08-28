@@ -1,0 +1,84 @@
+name: Debug CI/CD Issues
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  debug:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Debug Environment
+      run: |
+        echo "=== System Info ==="
+        uname -a
+        lsb_release -a
+        echo ""
+        
+        echo "=== Available Compilers ==="
+        which gcc && gcc --version
+        which g++ && g++ --version
+        which clang && clang --version
+        which clang++ && clang++ --version
+        echo ""
+        
+        echo "=== Directory Structure ==="
+        pwd
+        ls -la
+        echo ""
+        echo "=== Source Directory ==="
+        ls -la src/ || echo "src/ directory not found"
+        echo ""
+        echo "=== Motion Detection Directory ==="
+        ls -la src/motion_detection/ || echo "src/motion_detection/ not found"
+        echo ""
+        echo "=== Submodules ==="
+        git submodule status
+        ls -la src/motion_detection/libs/ || echo "libs/ directory not found"
+        echo ""
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libopencv-dev \
+          libgtest-dev \
+          libyaml-cpp-dev \
+          pkg-config
+        
+        echo "=== Installed Packages ==="
+        dpkg -l | grep -E "(opencv|gtest|yaml)" || echo "No matching packages found"
+        echo ""
+
+    - name: Test CMake Configuration
+      run: |
+        echo "=== CMake Version ==="
+        cmake --version
+        echo ""
+        
+        echo "=== Testing CMake Configuration ==="
+        mkdir test_build && cd test_build
+        cmake -DBUILD_TESTING=ON .. || echo "CMake configuration failed"
+        
+        echo "=== CMake Cache ==="
+        cat CMakeCache.txt | grep -E "(OpenCV|GTEST|YAML)" || echo "No relevant cache entries"
+        echo ""
+
+    - name: Test Basic Compilation
+      run: |
+        echo "=== Testing Basic Compilation ==="
+        cd test_build
+        make -j2 || echo "Basic compilation failed"
+        echo ""
+
+    - name: List Generated Files
+      run: |
+        echo "=== Generated Files ==="
+        find test_build -name "*.o" -o -name "*.a" -o -name "*.so" -o -name "*test" -o -name "*birds_of_play" | head -20
+        echo ""
