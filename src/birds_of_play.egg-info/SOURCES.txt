@@ -1,0 +1,9 @@
+LICENSE.md
+README.md
+pyproject.toml
+src/birds_of_play.egg-info/PKG-INFO
+src/birds_of_play.egg-info/SOURCES.txt
+src/birds_of_play.egg-info/dependency_links.txt
+src/birds_of_play.egg-info/requires.txt
+src/birds_of_play.egg-info/top_level.txt
+src/motion_detection/libs/spdlog/scripts/extract_version.py

@@ -1,172 +1,177 @@
 #!/usr/bin/env python3
 """
-Example usage of Birds of Play Python bindings
+Example usage of Birds of Play - runs the C++ motion detection executable
 """
 
-import numpy as np
-import cv2
+import subprocess
 import sys
 import os
+import time
 
-# Add the build directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'build', 'src', 'motion_detection'))
+def check_build():
+    """Check if the C++ executable is built"""
+    executable_path = os.path.join("build", "birds_of_play")
+    if not os.path.exists(executable_path):
+        print(f"❌ C++ executable not found at: {executable_path}")
+        print("Please build the project first:")
+        print("  mkdir -p build && cd build")
+        print("  cmake .. -DBUILD_TESTING=ON")
+        print("  make -j$(nproc)")
+        return False
+    return True
 
-def create_test_video():
-    """Create a simple test video with moving objects"""
-    print("Creating test video...")
+def run_motion_detection_demo():
+    """Run the C++ motion detection demo with webcam"""
+    print("🐦 Birds of Play - C++ Motion Detection Demo")
+    print("=" * 50)
     
-    # Create a video writer
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('test_video.mp4', fourcc, 30.0, (640, 480))
+    if not check_build():
+        return False
     
-    # Create frames with moving objects
-    for frame_num in range(100):  # 3.3 seconds at 30 fps
-        # Create a black frame
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        
-        # Add a moving rectangle
-        x = int(50 + frame_num * 2)  # Move right
-        y = int(200 + 20 * np.sin(frame_num * 0.1))  # Oscillate up and down
-        cv2.rectangle(frame, (x, y), (x + 50, y + 50), (255, 255, 255), -1)
-        
-        # Add a moving circle
-        circle_x = int(400 - frame_num * 1.5)  # Move left
-        circle_y = int(300 + 30 * np.cos(frame_num * 0.15))  # Oscillate
-        cv2.circle(frame, (circle_x, circle_y), 30, (128, 128, 128), -1)
-        
-        # Add some noise
-        noise = np.random.randint(0, 30, frame.shape, dtype=np.uint8)
-        frame = cv2.add(frame, noise)
-        
-        out.write(frame)
+    executable_path = os.path.join("build", "birds_of_play")
+    config_path = os.path.join("src", "motion_detection", "config.yaml")
     
-    out.release()
-    print("Test video created: test_video.mp4")
-
-def process_video_with_motion_detection():
-    """Process the test video using the Python bindings"""
-    print("\nProcessing video with motion detection...")
+    print(f"📹 Starting motion detection with webcam...")
+    print(f"🔧 Using config: {config_path}")
+    print(f"⚙️  Executable: {executable_path}")
+    print("\n⌨️  Controls:")
+    print("   'q' or ESC - Quit application")
+    print("   's' - Save current frame with detections")
+    print("\n🔍 Watch for:")
+    print("   🟢 Green/Blue/Red boxes - Individual motion detections")
+    print("   ⬜ White boxes - Consolidated motion regions")
+    print("\n" + "=" * 50)
     
     try:
-        import birds_of_play_python
+        # Run the C++ executable
+        cmd = [executable_path, config_path]
+        print(f"🚀 Running: {' '.join(cmd)}")
         
-        # Create motion processor
-        processor = birds_of_play_python.MotionProcessor()
+        # Start the process
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
         
-        # Open the test video
-        cap = cv2.VideoCapture('test_video.mp4')
+        # Print output in real-time
+        print("\n📺 Motion detection window should open...")
+        print("📊 Live output:")
+        print("-" * 30)
         
-        if not cap.isOpened():
-            print("Error: Could not open test video")
-            return
-        
-        # Create output video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter('motion_detection_output.mp4', fourcc, 30.0, (640, 480))
-        
-        frame_count = 0
         while True:
-            ret, frame = cap.read()
-            if not ret:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
                 break
-            
-            # Process frame with motion detection
-            processed_frame = processor.process_frame(frame)
-            
-            # Convert back to BGR for video writing
-            if len(processed_frame.shape) == 3 and processed_frame.shape[2] == 1:
-                # Convert grayscale to BGR
-                processed_frame = cv2.cvtColor(processed_frame, cv2.COLOR_GRAY2BGR)
-            
-            # Write the processed frame
-            out.write(processed_frame)
-            
-            frame_count += 1
-            if frame_count % 30 == 0:  # Print progress every second
-                print(f"Processed {frame_count} frames...")
+            if output:
+                print(output.strip())
         
-        cap.release()
-        out.release()
-        print(f"Motion detection processing complete. Output saved to: motion_detection_output.mp4")
+        # Wait for process to finish
+        return_code = process.poll()
         
-    except ImportError as e:
-        print(f"Failed to import birds_of_play_python: {e}")
-        print("Make sure to build the project first with: cd build && make")
+        if return_code == 0:
+            print("\n✅ Motion detection demo completed successfully!")
+        else:
+            print(f"\n❌ Motion detection demo exited with code: {return_code}")
+            
+    except KeyboardInterrupt:
+        print("\n⏹️  Demo interrupted by user")
+        if 'process' in locals():
+            process.terminate()
+            process.wait()
     except Exception as e:
-        print(f"Error during video processing: {e}")
+        print(f"\n❌ Error running motion detection demo: {e}")
+        return False
+    
+    return True
 
-def interactive_demo():
-    """Interactive demo using webcam"""
-    print("\nStarting interactive demo (press 'q' to quit)...")
+def run_with_video_file(video_path):
+    """Run motion detection on a video file instead of webcam"""
+    print(f"🎬 Birds of Play - Motion Detection on Video: {video_path}")
+    print("=" * 50)
+    
+    if not check_build():
+        return False
+    
+    if not os.path.exists(video_path):
+        print(f"❌ Video file not found: {video_path}")
+        return False
+    
+    executable_path = os.path.join("build", "birds_of_play")
+    config_path = os.path.join("src", "motion_detection", "config.yaml")
+    
+    print(f"📹 Processing video: {video_path}")
+    print(f"🔧 Using config: {config_path}")
     
     try:
-        import birds_of_play_python
+        # Run the C++ executable with video file
+        cmd = [executable_path, config_path, video_path]
+        print(f"🚀 Running: {' '.join(cmd)}")
         
-        # Create motion processor
-        processor = birds_of_play_python.MotionProcessor()
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
         
-        # Open webcam
-        cap = cv2.VideoCapture(0)
-        
-        if not cap.isOpened():
-            print("Error: Could not open webcam")
-            return
-        
-        print("Webcam opened successfully. Press 'q' to quit.")
+        print("\n📊 Processing output:")
+        print("-" * 30)
         
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Could not read frame from webcam")
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
                 break
-            
-            # Process frame with motion detection
-            processed_frame = processor.process_frame(frame)
-            
-            # Convert back to BGR for display
-            if len(processed_frame.shape) == 3 and processed_frame.shape[2] == 1:
-                # Convert grayscale to BGR
-                processed_frame = cv2.cvtColor(processed_frame, cv2.COLOR_GRAY2BGR)
-            
-            # Display both original and processed frames
-            combined = np.hstack([frame, processed_frame])
-            cv2.imshow('Birds of Play - Motion Detection (Original | Processed)', combined)
-            
-            # Check for quit key
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            if output:
+                print(output.strip())
         
-        cap.release()
-        cv2.destroyAllWindows()
-        print("Interactive demo ended.")
+        return_code = process.poll()
         
-    except ImportError as e:
-        print(f"Failed to import birds_of_play_python: {e}")
-        print("Make sure to build the project first with: cd build && make")
+        if return_code == 0:
+            print("\n✅ Video processing completed successfully!")
+        else:
+            print(f"\n❌ Video processing exited with code: {return_code}")
+            
+    except KeyboardInterrupt:
+        print("\n⏹️  Processing interrupted by user")
+        if 'process' in locals():
+            process.terminate()
+            process.wait()
     except Exception as e:
-        print(f"Error during interactive demo: {e}")
+        print(f"\n❌ Error processing video: {e}")
+        return False
+    
+    return True
 
 def main():
     """Main function"""
-    print("Birds of Play Python Bindings Example")
-    print("=" * 40)
+    print("🐦 Birds of Play - C++ Motion Detection Demo Launcher")
+    print("=" * 60)
     
-    # Create test video
-    create_test_video()
+    print("Choose an option:")
+    print("1. 🎥 Run motion detection with webcam (live)")
+    print("2. 🎬 Run motion detection on video file")
+    print("3. 🚪 Exit")
     
-    # Process video with motion detection
-    process_video_with_motion_detection()
-    
-    # Ask user if they want to try interactive demo
-    print("\n" + "=" * 40)
-    response = input("Would you like to try the interactive webcam demo? (y/n): ")
-    
-    if response.lower() in ['y', 'yes']:
-        interactive_demo()
-    else:
-        print("Demo complete! Check the output files:")
-        print("- test_video.mp4: Input test video")
-        print("- motion_detection_output.mp4: Processed video with motion detection")
+    while True:
+        choice = input("\nEnter your choice (1-3): ").strip()
+        
+        if choice == "1":
+            run_motion_detection_demo()
+            break
+        elif choice == "2":
+            video_path = input("Enter path to video file: ").strip()
+            if video_path:
+                run_with_video_file(video_path)
+            break
+        elif choice == "3":
+            print("👋 Goodbye!")
+            break
+        else:
+            print("❌ Invalid choice. Please enter 1, 2, or 3.")
 
 if __name__ == "__main__":
     main()

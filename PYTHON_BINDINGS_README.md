@@ -22,15 +22,29 @@ This document explains how to use the Python bindings for the Birds of Play moti
 
 2. **Install Python dependencies:**
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
-3. **Build the project:**
+3. **Install development dependencies (optional):**
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+4. **Build the project:**
    ```bash
    mkdir build && cd build
    cmake .. -DBUILD_TESTING=ON
    make -j$(nproc)  # On Windows: cmake --build . --parallel
    ```
+
+## Project Structure
+
+The project uses modern Python packaging with `pyproject.toml`:
+
+- **`pyproject.toml`**: Project configuration and dependencies
+- **`src/motion_detection/src/python_bindings.cpp`**: Python bindings source
+- **`build/src/motion_detection/birds_of_play_python.*.so`**: Built Python module
+- **`example_python_usage.py`**: C++ motion detection demo launcher
 
 ## Usage
 
@@ -184,17 +198,13 @@ morph_close: true
 
 ## Testing
 
-Run the test script to verify the bindings work correctly:
-
-```bash
-python test_python_bindings.py
-```
-
-Run the example script for a complete demonstration:
+Run the C++ motion detection demo:
 
 ```bash
 python example_python_usage.py
 ```
+
+This will launch the full C++ motion detection system with webcam support.
 
 ## Troubleshooting
 
@@ -227,9 +237,10 @@ python example_python_usage.py
 
 ## Examples
 
-See the following files for complete examples:
-- `test_python_bindings.py`: Basic functionality tests
-- `example_python_usage.py`: Complete demonstration with video processing
+See `example_python_usage.py` for a complete demonstration including:
+- Live webcam motion detection
+- Video file processing
+- Real-time motion tracking and region consolidation
 
 ## Contributing
 
