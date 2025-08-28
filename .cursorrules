@@ -16,6 +16,7 @@ technologies:
 # ---- Code Style ----
 code_style:
   - Follow Modern C++ guidelines (C++17/20)
+  - Treat C++ warnings as errors
   - Use RAII and smart pointers; avoid raw pointers
   - Prefer references over pointers when possible
   - Use const correctness consistently
@@ -27,6 +28,15 @@ code_style:
   - Use auto when it aids readability
   - Prefer range-based for loops
   - Use structured bindings where appropriate
+  - Use std::fill, std::sort, std::find instead of loops
+  - Use v.front() for first, v.back() for last element
+  - Use std::thread + std::mutex/lock_guard
+  - Use std::make_unique instead of new
+  - Use std::vector instead of raw arrays
+  - Use std::string instead of C-style strings
+  - Use std::unique_ptr instead of raw pointers
+  - Use std::shared_ptr instead of raw pointers
+  - Use std::weak_ptr instead of raw pointers
 
 # ---- Memory Management ----
 memory:

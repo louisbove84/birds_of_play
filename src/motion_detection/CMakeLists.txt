@@ -10,6 +10,9 @@ find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(GTest REQUIRED)
 
+# Find pybind11 for Python bindings
+find_package(pybind11 REQUIRED)
+
 # Find MongoDB packages
 find_package(mongocxx REQUIRED)
 find_package(bsoncxx REQUIRED)
@@ -369,3 +372,35 @@ if(BUILD_TESTING)
     )
 
 endif() 
+
+# ==============================================================================
+# PYTHON BINDINGS
+# ==============================================================================
+
+# Create Python module using pybind11
+pybind11_add_module(birds_of_play_python src/python_bindings.cpp)
+
+# Link the Python module with our library and dependencies
+target_link_libraries(birds_of_play_python
+    PRIVATE
+        ${PROJECT_NAME}_lib
+        ${OpenCV_LIBS}
+        yaml-cpp
+        spdlog::spdlog_header_only
+        ${UUID_LIBRARIES}
+        mongo::mongocxx_shared
+        mongo::bsoncxx_shared
+        ${EXTRA_LIBS}
+)
+
+# Include directories for Python module
+target_include_directories(birds_of_play_python
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/spdlog/include
+        ${OpenCV_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIR}
+        ${UUID_INCLUDE_DIRS}
+        ${MONGOCXX_INCLUDE_DIRS}
+        ${BSONCXX_INCLUDE_DIRS}
+)
