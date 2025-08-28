@@ -1,0 +1,44 @@
+name: C++ Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          clang-format \
+          clang-tidy \
+          cppcheck
+
+    - name: Check code formatting
+      run: |
+        # Check if all files are properly formatted
+        find src/ -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
+
+    - name: Run clang-tidy
+      run: |
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=OFF ..
+        make -j$(nproc)
+        
+        # Run clang-tidy on source files
+        find ../src/ -name "*.cpp" | xargs clang-tidy -p build/ -checks=*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=all --std=c++17 --suppress=missingIncludeSystem src/ || true
