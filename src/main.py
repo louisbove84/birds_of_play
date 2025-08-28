@@ -100,6 +100,48 @@ def save_frame_to_mongodb(frame_db, frame, metadata=None):
         print(f"❌ Failed to save frame to MongoDB: {e}")
         return None
 
+def save_frame_to_mongodb_from_file(frame_db, frame_filename, metadata=None):
+    """Save a frame from file to MongoDB with metadata"""
+    if frame_db is None:
+        return None
+    
+    try:
+        import cv2
+        
+        # Read the frame from file
+        frame = cv2.imread(frame_filename)
+        if frame is None:
+            print(f"❌ Could not read frame from file: {frame_filename}")
+            return None
+        
+        # Prepare metadata
+        frame_metadata = metadata or {}
+        frame_metadata.update({
+            "source": "motion_detection_cpp",
+            "original_filename": frame_filename,
+            "timestamp": datetime.utcnow().isoformat(),
+            "auto_saved": True
+        })
+        
+        # Save frame to MongoDB
+        frame_uuid = frame_db.save_frame(frame, frame_metadata)
+        
+        if frame_uuid:
+            print(f"💾 Frame from {frame_filename} saved with UUID: {frame_uuid[:8]}...")
+            
+            # Optionally remove the temporary file
+            try:
+                os.remove(frame_filename)
+                print(f"🗑️  Removed temporary file: {frame_filename}")
+            except Exception as e:
+                print(f"⚠️  Could not remove temporary file {frame_filename}: {e}")
+        
+        return frame_uuid
+        
+    except Exception as e:
+        print(f"❌ Failed to save frame from file to MongoDB: {e}")
+        return None
+
 def run_with_python_bindings(video_source=None):
     """Run motion detection using Python bindings"""
     print("🐍 Birds of Play - Python Bindings Mode")
@@ -166,9 +208,9 @@ def run_with_python_bindings(video_source=None):
         print(f"❌ Error in Python bindings mode: {e}")
         return False
 
-def run_motion_detection_demo():
-    """Run the C++ motion detection demo with webcam"""
-    print("🐦 Birds of Play - C++ Motion Detection Demo")
+def run_motion_detection_demo(frame_db=None):
+    """Run the C++ motion detection demo with webcam and MongoDB frame storage"""
+    print("🐦 Birds of Play - C++ Motion Detection Demo with MongoDB")
     print("=" * 50)
     
     if not check_build():
@@ -180,6 +222,8 @@ def run_motion_detection_demo():
     print(f"📹 Starting motion detection with webcam...")
     print(f"🔧 Using config: {config_path}")
     print(f"⚙️  Executable: {executable_path}")
+    if frame_db:
+        print(f"💾 MongoDB frame storage: ENABLED (every 30 seconds)")
     print("\n⌨️  Controls:")
     print("   'q' or ESC - Quit application")
     print("   's' - Save current frame with detections")
@@ -202,7 +246,7 @@ def run_motion_detection_demo():
             bufsize=1
         )
         
-        # Print output in real-time
+        # Print output in real-time and monitor for saved frames
         print("\n📺 Motion detection window should open...")
         print("📊 Live output:")
         print("-" * 30)
@@ -212,7 +256,33 @@ def run_motion_detection_demo():
             if output == '' and process.poll() is not None:
                 break
             if output:
-                print(output.strip())
+                output_line = output.strip()
+                print(output_line)
+                
+                # Monitor for saved frames and store in MongoDB
+                if frame_db:
+                    # Check for manually saved frames
+                    if "saved_detection_frame_" in output_line and "Saved current frame to:" in output_line:
+                        frame_filename = output_line.split("Saved current frame to: ")[-1].strip()
+                        save_frame_to_mongodb_from_file(frame_db, frame_filename)
+                    
+                    # Check for auto-saved frames (every 1 second)
+                    if "auto_saved_detection_frame_" in output_line and "Auto-saved frame to:" in output_line:
+                        frame_filename = output_line.split("Auto-saved frame to: ")[-1].strip()
+                        save_frame_to_mongodb_from_file(frame_db, frame_filename)
+                    
+                    # Check for motion frames (every 30 frames)
+                    if "motion_frame_" in output_line and "motion_frame_" in output_line:
+                        # Extract frame number from the output
+                        import re
+                        match = re.search(r'motion_frame_(\d+)\.jpg', output_line)
+                        if match:
+                            frame_num = match.group(1)
+                            frame_filename = f"motion_frame_{frame_num}.jpg"
+                            if os.path.exists(frame_filename):
+                                save_frame_to_mongodb_from_file(frame_db, frame_filename)
+                
+
         
         # Wait for process to finish
         return_code = process.poll()
@@ -356,7 +426,7 @@ Examples:
     else:
         print("\n⚙️  Running in C++ Executable Mode...")
         if video_source is None:
-            success = run_motion_detection_demo()
+            success = run_motion_detection_demo(frame_db)
         else:
             success = run_with_video_file(video_source)
     

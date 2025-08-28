@@ -7,7 +7,11 @@
 #include <filesystem>                   // std::filesystem (fs::path, fs::create_directories)
 #include <string>                       // std::string
 #include <ctime>                        // std::time for timestamp
+#include <chrono>                       // std::chrono for timing
 #include <yaml-cpp/yaml.h>              // YAML::Node, YAML::LoadFile
+#include <pybind11/embed.h>             // Python embedding
+#include <pybind11/numpy.h>             // NumPy array support
+namespace py = pybind11;
 namespace fs = std::filesystem;         // Shorthand for std::filesystem
 
 // Colors for different tracked objects (cycled through based on object ID)
@@ -24,7 +28,13 @@ cv::Scalar getColor(int objectId) {
     return COLORS[objectId % COLORS.size()];
 }
 
+// Function to save frame to MongoDB (declaration)
+std::string save_frame_to_mongodb(const cv::Mat& frame, const std::string& metadata_json);
+
 int main(int argc, char** argv) {
+    // Initialize Python interpreter for MongoDB integration
+    py::scoped_interpreter guard{};
+    
     // Default to motion_detection config if no path provided
     fs::path config_path = (argc > 1) ? argv[1] : "motion_detection/config.yaml";
     
@@ -52,6 +62,7 @@ int main(int argc, char** argv) {
 
     // Initialize motion processor and motion region consolidator
     MotionProcessor motionProcessor(config_path.string());
+    motionProcessor.setVisualizationPath(""); // Disable visualization file saving
     MotionRegionConsolidator regionConsolidator;
     
     // Initialize camera
@@ -81,6 +92,8 @@ int main(int argc, char** argv) {
     cv::Mat frame;
     char key = 0;
     int frameCount = 0;
+    auto lastSaveTime = std::chrono::steady_clock::now();
+    const auto saveInterval = std::chrono::seconds(1); // Save every 1 second
 
     while (key != 'q' && key != 27) { // Loop until 'q' or ESC is pressed
         cap >> frame;
@@ -90,13 +103,11 @@ int main(int argc, char** argv) {
         }
 
         frameCount++;
+        auto currentTime = std::chrono::steady_clock::now();
 
         // Use unified function to process frame and consolidate regions
-        // Only save visualization occasionally to avoid disk spam
+        // Disable visualization file saving to avoid disk spam
         std::string visualizationPath = "";
-        if (frameCount % 30 == 0) { // Save every 30 frames (~1 second at 30fps)
-            visualizationPath = "motion_frame_" + std::to_string(frameCount) + ".jpg";
-        }
         
         auto [processingResult, consolidatedRegions] = processFrameAndConsolidate(
             motionProcessor, regionConsolidator, frame, visualizationPath);
@@ -133,6 +144,36 @@ int main(int argc, char** argv) {
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
         }
 
+        // Auto-save frame every 1 second
+        if (currentTime - lastSaveTime >= saveInterval) {
+            try {
+                // Create metadata JSON with motion detection info
+                std::string metadata = "{\"source\":\"motion_detection_cpp\",\"frame_count\":" + 
+                                     std::to_string(frameCount) + ",\"timestamp\":\"" + 
+                                     std::to_string(std::time(nullptr)) + "\",\"auto_saved\":true," +
+                                     "\"motion_detected\":" + (processingResult.detectedBounds.empty() ? "false" : "true") + "," +
+                                     "\"motion_regions\":" + std::to_string(processingResult.detectedBounds.size()) + "," +
+                                     "\"consolidated_regions\":" + std::to_string(consolidatedRegions.size()) + "," +
+                                     "\"confidence\":" + std::to_string(processingResult.detectedBounds.empty() ? 0.0 : 0.8) + "}";
+                
+                // Try to save directly to MongoDB using Python bindings
+                std::string result = save_frame_to_mongodb(displayFrame, metadata);
+                if (!result.empty()) {
+                    std::cout << "💾 Frame saved to MongoDB with UUID: " << result << std::endl;
+                    LOG_INFO("Frame saved to MongoDB: {}", result);
+                } else {
+                    std::cout << "❌ Failed to save frame to MongoDB" << std::endl;
+                    LOG_ERROR("Failed to save frame to MongoDB");
+                }
+                
+            } catch (const std::exception& e) {
+                std::cerr << "Error saving frame: " << e.what() << std::endl;
+                LOG_ERROR("Error saving frame to MongoDB: {}", e.what());
+            }
+            
+            lastSaveTime = currentTime;
+        }
+
         // Add status overlay
         std::string status = "Frame: " + std::to_string(frameCount) + 
                            " | Motions: " + std::to_string(processingResult.detectedBounds.size()) +
@@ -145,7 +186,9 @@ int main(int argc, char** argv) {
         
         // Handle 's' key to save current frame
         if (key == 's' || key == 'S') {
-            std::string saveFileName = "saved_detection_frame_" + std::to_string(frameCount) + ".jpg";
+            // Create frames directory if it doesn't exist
+            fs::create_directories("frames");
+            std::string saveFileName = "frames/saved_detection_frame_" + std::to_string(frameCount) + ".jpg";
             cv::imwrite(saveFileName, displayFrame);
             std::cout << "💾 Saved current frame to: " << saveFileName << std::endl;
             LOG_INFO("User saved frame: {}", saveFileName);
@@ -163,4 +206,68 @@ int main(int argc, char** argv) {
     LOG_INFO("Application ended after processing {} frames", frameCount);
 
     return 0;
+}
+
+// Function to save frame to MongoDB (implementation)
+std::string save_frame_to_mongodb(const cv::Mat& frame, const std::string& metadata_json) {
+    try {
+        // Import Python modules
+        py::module sys = py::module::import("sys");
+        py::module os = py::module::import("os");
+        
+        // Add the src directory to Python path
+        std::string current_dir = os.attr("getcwd")().cast<std::string>();
+        sys.attr("path").attr("insert")(0, current_dir + "/src");
+        
+        // Add virtual environment site-packages to Python path
+        std::string venv_site_packages = current_dir + "/venv/lib/python3.13/site-packages";
+        sys.attr("path").attr("insert")(0, venv_site_packages);
+        
+        // Import our MongoDB modules
+        py::module db_manager_module = py::module::import("mongodb.database_manager");
+        py::module frame_db_module = py::module::import("mongodb.frame_database");
+        
+        // Get the classes
+        py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
+        py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+        
+        // Create database manager and connect
+        py::object db_manager = DatabaseManager();
+        db_manager.attr("connect")();
+        
+        // Create frame database
+        py::object frame_db = FrameDatabase(db_manager);
+        
+        // Convert metadata JSON to Python dict
+        py::module json = py::module::import("json");
+        py::object metadata = json.attr("loads")(metadata_json);
+        
+        // Convert cv::Mat to numpy array for Python
+        // Create a copy of the frame data
+        cv::Mat frame_copy = frame.clone();
+        
+        // Convert BGR to RGB if needed
+        cv::cvtColor(frame_copy, frame_copy, cv::COLOR_BGR2RGB);
+        
+        // Create numpy array from cv::Mat
+        py::array_t<unsigned char> numpy_frame(
+            {frame_copy.rows, frame_copy.cols, frame_copy.channels()},
+            frame_copy.data
+        );
+        
+        // Save frame
+        py::object result = frame_db.attr("save_frame")(numpy_frame, metadata);
+        
+        // Disconnect
+        db_manager.attr("disconnect")();
+        
+        return result.cast<std::string>();
+        
+    } catch (const py::error_already_set& e) {
+        std::cerr << "Python error: " << e.what() << std::endl;
+        return "";
+    } catch (const std::exception& e) {
+        std::cerr << "C++ error: " << e.what() << std::endl;
+        return "";
+    }
 }

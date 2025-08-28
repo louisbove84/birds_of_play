@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birds of Play - Frame Viewer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-camera"></i> Birds of Play Frame Viewer</h1>
+            <div class="stats">
+                <span class="stat-item">
+                    <i class="fas fa-images"></i>
+                    <span id="totalFrames">Loading...</span> frames
+                </span>
+                <span class="stat-item">
+                    <i class="fas fa-clock"></i>
+                    <span id="lastUpdate">Loading...</span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search by UUID or filename...">
+                <button id="searchBtn"><i class="fas fa-search"></i></button>
+            </div>
+            <div class="filter-controls">
+                <select id="sortSelect">
+                    <option value="timestamp-desc">Newest First</option>
+                    <option value="timestamp-asc">Oldest First</option>
+                    <option value="filename-asc">Filename A-Z</option>
+                    <option value="filename-desc">Filename Z-A</option>
+                </select>
+                <button id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading">
+            <i class="fas fa-spinner fa-spin"></i> Loading frames...
+        </div>
+
+        <!-- Error -->
+        <div id="error" class="error" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorMessage"></span>
+        </div>
+
+        <!-- Info Banner -->
+        <div id="infoBanner" class="info-banner" style="display: none;">
+            <i class="fas fa-info-circle"></i>
+            <div class="info-content">
+                <h4>No Image Data Available</h4>
+                <p>The frames in the database contain metadata but no image data. To capture frames with images, run the motion detection system:</p>
+                <code>python src/main.py --webcam --mongo</code>
+            </div>
+        </div>
+
+        <!-- Frames Grid -->
+        <div id="framesContainer" class="frames-grid">
+            <!-- Frames will be loaded here -->
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="pagination" style="display: none;">
+            <button id="prevPage" class="btn btn-secondary">
+                <i class="fas fa-chevron-left"></i> Previous
+            </button>
+            <span id="pageInfo">Page 1 of 1</span>
+            <button id="nextPage" class="btn btn-secondary">
+                Next <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <!-- Image Modal -->
+        <div id="imageModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div class="modal-header">
+                    <h3 id="modalTitle">Frame Details</h3>
+                </div>
+                <div class="modal-body">
+                    <img id="modalImage" src="" alt="Frame">
+                    <div class="frame-details">
+                        <div class="detail-item">
+                            <strong>UUID:</strong> <span id="modalUuid"></span>
+                            <button class="copy-btn" onclick="copyToClipboard('modalUuid')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Filename:</strong> <span id="modalFilename"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Timestamp:</strong> <span id="modalTimestamp"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Source:</strong> <span id="modalSource"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Auto-saved:</strong> <span id="modalAutoSaved"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
