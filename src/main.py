@@ -43,40 +43,62 @@ def check_build():
     return True
 
 def setup_mongodb_connection():
-    """Setup MongoDB connection for motion detection logging"""
+    """Setup MongoDB connection and frame database"""
     try:
-        import pymongo
-        from pymongo import MongoClient
+        from mongodb.database_manager import DatabaseManager
+        from mongodb.frame_database import FrameDatabase
         
-        # MongoDB connection settings
-        client = MongoClient('mongodb://localhost:27017/')
-        db = client['birds_of_play']
-        motion_collection = db['motion_detections']
+        # Initialize database manager
+        db_manager = DatabaseManager()
+        
+        # Connect to database
+        if not db_manager.connect():
+            print("❌ Failed to connect to MongoDB")
+            return None, None
+        
+        # Initialize frame database
+        frame_db = FrameDatabase(db_manager)
+        
+        # Create indexes for better performance
+        frame_db.create_indexes()
         
         print("✅ MongoDB connection established")
-        return motion_collection
-    except ImportError:
-        print("⚠️  PyMongo not installed. Install with: pip install pymongo")
-        return None
+        print(f"📊 Frame database initialized: {frame_db.get_frame_count()} frames")
+        
+        return db_manager, frame_db
+        
+    except ImportError as e:
+        print(f"⚠️  MongoDB modules not available: {e}")
+        print("Make sure MongoDB dependencies are installed")
+        return None, None
     except Exception as e:
         print(f"❌ MongoDB connection failed: {e}")
-        return None
+        return None, None
 
-def log_motion_to_mongodb(collection, frame_data):
-    """Log motion detection data to MongoDB"""
-    if collection is None:
-        return
+def save_frame_to_mongodb(frame_db, frame, metadata=None):
+    """Save a frame to MongoDB with metadata"""
+    if frame_db is None:
+        return None
     
     try:
-        # Add timestamp
-        frame_data['timestamp'] = datetime.utcnow()
-        frame_data['created_at'] = datetime.utcnow()
+        # Prepare metadata
+        frame_metadata = metadata or {}
+        frame_metadata.update({
+            "source": "motion_detection",
+            "timestamp": datetime.utcnow().isoformat()
+        })
         
-        # Insert into MongoDB
-        result = collection.insert_one(frame_data)
-        return result.inserted_id
+        # Save frame
+        frame_uuid = frame_db.save_frame(frame, frame_metadata)
+        
+        if frame_uuid:
+            print(f"💾 Frame saved with UUID: {frame_uuid[:8]}...")
+        
+        return frame_uuid
+        
     except Exception as e:
-        print(f"❌ MongoDB logging failed: {e}")
+        print(f"❌ Failed to save frame to MongoDB: {e}")
+        return None
 
 def run_with_python_bindings(video_source=None):
     """Run motion detection using Python bindings"""
@@ -306,10 +328,11 @@ Examples:
     print("=" * 60)
     
     # Setup MongoDB if requested
-    mongo_collection = None
+    db_manager = None
+    frame_db = None
     if args.mongo:
         print("\n📊 Setting up MongoDB connection...")
-        mongo_collection = setup_mongodb_connection()
+        db_manager, frame_db = setup_mongodb_connection()
     
     # Determine video source
     video_source = None
@@ -336,6 +359,11 @@ Examples:
             success = run_motion_detection_demo()
         else:
             success = run_with_video_file(video_source)
+    
+    # Cleanup MongoDB connection
+    if db_manager:
+        db_manager.disconnect()
+        print("📊 MongoDB connection closed")
     
     if success:
         print("\n✅ Birds of Play completed successfully!")
