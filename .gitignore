@@ -52,4 +52,6 @@ Thumbs.db
 # Test output files
 motion_frame_*.jpg
 saved_detection_frame_*.jpg
-*.log 
+*.log # YOLO model files
+*.pt
+yolo11*.pt

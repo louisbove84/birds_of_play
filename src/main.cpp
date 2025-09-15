@@ -35,14 +35,24 @@ int main(int argc, char** argv) {
     // Initialize Python interpreter for MongoDB integration
     py::scoped_interpreter guard{};
     
-    // Default to motion_detection config if no path provided
+    // Parse command line arguments
     fs::path config_path = (argc > 1) ? argv[1] : "motion_detection/config.yaml";
+    std::string video_source = (argc > 2) ? argv[2] : "";  // Video file path (empty = use webcam)
     
     if (!fs::exists(config_path)) {
         std::cerr << "Error: Configuration file not found: " << config_path << std::endl;
-        std::cerr << "Usage: " << argv[0] << " [config_path]" << std::endl;
-        std::cerr << "Default config: motion_detection/config.yaml" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " [config_path] [video_path]" << std::endl;
+        std::cerr << "  config_path: Path to YAML configuration file (default: motion_detection/config.yaml)" << std::endl;
+        std::cerr << "  video_path:  Path to video file (optional, default: use webcam)" << std::endl;
         return -1;
+    }
+    
+    // Debug: Print what we're using
+    std::cout << "🔧 Config file: " << config_path << std::endl;
+    if (!video_source.empty()) {
+        std::cout << "🎬 Video file: " << video_source << std::endl;
+    } else {
+        std::cout << "📹 Using webcam" << std::endl;
     }
     
     YAML::Node config = YAML::LoadFile(config_path.string());
@@ -65,18 +75,36 @@ int main(int argc, char** argv) {
     motionProcessor.setVisualizationPath(""); // Disable visualization file saving
     MotionRegionConsolidator regionConsolidator;
     
-    // Initialize camera
-    cv::VideoCapture cap(0);
-    if (!cap.isOpened()) {
-        LOG_CRITICAL("Error: Could not open camera.");
-        std::cerr << "Error: Could not open camera. Please check if your webcam is connected." << std::endl;
-        return -1;
+    // Initialize video source (camera or video file)
+    cv::VideoCapture cap;
+    if (!video_source.empty()) {
+        // Use video file
+        cap.open(video_source);
+        if (!cap.isOpened()) {
+            LOG_CRITICAL("Error: Could not open video file: " + video_source);
+            std::cerr << "Error: Could not open video file: " << video_source << std::endl;
+            return -1;
+        }
+        LOG_INFO("📹 Opened video file: " + video_source);
+    } else {
+        // Use webcam
+        cap.open(0);
+        if (!cap.isOpened()) {
+            LOG_CRITICAL("Error: Could not open camera.");
+            std::cerr << "Error: Could not open camera. Please check if your webcam is connected." << std::endl;
+            return -1;
+        }
+        LOG_INFO("📹 Opened webcam");
     }
     
 
 
     LOG_INFO("🐦 Birds of Play Motion Detection System initialized successfully!");
-    LOG_INFO("📹 Using webcam for live motion detection and region consolidation");
+    if (!video_source.empty()) {
+        LOG_INFO("🎬 Processing video file: " + video_source);
+    } else {
+        LOG_INFO("📹 Using webcam for live motion detection and region consolidation");
+    }
     LOG_INFO("⌨️  Press 'q' or ESC to quit, 's' to save current frame");
     
     std::cout << "\n🐦 Birds of Play - Live Motion Detection Demo" << std::endl;
@@ -147,14 +175,33 @@ int main(int argc, char** argv) {
         // Auto-save frame every 1 second
         if (currentTime - lastSaveTime >= saveInterval) {
             try {
-                // Create metadata JSON with motion detection info
+                // Create metadata JSON with motion detection info and consolidated regions
                 std::string metadata = "{\"source\":\"motion_detection_cpp\",\"frame_count\":" + 
                                      std::to_string(frameCount) + ",\"timestamp\":\"" + 
                                      std::to_string(std::time(nullptr)) + "\",\"auto_saved\":true," +
                                      "\"motion_detected\":" + (processingResult.detectedBounds.empty() ? "false" : "true") + "," +
                                      "\"motion_regions\":" + std::to_string(processingResult.detectedBounds.size()) + "," +
-                                     "\"consolidated_regions\":" + std::to_string(consolidatedRegions.size()) + "," +
-                                     "\"confidence\":" + std::to_string(processingResult.detectedBounds.empty() ? 0.0 : 0.8) + "}";
+                                     "\"consolidated_regions_count\":" + std::to_string(consolidatedRegions.size()) + "," +
+                                     "\"confidence\":" + std::to_string(processingResult.detectedBounds.empty() ? 0.0 : 0.8);
+                
+                // Add consolidated regions coordinates for YOLO11 processing
+                if (!consolidatedRegions.empty()) {
+                    metadata += ",\"consolidated_regions\":[";
+                    for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
+                        const auto& region = consolidatedRegions[i];
+                        metadata += "{\"x\":" + std::to_string(region.boundingBox.x) + 
+                                   ",\"y\":" + std::to_string(region.boundingBox.y) +
+                                   ",\"width\":" + std::to_string(region.boundingBox.width) +
+                                   ",\"height\":" + std::to_string(region.boundingBox.height) +
+                                   ",\"object_count\":" + std::to_string(region.trackedObjectIds.size()) + "}";
+                        if (i < consolidatedRegions.size() - 1) metadata += ",";
+                    }
+                    metadata += "]";
+                } else {
+                    metadata += ",\"consolidated_regions\":[]";
+                }
+                
+                metadata += "}";
                 
                 // Try to save directly to MongoDB using Python bindings
                 std::string result = save_frame_to_mongodb(displayFrame, metadata);

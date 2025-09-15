@@ -138,7 +138,22 @@ function displayFrames(frames) {
 
 // Create a frame card element
 function createFrameCard(frame) {
-    const timestamp = frame.metadata.timestamp ? new Date(frame.metadata.timestamp).toLocaleString() : 'Unknown';
+    // Parse timestamp - handle both Unix timestamp (C++) and ISO format (Python)
+    let timestamp = 'Unknown';
+    if (frame.metadata.timestamp) {
+        // Try Unix timestamp first (C++ format - string of seconds)
+        const timestampNum = parseInt(frame.metadata.timestamp);
+        if (!isNaN(timestampNum)) {
+            // Convert seconds to milliseconds for JavaScript Date
+            timestamp = new Date(timestampNum * 1000).toLocaleString();
+        } else {
+            // Try ISO format (Python format - ISO string)
+            const timestampDate = new Date(frame.metadata.timestamp);
+            if (!isNaN(timestampDate.getTime())) {
+                timestamp = timestampDate.toLocaleString();
+            }
+        }
+    }
     const uuid = frame._id || 'N/A';
     const filename = frame.metadata.original_filename || 'Unknown';
     const source = frame.metadata.source || 'Unknown';
@@ -261,7 +276,22 @@ async function openImageModal(uuid) {
             modalTitle.textContent = frame.metadata.original_filename || 'Frame Details';
             modalUuid.textContent = frame._id || 'N/A';
             modalFilename.textContent = frame.metadata.original_filename || 'Unknown';
-            modalTimestamp.textContent = frame.metadata.timestamp ? new Date(frame.metadata.timestamp).toLocaleString() : 'Unknown';
+            // Parse timestamp for modal - handle both Unix timestamp (C++) and ISO format (Python)
+            let modalTimestampText = 'Unknown';
+            if (frame.metadata.timestamp) {
+                // Try Unix timestamp first (C++ format - string of seconds)
+                const timestampNum = parseInt(frame.metadata.timestamp);
+                if (!isNaN(timestampNum)) {
+                    modalTimestampText = new Date(timestampNum * 1000).toLocaleString();
+                } else {
+                    // Try ISO format (Python format - ISO string)
+                    const timestampDate = new Date(frame.metadata.timestamp);
+                    if (!isNaN(timestampDate.getTime())) {
+                        modalTimestampText = timestampDate.toLocaleString();
+                    }
+                }
+            }
+            modalTimestamp.textContent = modalTimestampText;
             modalSource.textContent = frame.metadata.source || 'Unknown';
             modalAutoSaved.textContent = frame.metadata.auto_saved ? 'Yes' : 'No';
             

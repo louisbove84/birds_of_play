@@ -16,6 +16,13 @@ let db;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Disable caching for development
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Set EJS as templating engine
