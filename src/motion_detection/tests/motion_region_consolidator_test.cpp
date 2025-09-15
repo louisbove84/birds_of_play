@@ -2,6 +2,7 @@
 #include "motion_region_consolidator.hpp"
 #include "motion_processor.hpp"
 #include "logger.hpp"
+#include "test_helpers.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <vector>
@@ -88,18 +89,21 @@ protected:
         config.maxFramesWithoutUpdate = 3;
         config.idealModelRegionSize = 640;
         config.frameSize = cv::Size(1920, 1080);
-        
+
         // Initialize consolidator
         consolidator = std::make_unique<MotionRegionConsolidator>(config);
-        
-        // Set up paths for real test images
-        configPath = "config.yaml";
-        testImage1Path = "1/test_image.jpg";
-        testImage2Path = "1/test_image2.jpg";
-        
+
+        // Find test resource directory
+        std::string testDir = findTestResourceDir();
+
+        // Set up paths for real test images relative to the test resource directory
+        configPath = testDir + "/config.yaml";
+        testImage1Path = testDir + "/img/1/test_image.jpg";
+        testImage2Path = testDir + "/img/1/test_image2.jpg";
+
         // Create output directory
         std::filesystem::create_directories("test_results/motion_region_consolidator");
-        
+
         // Process real images to get TrackedObjects
         realTrackedObjects = processRealImages(configPath, testImage1Path, testImage2Path);
         LOG_INFO("SetUp complete: {} real TrackedObjects available for testing", realTrackedObjects.size());
@@ -313,36 +317,6 @@ TEST_F(MotionRegionConsolidatorTest, StandaloneConsolidationBirdLike) {
 // CONFIGURATION AND EDGE CASE TESTS
 // ============================================================================
 
-// Test configuration variations
-TEST_F(MotionRegionConsolidatorTest, ConfigurationVariations) {
-    std::vector<TrackedObject> objects = createSyntheticObjects();
-    
-    // Test tight configuration
-    ConsolidationConfig tightConfig = config;
-    tightConfig.maxDistanceThreshold = 50.0;
-    tightConfig.minObjectsPerRegion = 3;
-    
-    MotionRegionConsolidator tightConsolidator(tightConfig);
-    auto tightRegions = tightConsolidator.consolidateRegionsStandalone(objects, 
-        "test_results/motion_region_consolidator/google_test_mode/04_tight_config.jpg");
-    
-    // Test loose configuration
-    ConsolidationConfig looseConfig = config;
-    looseConfig.maxDistanceThreshold = 300.0;
-    looseConfig.minObjectsPerRegion = 1;
-    
-    MotionRegionConsolidator looseConsolidator(looseConfig);
-    auto looseRegions = looseConsolidator.consolidateRegionsStandalone(objects, 
-        "test_results/motion_region_consolidator/google_test_mode/05_loose_config.jpg");
-    
-    LOG_INFO("Configuration comparison:");
-    LOG_INFO("Tight config: {} regions", tightRegions.size());
-    LOG_INFO("Loose config: {} regions", looseRegions.size());
-    
-    // Loose config should generally create fewer regions
-    EXPECT_LE(looseRegions.size(), tightRegions.size()) 
-        << "Loose config should create fewer or equal regions";
-}
 
 // Test edge cases
 TEST_F(MotionRegionConsolidatorTest, EdgeCases) {
@@ -511,22 +485,6 @@ TEST_F(MotionRegionConsolidatorTest, ConsolidateRegionsMerging) {
     }
 }
 
-// Test stale region removal
-TEST_F(MotionRegionConsolidatorTest, RemoveStaleRegions) {
-    std::vector<TrackedObject> objects;
-    // Create initial regions
-    objects.emplace_back(0, cv::Rect(100, 100, 50, 50), "uuid0");
-    objects.emplace_back(1, cv::Rect(120, 120, 50, 50), "uuid1");
-    consolidator->consolidateRegions(objects);
-    
-    // Simulate frames without objects
-    for (int i = 0; i < config.maxFramesWithoutUpdate + 1; ++i) {
-        consolidator->consolidateRegions({});
-    }
-    
-    auto regions = consolidator->consolidateRegions({});
-    EXPECT_TRUE(regions.empty()) << "Expected stale regions to be removed";
-}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

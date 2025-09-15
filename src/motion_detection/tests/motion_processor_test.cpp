@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "motion_processor.hpp"
 #include "logger.hpp"
+#include "test_helpers.hpp"
 #include <opencv2/opencv.hpp>
 #include <cassert>
 #include <fstream>
@@ -245,16 +246,19 @@ protected:
     void SetUp() override {
         // Initialize logger
         initLogger();
-        
-        // Set up test paths
-        configPath = "config.yaml";
-        testImage1Path = "1/test_image.jpg";
-        testImage2Path = "1/test_image2.jpg";
-        
+
+        // Find test resource directory
+        std::string testDir = findTestResourceDir();
+
+        // Set up test paths relative to the test resource directory
+        configPath = testDir + "/config.yaml";
+        testImage1Path = testDir + "/img/1/test_image.jpg";
+        testImage2Path = testDir + "/img/1/test_image2.jpg";
+
         // Create output directory
         outputDir = "test_results/motion_processor/06_google_test_mode";
         std::filesystem::create_directories(outputDir);
-        
+
         // Initialize motion processor
         motionProcessor = std::make_unique<MotionProcessor>(configPath);
         motionProcessor->enableVisualization(true);
