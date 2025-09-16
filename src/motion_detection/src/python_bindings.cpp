@@ -138,4 +138,55 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             return std::string("");
         }
     }, "Save a frame directly to MongoDB");
+    
+    // Function to save both original and processed frames to MongoDB
+    m.def("save_frames_to_mongodb", [](const cv::Mat& original_frame, const cv::Mat& processed_frame, const std::string& metadata_json) {
+        try {
+            // Import Python modules
+            py::module sys = py::module::import("sys");
+            py::module os = py::module::import("os");
+            
+            // Add the src directory to Python path
+            std::string current_dir = os.attr("getcwd")().cast<std::string>();
+            sys.attr("path").attr("insert")(0, current_dir + "/src");
+            
+            // Import our MongoDB modules
+            py::module db_manager_module = py::module::import("mongodb.database_manager");
+            py::module frame_db_module = py::module::import("mongodb.frame_database");
+            
+            // Get the classes
+            py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
+            py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+            
+            // Create database manager and connect
+            py::object db_manager = DatabaseManager();
+            db_manager.attr("connect")();
+            
+            // Create frame database
+            py::object frame_db = FrameDatabase(db_manager);
+            
+            // Convert metadata JSON to Python dict
+            py::module json = py::module::import("json");
+            py::object metadata = json.attr("loads")(metadata_json);
+            
+            // Convert cv::Mat to numpy arrays for Python
+            py::array_t<unsigned char> numpy_original = cv_mat_to_numpy(original_frame);
+            py::array_t<unsigned char> numpy_processed = cv_mat_to_numpy(processed_frame);
+            
+            // Save both frames
+            py::object result = frame_db.attr("save_frame_with_original")(numpy_original, numpy_processed, metadata);
+            
+            // Disconnect
+            db_manager.attr("disconnect")();
+            
+            return result.cast<std::string>();
+            
+        } catch (const py::error_already_set& e) {
+            std::cerr << "Python error: " << e.what() << std::endl;
+            return std::string("");
+        } catch (const std::exception& e) {
+            std::cerr << "C++ error: " << e.what() << std::endl;
+            return std::string("");
+        }
+    }, "Save both original and processed frames to MongoDB");
 }

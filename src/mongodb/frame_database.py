@@ -119,6 +119,62 @@ class FrameDatabase:
             self.logger.error(f"Failed to save frame: {e}")
             return None
     
+    def save_frame_with_original(self, original_frame: np.ndarray, processed_frame: np.ndarray, 
+                                metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """
+        Save both original and processed frames to the database with a unique UUID.
+        
+        Args:
+            original_frame: Original clean frame
+            processed_frame: Processed frame with overlays/annotations
+            metadata: Additional metadata to store with the frame
+            
+        Returns:
+            UUID of the saved frame or None if failed
+        """
+        try:
+            collection = self.db_manager.get_collection(self.collection_name)
+            if collection is None:
+                return None
+            
+            # Generate unique UUID
+            frame_uuid = str(uuid.uuid4())
+            
+            # Encode both frames
+            encoded_original = self._encode_frame(original_frame)
+            encoded_processed = self._encode_frame(processed_frame)
+            
+            if not encoded_original or not encoded_processed:
+                return None
+            
+            # Prepare document
+            document = {
+                "_id": frame_uuid,
+                "frame_data": encoded_processed,  # Keep processed as main frame_data for backward compatibility
+                "original_frame_data": encoded_original,  # Store original separately
+                "frame_shape": processed_frame.shape,
+                "original_frame_shape": original_frame.shape,
+                "frame_dtype": str(processed_frame.dtype),
+                "original_frame_dtype": str(original_frame.dtype),
+                "timestamp": datetime.utcnow(),
+                "created_at": datetime.utcnow(),
+                "metadata": metadata or {}
+            }
+            
+            # Insert into database
+            result = collection.insert_one(document)
+            
+            if result.inserted_id:
+                self.logger.info(f"Saved frame with original and processed data, UUID: {frame_uuid}")
+                return frame_uuid
+            else:
+                self.logger.error("Failed to insert frame into database")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Failed to save frame with original: {e}")
+            return None
+    
     def get_frame(self, frame_uuid: str) -> Optional[np.ndarray]:
         """
         Retrieve a frame by UUID.
@@ -151,6 +207,47 @@ class FrameDatabase:
             
         except Exception as e:
             self.logger.error(f"Failed to retrieve frame {frame_uuid}: {e}")
+            return None
+    
+    def get_original_frame(self, frame_uuid: str) -> Optional[np.ndarray]:
+        """
+        Retrieve the original (clean) frame by UUID.
+        
+        Args:
+            frame_uuid: UUID of the frame to retrieve
+            
+        Returns:
+            Original frame as numpy array or None if not found
+        """
+        try:
+            collection = self.db_manager.get_collection(self.collection_name)
+            if collection is None:
+                return None
+            
+            # Find document by UUID
+            document = collection.find_one({"_id": frame_uuid})
+            if not document:
+                self.logger.warning(f"Frame not found with UUID: {frame_uuid}")
+                return None
+            
+            # Check if original frame data exists
+            encoded_original = document.get("original_frame_data", "")
+            if not encoded_original:
+                self.logger.warning(f"No original frame data found for UUID: {frame_uuid}")
+                return None
+            
+            # Decode original frame
+            frame = self._decode_frame(encoded_original)
+            
+            if frame is not None:
+                self.logger.info(f"Retrieved original frame with UUID: {frame_uuid}")
+            else:
+                self.logger.error(f"Failed to decode original frame with UUID: {frame_uuid}")
+            
+            return frame
+            
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve original frame: {e}")
             return None
     
     def get_frame_metadata(self, frame_uuid: str) -> Optional[Dict[str, Any]]:

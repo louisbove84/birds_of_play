@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birds of Play - Object Detection Results</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐦 Birds of Play - Object Detection Results</h1>
+            <p>Object detection analysis on consolidated motion regions</p>
+            <nav class="nav-links">
+               <a href="http://localhost:3000" class="nav-link">
+                   📹 View Motion Detection Frames
+               </a>
+                <span class="nav-separator">|</span>
+                <span class="nav-current">🔍 Object Detection Results</span>
+            </nav>
+        </header>
+
+        <!-- Summary Section -->
+        <section class="summary-section">
+            <h2>📊 Detection Summary</h2>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Total Results</h3>
+                    <div class="summary-value" id="totalResults">-</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Success Rate</h3>
+                    <div class="summary-value" id="successRate">-</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Total Detections</h3>
+                    <div class="summary-value" id="totalDetections">-</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Avg per Frame</h3>
+                    <div class="summary-value" id="avgDetections">-</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detection Results Section -->
+        <section class="results-section">
+            <h2>🔍 Detection Results</h2>
+            <div class="controls">
+                <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+                <select id="modelFilter" class="filter-select">
+                    <option value="">All Models</option>
+                    <option value="yolo11n" selected>YOLO11n</option>
+                    <option value="yolo11s">YOLO11s</option>
+                    <option value="yolo11m">YOLO11m</option>
+                </select>
+            </div>
+            
+            <div id="loadingIndicator" class="loading">Loading detection results...</div>
+            <div id="resultsContainer" class="results-container"></div>
+        </section>
+    </div>
+
+    <!-- Detection Detail Modal -->
+    <div id="detectionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔍 Detection Details</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="detection-info">
+                    <div class="info-section">
+                        <h3>Frame Information</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Frame UUID:</label>
+                                <span id="modalFrameUuid">-</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Processing Time:</label>
+                                <span id="modalProcessingTime">-</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Detection Model:</label>
+                                <span id="modalDetectionModel">-</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Regions Processed:</label>
+                                <span id="modalRegionsProcessed">-</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Total Detections:</label>
+                                <span id="modalTotalDetections">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>Detected Objects</h3>
+                        <div id="modalDetections" class="detections-list"></div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>Actions</h3>
+                        <div class="action-buttons">
+                            <button id="viewOriginalBtn" class="btn btn-secondary">📷 View Original Frame</button>
+                            <button id="viewDetectionImageBtn" class="btn btn-secondary">🖼️ View Detection Image</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Original Frame Modal -->
+    <div id="originalFrameModal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>📷 Original Motion Detection Frame</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="frame-info">
+                    <div class="info-item">
+                        <label>Frame UUID:</label>
+                        <span id="originalFrameUuid">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Timestamp:</label>
+                        <span id="originalFrameTimestamp">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Motion Regions:</label>
+                        <span id="originalFrameRegions">-</span>
+                    </div>
+                </div>
+                <div class="frame-image-container">
+                    <img id="originalFrameImage" src="" alt="Original Frame" />
+                </div>
+                <div class="action-buttons">
+                    <button id="showDetectionOverlayBtn" class="btn btn-primary">🔍 Show Detection Overlays</button>
+                    <button id="hideDetectionOverlayBtn" class="btn btn-secondary" style="display: none;">👁️ Hide Detection Overlays</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detection Image Modal -->
+    <div id="detectionImageModal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>🖼️ Detection Analysis Image</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="frame-info">
+                    <div class="info-item">
+                        <label>Frame UUID:</label>
+                        <span id="detectionImageUuid">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Detection Model:</label>
+                        <span id="detectionImageModel">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Total Detections:</label>
+                        <span id="detectionImageCount">-</span>
+                    </div>
+                </div>
+                <div class="frame-image-container">
+                    <img id="detectionImage" src="" alt="Detection Image" />
+                </div>
+                <div class="action-buttons">
+                    <button id="viewOriginalFromDetectionBtn" class="btn btn-secondary">📷 View Original Frame</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

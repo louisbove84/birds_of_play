@@ -79,179 +79,25 @@ def setup_mongodb_connection():
         print(f"❌ MongoDB connection failed: {e}")
         return None, None
 
-def run_yolo_on_mongodb_frames(frame_db):
-    """Run YOLO11 on consolidated motion regions from MongoDB frames"""
-    print("🔍 Birds of Play - YOLO11 Analysis on Motion Regions")
-    print("=" * 50)
-    
+def run_image_detection_on_mongodb_frames(frame_db):
+    """Run image detection on consolidated motion regions from MongoDB frames"""
     if frame_db is None:
         print("❌ No MongoDB connection available")
         return False
     
     try:
-        # Get frame metadata from MongoDB (without frame data initially)
-        frame_metadata_list = frame_db.list_frames(limit=1000)  # Get up to 1000 frames
-        if not frame_metadata_list:
-            print("📭 No frames found in MongoDB")
-            return True
-        
-        print(f"📊 Found {len(frame_metadata_list)} frames in MongoDB")
-        
-        # Filter frames that have consolidated regions
-        frames_with_regions = []
-        total_regions = 0
-        
-        for frame_metadata in frame_metadata_list:
-            metadata = frame_metadata.get('metadata', {})
-            regions = metadata.get('consolidated_regions', [])
-            if regions:
-                # Get the actual frame data for frames with regions
-                frame_uuid = frame_metadata.get('uuid') or frame_metadata.get('_id')
-                if frame_uuid:
-                    frame_image = frame_db.get_frame(frame_uuid)
-                    if frame_image is not None:
-                        frame_data = {
-                            'uuid': frame_uuid,
-                            'metadata': metadata,
-                            'image': frame_image,
-                            'timestamp': frame_metadata.get('timestamp')
-                        }
-                        frames_with_regions.append(frame_data)
-                        total_regions += len(regions)
-                    else:
-                        print(f"   ⚠️  Could not retrieve image data for frame {str(frame_uuid)[:8]}...")
-                else:
-                    print(f"   ⚠️  No UUID found for frame with regions")
-        
-        if not frames_with_regions:
-            print("📭 No frames with consolidated motion regions found")
-            return True
-            
-        print(f"🎯 Found {len(frames_with_regions)} frames with {total_regions} motion regions")
-        print("🚀 Starting YOLO11 analysis on motion regions only...")
-        
-        # Load YOLO11 model
-        print("📦 Loading YOLO11 model...")
-        try:
-            from ultralytics import YOLO
-            import numpy as np
-            yolo_model = YOLO('yolo11n.pt')  # Lightweight model for real-time processing
-            print("✅ YOLO11 model loaded successfully!")
-        except Exception as e:
-            print(f"❌ Failed to load YOLO11 model: {e}")
-            return False
-        
-        for i, frame_data in enumerate(frames_with_regions):
-            frame_uuid = frame_data.get('uuid', 'unknown')
-            metadata = frame_data.get('metadata', {})
-            regions = metadata.get('consolidated_regions', [])
-            
-            print(f"🔍 Processing frame {i+1}/{len(frames_with_regions)} (UUID: {frame_uuid[:8]}...) - {len(regions)} regions")
-            
-            # Process each region with YOLO11
-            yolo_results = []
-            
-            # Get the image data from MongoDB (already a numpy array)
-            full_frame = frame_data.get('image')
-            if full_frame is None:
-                print(f"   ❌ No image data found for frame {frame_uuid[:8]}...")
-                continue
-                
-            # Verify it's a valid image
-            if not isinstance(full_frame, np.ndarray) or full_frame.size == 0:
-                print(f"   ❌ Invalid image data for frame {frame_uuid[:8]}...")
-                continue
-            
-            for j, region in enumerate(regions):
-                x, y, w, h = region['x'], region['y'], region['width'], region['height']
-                print(f"   📦 Region {j+1}: ({x},{y},{w},{h}) - {region.get('object_count', 0)} objects")
-                
-                # Extract region from full frame
-                region_image = full_frame[y:y+h, x:x+w]
-                
-                if region_image.size == 0:
-                    print(f"   ⚠️  Empty region {j+1}, skipping...")
-                    continue
-                
-                try:
-                    # Run YOLO11 on the cropped region
-                    region_results = yolo_model(region_image, verbose=False)
-                    
-                    # Process YOLO results
-                    region_detections = []
-                    for result in region_results:
-                        boxes = result.boxes
-                        if boxes is not None:
-                            for box in boxes:
-                                # Get box coordinates (relative to region)
-                                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                                confidence = float(box.conf[0].cpu().numpy())
-                                class_id = int(box.cls[0].cpu().numpy())
-                                class_name = yolo_model.names[class_id]
-                                
-                                # Convert coordinates back to full frame
-                                detection = {
-                                    'x1': int(x1 + x),  # Adjust to full frame coordinates
-                                    'y1': int(y1 + y),
-                                    'x2': int(x2 + x),
-                                    'y2': int(y2 + y),
-                                    'confidence': confidence,
-                                    'class_id': class_id,
-                                    'class_name': class_name,
-                                    'region_x': int(x1),  # Original region coordinates
-                                    'region_y': int(y1),
-                                    'region_w': int(x2 - x1),
-                                    'region_h': int(y2 - y1)
-                                }
-                                region_detections.append(detection)
-                    
-                    print(f"   🔍 Found {len(region_detections)} objects in region {j+1}")
-                    for detection in region_detections:
-                        print(f"      - {detection['class_name']}: {detection['confidence']:.2f}")
-                    
-                    yolo_results.append({
-                        'region_id': j,
-                        'region_bounds': region,
-                        'detections': region_detections,
-                        'processed': True,
-                        'detection_count': len(region_detections)
-                    })
-                    
-                except Exception as e:
-                    print(f"   ❌ YOLO processing failed for region {j+1}: {e}")
-                    yolo_results.append({
-                        'region_id': j,
-                        'region_bounds': region,
-                        'detections': [],
-                        'processed': False,
-                        'error': str(e)
-                    })
-            
-            # Update frame metadata with YOLO results
-            updated_metadata = metadata.copy()
-            updated_metadata['yolo_analysis'] = {
-                'processed': True,
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'regions_processed': len(regions),
-                'results': yolo_results
-            }
-            
-            # Update MongoDB with YOLO results (TODO: Implement update_frame_metadata)
-            try:
-                total_detections = sum(result.get('detection_count', 0) for result in yolo_results)
-                print(f"   💾 YOLO analysis complete: {total_detections} total detections")
-                # TODO: Implement frame_db.update_frame_metadata(frame_uuid, updated_metadata)
-                print(f"   📊 Results: {len(yolo_results)} regions processed")
-            except Exception as e:
-                print(f"   ❌ Error processing YOLO results for frame {frame_uuid[:8]}...: {e}")
-            
-            print(f"   ✅ Processed {len(regions)} regions for frame {frame_uuid[:8]}...")
-        
-        print(f"✅ YOLO11 analysis completed! Processed {total_regions} motion regions across {len(frames_with_regions)} frames")
-        return True
-        
+        # Use the image detection CLI module
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from image_detection.cli import run_detection
+        return run_detection(frame_db)
+    except ImportError as e:
+        print(f"❌ Failed to import image detection modules: {e}")
+        print("Make sure ultralytics is installed: pip install ultralytics")
+        return False
     except Exception as e:
-        print(f"❌ Error running YOLO11 analysis: {e}")
+        print(f"❌ Error running image detection analysis: {e}")
         return False
 
 def run_with_python_bindings(video_source=None):
@@ -470,7 +316,7 @@ Examples:
   python src/main.py --video input.mp4           # Process video file
   python src/main.py --webcam --mongo            # With direct C++ → MongoDB
   python src/main.py --python-bindings --webcam  # Use Python bindings
-  python src/main.py --mongo --yolo              # Run YOLO11 on MongoDB frames
+  python src/main.py --mongo --detect            # Run image detection on MongoDB frames
   python src/main.py --config custom.yaml        # Custom config
         """
     )
@@ -485,8 +331,8 @@ Examples:
                        help='Enable MongoDB logging')
     parser.add_argument('--python-bindings', action='store_true',
                        help='Use Python bindings instead of C++ executable')
-    parser.add_argument('--yolo', action='store_true',
-                       help='Run YOLO11 analysis on MongoDB frames (requires --mongo)')
+    parser.add_argument('--detect', action='store_true',
+                       help='Run image detection analysis on MongoDB frames (requires --mongo)')
     
     args = parser.parse_args()
     
@@ -514,22 +360,22 @@ Examples:
             return 1
     elif args.webcam:
         video_source = None  # Use webcam
-    elif not args.yolo:
-        # Require explicit video source specification (unless running YOLO-only mode)
+    elif not args.detect:
+        # Require explicit video source specification (unless running detection-only mode)
         print("❌ Error: Must specify either --video <path> or --webcam")
         print("   Use --help for usage information")
         return 1
     
-    # Validate YOLO option
-    if args.yolo and not args.mongo:
-        print("❌ --yolo requires --mongo to be enabled")
+    # Validate detection option
+    if args.detect and not args.mongo:
+        print("❌ --detect requires --mongo to be enabled")
         return 1
     
     # Run appropriate mode
     success = False
-    if args.yolo:
-        print("\n🔍 Running YOLO11 Analysis Mode...")
-        success = run_yolo_on_mongodb_frames(frame_db)
+    if args.detect:
+        print("\n🔍 Running Image Detection Analysis Mode...")
+        success = run_image_detection_on_mongodb_frames(frame_db)
     elif args.python_bindings:
         print("\n🐍 Running in Python Bindings Mode...")
         success = run_with_python_bindings(video_source)

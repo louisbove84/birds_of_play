@@ -105,7 +105,8 @@ app.get('/api/frames/:id', async (req, res) => {
         // Transform frame to match frontend expectations
         const transformedFrame = {
             ...frame,
-            image_data: frame.frame_data || null  // Map frame_data to image_data
+            image_data: frame.frame_data || null,  // Map frame_data to image_data
+            original_image_data: frame.original_frame_data || null  // Map original_frame_data to original_image_data
         };
         
         res.json(transformedFrame);

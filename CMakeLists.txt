@@ -45,7 +45,7 @@ if(EXISTS "/opt/homebrew/lib")
 endif()
 
 # Create main executable using the motion detection library
-add_executable(birds_of_play src/main.cpp)
+add_executable(birds_of_play src/main.cpp src/mongodb_functions.cpp)
 
 # Create test executable for Python bindings
 add_executable(test_python_bindings test_python_bindings.cpp)

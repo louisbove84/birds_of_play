@@ -4,6 +4,19 @@ let currentSort = 'timestamp-desc';
 let searchQuery = '';
 let allFrames = [];
 
+// Setup navigation links
+function setupNavigation() {
+    const currentPort = window.location.port;
+    const motionDetectionPort = '3000';
+    const detectionResultsPort = '3001';
+    
+    // Update navigation links to use the correct ports
+    const detectionLink = document.querySelector('.nav-link[href*="localhost"]');
+    if (detectionLink && currentPort === motionDetectionPort) {
+        detectionLink.href = `http://localhost:${detectionResultsPort}`;
+    }
+}
+
 // DOM elements
 const framesContainer = document.getElementById('framesContainer');
 const loading = document.getElementById('loading');
@@ -31,6 +44,7 @@ const closeModal = document.querySelector('.close');
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    setupNavigation();
     loadFrames();
     setupEventListeners();
     updateLastUpdate();
@@ -73,6 +87,16 @@ function setupEventListeners() {
     window.addEventListener('click', function(e) {
         if (e.target === imageModal) {
             closeImageModal();
+        }
+    });
+    
+    // Original frame modal events
+    const originalFrameModal = document.getElementById('originalFrameModal');
+    const originalCloseModal = originalFrameModal.querySelector('.close');
+    originalCloseModal.addEventListener('click', closeOriginalFrameModal);
+    window.addEventListener('click', function(e) {
+        if (e.target === originalFrameModal) {
+            closeOriginalFrameModal();
         }
     });
     
@@ -205,6 +229,11 @@ function createFrameCard(frame) {
                     </div>
                     ` : ''}
                 </div>
+                <div class="frame-actions">
+                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); viewOriginalFrame('${uuid}')">
+                        <i class="fas fa-eye"></i> View Original
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -322,6 +351,66 @@ async function openImageModal(uuid) {
 // Close image modal
 function closeImageModal() {
     imageModal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// View original frame (without motion detection overlays)
+async function viewOriginalFrame(uuid) {
+    try {
+        const response = await fetch(`/api/frames/${uuid}`);
+        const frame = await response.json();
+        
+        if (response.ok) {
+            // Try to get the original frame image (without overlays)
+            let imageSrc;
+            if (frame.original_image_data && frame.original_image_data.length > 0) {
+                // Use original frame data if available
+                imageSrc = `data:image/jpeg;base64,${frame.original_image_data}`;
+            } else if (frame.image_data && frame.image_data.length > 0) {
+                // Fallback to regular image data
+                imageSrc = `data:image/jpeg;base64,${frame.image_data}`;
+            } else {
+                imageSrc = '/images/placeholder.svg';
+            }
+            
+            // Update original frame modal
+            document.getElementById('originalModalImage').src = imageSrc;
+            document.getElementById('originalModalTitle').textContent = 'Original Frame (No Overlays)';
+            document.getElementById('originalModalUuid').textContent = frame._id || 'N/A';
+            document.getElementById('originalModalFilename').textContent = frame.metadata.original_filename || 'Unknown';
+            
+            // Parse timestamp for modal - handle both Unix timestamp (C++) and ISO format (Python)
+            let modalTimestampText = 'Unknown';
+            if (frame.metadata.timestamp) {
+                // Try Unix timestamp first (C++ format - string of seconds)
+                const timestampNum = parseInt(frame.metadata.timestamp);
+                if (!isNaN(timestampNum)) {
+                    modalTimestampText = new Date(timestampNum * 1000).toLocaleString();
+                } else {
+                    // Try ISO format (Python format - ISO string)
+                    const timestampDate = new Date(frame.metadata.timestamp);
+                    if (!isNaN(timestampDate.getTime())) {
+                        modalTimestampText = timestampDate.toLocaleString();
+                    }
+                }
+            }
+            document.getElementById('originalModalTimestamp').textContent = modalTimestampText;
+            document.getElementById('originalModalSource').textContent = frame.metadata.source || 'Unknown';
+            
+            // Show the original frame modal
+            document.getElementById('originalFrameModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        } else {
+            throw new Error('Frame not found');
+        }
+    } catch (err) {
+        alert('Error loading original frame: ' + err.message);
+    }
+}
+
+// Close original frame modal
+function closeOriginalFrameModal() {
+    document.getElementById('originalFrameModal').style.display = 'none';
     document.body.style.overflow = 'auto';
 }
 

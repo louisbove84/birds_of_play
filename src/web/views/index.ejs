@@ -12,6 +12,13 @@
         <!-- Header -->
         <header class="header">
             <h1><i class="fas fa-camera"></i> Birds of Play Frame Viewer</h1>
+            <nav class="nav-links">
+                <span class="nav-current">📹 Motion Detection Frames</span>
+                <span class="nav-separator">|</span>
+               <a href="http://localhost:3001" class="nav-link">
+                   🔍 View Object Detection Results
+               </a>
+            </nav>
             <div class="stats">
                 <span class="stat-item">
                     <i class="fas fa-images"></i>
@@ -105,6 +112,39 @@
                         </div>
                         <div class="detail-item">
                             <strong>Auto-saved:</strong> <span id="modalAutoSaved"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Original Frame Modal -->
+        <div id="originalFrameModal" class="modal">
+            <div class="modal-content large">
+                <span class="close">&times;</span>
+                <div class="modal-header">
+                    <h3 id="originalModalTitle">Original Frame (No Overlays)</h3>
+                </div>
+                <div class="modal-body">
+                    <img id="originalModalImage" src="" alt="Original Frame">
+                    <div class="frame-details">
+                        <div class="detail-item">
+                            <strong>UUID:</strong> <span id="originalModalUuid"></span>
+                            <button class="copy-btn" onclick="copyToClipboard('originalModalUuid')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Filename:</strong> <span id="originalModalFilename"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Timestamp:</strong> <span id="originalModalTimestamp"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Source:</strong> <span id="originalModalSource"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Note:</strong> <span style="color: #4CAF50;">This is the original frame without motion detection overlays</span>
                         </div>
                     </div>
                 </div>
