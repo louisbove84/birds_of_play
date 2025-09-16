@@ -158,7 +158,26 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
     // Step 6: Remove stale regions
     removeStaleRegions();
     
+    // Step 7: Apply splitting to final merged regions to ensure optimal sizes
+    LOG_INFO("Before final splitting: {} regions", consolidatedRegions_.size());
+    consolidatedRegions_ = splitLargeRegions(consolidatedRegions_);
+    LOG_INFO("After final splitting: {} regions", consolidatedRegions_.size());
+    
+    // Step 8: Remove overlapping regions, prioritizing those closer to ideal size
+    LOG_INFO("Before overlap removal: {} regions", consolidatedRegions_.size());
+    consolidatedRegions_ = removeOverlappingRegions(consolidatedRegions_);
+    LOG_INFO("After overlap removal: {} regions", consolidatedRegions_.size());
+    
     LOG_DEBUG("Created {} consolidated regions", consolidatedRegions_.size());
+    
+    // Debug: Log region sizes
+    for (size_t i = 0; i < consolidatedRegions_.size(); ++i) {
+        const auto& region = consolidatedRegions_[i];
+        LOG_DEBUG("Final region {}: {}x{} at ({},{})", i, 
+                 region.boundingBox.width, region.boundingBox.height,
+                 region.boundingBox.x, region.boundingBox.y);
+    }
+    
     return consolidatedRegions_;
 }
 
@@ -176,16 +195,29 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::createConsolidatedRegi
         // Expand bounding box for better YOLO detection
         bbox = expandBoundingBox(bbox, config_.regionExpansionFactor, config_.frameSize);
         
-        // Adjust to ideal model region size, preserving aspect ratio
+        // Adjust to ideal model region size, making regions more square for better YOLO detection
         double aspectRatio = static_cast<double>(bbox.width) / bbox.height;
         int idealSize = config_.idealModelRegionSize;
         int newWidth, newHeight;
-        if (aspectRatio >= 1.0) {
+        
+        // Create more square regions for better YOLO detection
+        if (aspectRatio >= 1.5) {
+            // Very wide region - make it square
             newWidth = idealSize;
-            newHeight = static_cast<int>(idealSize / aspectRatio);
-        } else {
             newHeight = idealSize;
-            newWidth = static_cast<int>(idealSize * aspectRatio);
+        } else if (aspectRatio <= 0.67) {
+            // Very tall region - make it square  
+            newWidth = idealSize;
+            newHeight = idealSize;
+        } else {
+            // Moderate aspect ratio - preserve but limit size
+            if (aspectRatio >= 1.0) {
+                newWidth = idealSize;
+                newHeight = static_cast<int>(idealSize / aspectRatio);
+            } else {
+                newHeight = idealSize;
+                newWidth = static_cast<int>(idealSize * aspectRatio);
+            }
         }
         
         // Center the adjusted box
@@ -200,16 +232,35 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::createConsolidatedRegi
         bbox.x = std::max(0, std::min(bbox.x, config_.frameSize.width - bbox.width));
         bbox.y = std::max(0, std::min(bbox.y, config_.frameSize.height - bbox.height));
         
-        // Check area constraints
-        double area = bbox.width * bbox.height;
-        if (area >= config_.minRegionArea && area <= config_.maxRegionArea) {
-            regions.emplace_back(bbox, group);
-            LOG_DEBUG("Created consolidated region: {}x{} at ({},{}) with {} objects",
+        // Ensure region meets minimum size for YOLO11 - expand if needed, never discard
+        int minSize = config_.idealModelRegionSize / 2; // 50% of ideal size (320x320)
+        if (bbox.width < minSize || bbox.height < minSize) {
+            // Expand small region to minimum size while keeping center point
+            cv::Point center(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+            bbox.x = center.x - minSize / 2;
+            bbox.y = center.y - minSize / 2;
+            bbox.width = minSize;
+            bbox.height = minSize;
+            
+            // Clamp to frame boundaries after expansion
+            bbox.x = std::max(0, std::min(bbox.x, config_.frameSize.width - bbox.width));
+            bbox.y = std::max(0, std::min(bbox.y, config_.frameSize.height - bbox.height));
+            
+            LOG_DEBUG("Expanded small region to minimum size: {}x{} at ({},{}) with {} objects",
                      bbox.width, bbox.height, bbox.x, bbox.y, group.size());
         }
+        
+        regions.emplace_back(bbox, group);
+        LOG_DEBUG("Created consolidated region: {}x{} at ({},{}) with {} objects (aspect ratio: {:.2f})",
+                 bbox.width, bbox.height, bbox.x, bbox.y, group.size(), aspectRatio);
     }
     
-    return regions;
+    // Split large regions into ideal-sized regions for better YOLO11 performance
+    LOG_INFO("Before splitting: {} regions", regions.size());
+    std::vector<ConsolidatedRegion> optimizedRegions = splitLargeRegions(regions);
+    LOG_INFO("After splitting: {} regions", optimizedRegions.size());
+    
+    return optimizedRegions;
 }
 
 void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedObject>& objects) {
@@ -477,5 +528,169 @@ void MotionRegionConsolidator::drawConsolidatedRegions(cv::Mat& image,
                    cv::Point(region.boundingBox.x, region.boundingBox.y + region.boundingBox.height - 10),
                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
     }
+}
+
+// ============================================================================
+// REGION OPTIMIZATION METHODS
+// ============================================================================
+
+std::vector<ConsolidatedRegion> MotionRegionConsolidator::splitLargeRegions(
+    const std::vector<ConsolidatedRegion>& regions) {
+    
+    std::vector<ConsolidatedRegion> optimizedRegions;
+    int idealSize = config_.idealModelRegionSize;
+    int tolerancePercent = config_.sizeTolerancePercent;
+    
+    // Calculate tolerance range (e.g., 30% tolerance means 448-832 for 640 ideal size)
+    int minSize = idealSize * (100 - tolerancePercent) / 100;
+    int maxSize = idealSize * (100 + tolerancePercent) / 100;
+    
+    for (const auto& region : regions) {
+        int width = region.boundingBox.width;
+        int height = region.boundingBox.height;
+        
+        // Check if region is outside tolerance range and needs splitting
+        if (width > maxSize || height > maxSize) {
+            LOG_INFO("Splitting large region: {}x{} into ideal-sized regions", width, height);
+            
+            // Calculate how many splits we need
+            int splitsX = (width + idealSize - 1) / idealSize;  // Ceiling division
+            int splitsY = (height + idealSize - 1) / idealSize;  // Ceiling division
+            
+            // Create grid of sub-regions
+            for (int y = 0; y < splitsY; ++y) {
+                for (int x = 0; x < splitsX; ++x) {
+                    // Calculate sub-region bounds
+                    int subX = region.boundingBox.x + (x * idealSize);
+                    int subY = region.boundingBox.y + (y * idealSize);
+                    int subWidth = std::min(idealSize, region.boundingBox.x + region.boundingBox.width - subX);
+                    int subHeight = std::min(idealSize, region.boundingBox.y + region.boundingBox.height - subY);
+                    
+                    // Create sub-region (all sub-regions are kept, never discarded)
+                    cv::Rect subBbox(subX, subY, subWidth, subHeight);
+                    
+                    // Create new consolidated region with same object IDs
+                    // (we'll distribute the objects across sub-regions)
+                    ConsolidatedRegion subRegion(subBbox, region.trackedObjectIds);
+                    subRegion.framesSinceLastUpdate = region.framesSinceLastUpdate;
+                    
+                    optimizedRegions.push_back(subRegion);
+                    
+                    LOG_INFO("  Created sub-region: {}x{} at ({},{})", 
+                             subWidth, subHeight, subX, subY);
+                }
+            }
+        } else {
+            // Region is within tolerance range, keep as-is
+            optimizedRegions.push_back(region);
+            LOG_INFO("Kept region as-is: {}x{} (within {}% tolerance of ideal {}x{})", 
+                     width, height, tolerancePercent, idealSize, idealSize);
+        }
+    }
+    
+    LOG_INFO("Region optimization: {} -> {} regions", regions.size(), optimizedRegions.size());
+    return optimizedRegions;
+}
+
+std::vector<ConsolidatedRegion> MotionRegionConsolidator::removeOverlappingRegions(
+    const std::vector<ConsolidatedRegion>& regions) {
+    
+    if (regions.empty()) {
+        return regions;
+    }
+    
+    std::vector<ConsolidatedRegion> filteredRegions;
+    int idealSize = config_.idealModelRegionSize;
+    int tolerancePercent = config_.sizeTolerancePercent;
+    
+    // Calculate tolerance range for ideal size
+    int minIdealSize = idealSize * (100 - tolerancePercent) / 100;
+    int maxIdealSize = idealSize * (100 + tolerancePercent) / 100;
+    
+    LOG_INFO("Removing overlapping regions from {} regions (ideal size: {}±{}%)", 
+             regions.size(), idealSize, tolerancePercent);
+    
+    for (size_t i = 0; i < regions.size(); ++i) {
+        const auto& currentRegion = regions[i];
+        bool shouldKeep = true;
+        
+        // Check for overlaps with already filtered regions
+        for (const auto& filteredRegion : filteredRegions) {
+            if (areRegionsOverlapping(currentRegion, filteredRegion)) {
+                // Calculate how close each region is to ideal size
+                int currentWidth = currentRegion.boundingBox.width;
+                int currentHeight = currentRegion.boundingBox.height;
+                int filteredWidth = filteredRegion.boundingBox.width;
+                int filteredHeight = filteredRegion.boundingBox.height;
+                
+                // Calculate size deviation from ideal (lower is better)
+                int currentDeviation = std::abs(currentWidth - idealSize) + std::abs(currentHeight - idealSize);
+                int filteredDeviation = std::abs(filteredWidth - idealSize) + std::abs(filteredHeight - idealSize);
+                
+                // Check if current region is within ideal tolerance range
+                bool currentIsIdeal = (currentWidth >= minIdealSize && currentWidth <= maxIdealSize) &&
+                                     (currentHeight >= minIdealSize && currentHeight <= maxIdealSize);
+                bool filteredIsIdeal = (filteredWidth >= minIdealSize && filteredWidth <= maxIdealSize) &&
+                                      (filteredHeight >= minIdealSize && filteredHeight <= maxIdealSize);
+                
+                // Decision logic:
+                // 1. If one is ideal and other isn't, keep the ideal one
+                // 2. If both are ideal or both aren't ideal, keep the one closer to ideal size
+                // 3. If tied, keep the one with more objects
+                if (currentIsIdeal && !filteredIsIdeal) {
+                    // Current is ideal, filtered is not - remove filtered and keep current
+                    shouldKeep = true;
+                    // Remove the filtered region (we'll handle this by rebuilding the list)
+                    LOG_DEBUG("Overlap detected: keeping ideal region {}x{} over non-ideal {}x{}", 
+                             currentWidth, currentHeight, filteredWidth, filteredHeight);
+                } else if (!currentIsIdeal && filteredIsIdeal) {
+                    // Filtered is ideal, current is not - keep filtered, discard current
+                    shouldKeep = false;
+                    LOG_DEBUG("Overlap detected: keeping ideal region {}x{} over non-ideal {}x{}", 
+                             filteredWidth, filteredHeight, currentWidth, currentHeight);
+                    break;
+                } else {
+                    // Both are ideal or both aren't ideal - compare deviation from ideal
+                    if (currentDeviation < filteredDeviation) {
+                        // Current is closer to ideal - keep current, remove filtered
+                        shouldKeep = true;
+                        LOG_DEBUG("Overlap detected: keeping region {}x{} (deviation: {}) over {}x{} (deviation: {})", 
+                                 currentWidth, currentHeight, currentDeviation, 
+                                 filteredWidth, filteredHeight, filteredDeviation);
+                    } else if (currentDeviation > filteredDeviation) {
+                        // Filtered is closer to ideal - keep filtered, discard current
+                        shouldKeep = false;
+                        LOG_DEBUG("Overlap detected: keeping region {}x{} (deviation: {}) over {}x{} (deviation: {})", 
+                                 filteredWidth, filteredHeight, filteredDeviation,
+                                 currentWidth, currentHeight, currentDeviation);
+                        break;
+                    } else {
+                        // Tied on deviation - keep the one with more objects
+                        if (currentRegion.trackedObjectIds.size() > filteredRegion.trackedObjectIds.size()) {
+                            shouldKeep = true;
+                            LOG_DEBUG("Overlap detected: keeping region {}x{} with {} objects over {}x{} with {} objects", 
+                                     currentWidth, currentHeight, currentRegion.trackedObjectIds.size(),
+                                     filteredWidth, filteredHeight, filteredRegion.trackedObjectIds.size());
+                        } else {
+                            shouldKeep = false;
+                            LOG_DEBUG("Overlap detected: keeping region {}x{} with {} objects over {}x{} with {} objects", 
+                                     filteredWidth, filteredHeight, filteredRegion.trackedObjectIds.size(),
+                                     currentWidth, currentHeight, currentRegion.trackedObjectIds.size());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (shouldKeep) {
+            filteredRegions.push_back(currentRegion);
+        }
+    }
+    
+    LOG_INFO("Overlap removal: {} -> {} regions (removed {} overlapping regions)", 
+             regions.size(), filteredRegions.size(), regions.size() - filteredRegions.size());
+    
+    return filteredRegions;
 }
 

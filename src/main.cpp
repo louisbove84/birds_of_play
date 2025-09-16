@@ -69,11 +69,47 @@ int main(int argc, char** argv) {
     }
     Logger::init(logLevel, logFilePath, logToFile);
     LOG_INFO("Birds of Play Motion Detection Demo - Logger initialized at {}", logFilePath);
+    
+    // Read MongoDB configuration
+    bool saveOnlyConsolidatedRegions = config["save_only_consolidated_regions"] ? 
+                                      config["save_only_consolidated_regions"].as<bool>() : false;
+    LOG_INFO("MongoDB save mode: {} frames", 
+             saveOnlyConsolidatedRegions ? "consolidated regions only" : "all motion frames");
 
     // Initialize motion processor and motion region consolidator
     MotionProcessor motionProcessor(config_path.string());
     motionProcessor.setVisualizationPath(""); // Disable visualization file saving
-    MotionRegionConsolidator regionConsolidator;
+    
+    // Configure region consolidation
+    ConsolidationConfig consolidationConfig;
+    consolidationConfig.maxDistanceThreshold = config["max_distance_threshold"] ? 
+                                             config["max_distance_threshold"].as<double>() : 150.0;
+    consolidationConfig.minObjectsPerRegion = config["min_objects_per_region"] ? 
+                                            config["min_objects_per_region"].as<int>() : 1;
+    consolidationConfig.overlapThreshold = config["overlap_threshold"] ? 
+                                         config["overlap_threshold"].as<double>() : 0.2;
+    consolidationConfig.gridCellSize = config["grid_cell_size"] ? 
+                                      config["grid_cell_size"].as<double>() : 150.0;
+    consolidationConfig.maxFramesWithoutUpdate = config["max_frames_without_update"] ? 
+                                                config["max_frames_without_update"].as<int>() : 10;
+    consolidationConfig.minRegionArea = config["min_region_area"] ? 
+                                       config["min_region_area"].as<double>() : 200.0;
+    consolidationConfig.maxRegionArea = config["max_region_area"] ? 
+                                       config["max_region_area"].as<double>() : 100000.0;
+    consolidationConfig.regionExpansionFactor = config["region_expansion_factor"] ? 
+                                               config["region_expansion_factor"].as<double>() : 1.1;
+    consolidationConfig.idealModelRegionSize = config["ideal_model_region_size"] ? 
+                                              config["ideal_model_region_size"].as<int>() : 640;
+    consolidationConfig.sizeTolerancePercent = config["size_tolerance_percent"] ? 
+                                             config["size_tolerance_percent"].as<int>() : 30;
+    
+    // Set frame size (will be updated when we know the actual video dimensions)
+    consolidationConfig.frameSize = cv::Size(1920, 1080); // Default, will be updated from video
+    
+    MotionRegionConsolidator regionConsolidator(consolidationConfig);
+    LOG_INFO("Region consolidation configured: maxDistance={}, minObjects={}, overlap={}", 
+             consolidationConfig.maxDistanceThreshold, consolidationConfig.minObjectsPerRegion, 
+             consolidationConfig.overlapThreshold);
     
     // Initialize video source (camera or video file)
     cv::VideoCapture cap;
@@ -97,7 +133,17 @@ int main(int argc, char** argv) {
         LOG_INFO("📹 Opened webcam");
     }
     
-
+    // Update frame size in consolidation config based on actual video dimensions
+    cv::Mat testFrame;
+    cap >> testFrame;
+    if (!testFrame.empty()) {
+        consolidationConfig.frameSize = testFrame.size();
+        regionConsolidator.updateConfig(consolidationConfig);
+        LOG_INFO("Updated consolidation frame size to: {}x{}", 
+                 consolidationConfig.frameSize.width, consolidationConfig.frameSize.height);
+    }
+    // Reset video position to beginning
+    cap.set(cv::CAP_PROP_POS_FRAMES, 0);
 
     LOG_INFO("🐦 Birds of Play Motion Detection System initialized successfully!");
     if (!video_source.empty()) {
@@ -144,37 +190,70 @@ int main(int argc, char** argv) {
         if (!consolidatedRegions.empty()) {
             LOG_DEBUG("Frame {}: {} motion detections -> {} consolidated regions", 
                      frameCount, processingResult.detectedBounds.size(), consolidatedRegions.size());
+            for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
+                const auto& region = consolidatedRegions[i];
+                LOG_DEBUG("  Region {}: {}x{} at ({},{}) with {} objects", 
+                         i, region.boundingBox.width, region.boundingBox.height,
+                         region.boundingBox.x, region.boundingBox.y, region.trackedObjectIds.size());
+            }
         }
         
         // Create live display frame
         cv::Mat displayFrame = frame.clone();
         
-        // Draw individual motion detections
+        // Draw individual motion detections in gray (lower priority)
         for (size_t i = 0; i < processingResult.detectedBounds.size(); ++i) {
             const auto& bounds = processingResult.detectedBounds[i];
-            cv::Scalar color = getColor(i);
-            cv::rectangle(displayFrame, bounds, color, 2);
+            cv::Scalar color = cv::Scalar(200, 200, 200); // Light gray for individual motion detections
+            cv::rectangle(displayFrame, bounds, color, 1);
             
             // Add motion detection label
-            std::string info = "Motion:" + std::to_string(i);
-            cv::putText(displayFrame, info, cv::Point(bounds.x, bounds.y - 10),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+            std::string info = "M:" + std::to_string(i);
+            cv::putText(displayFrame, info, cv::Point(bounds.x, bounds.y - 5),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.4, color, 1);
         }
         
-        // Draw consolidated regions (higher priority - drawn on top)
+        // Draw consolidated regions in red (higher priority - drawn on top)
         for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
             const auto& region = consolidatedRegions[i];
-            cv::Scalar regionColor = cv::Scalar(255, 255, 255); // White for consolidated regions
+            cv::Scalar regionColor = cv::Scalar(0, 0, 255); // Red for consolidated regions
             cv::rectangle(displayFrame, region.boundingBox, regionColor, 3);
             
             std::string regionInfo = "Region:" + std::to_string(i) + " (" + std::to_string(region.trackedObjectIds.size()) + " objs)";
             cv::putText(displayFrame, regionInfo, cv::Point(region.boundingBox.x, region.boundingBox.y - 30),
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
         }
+        
+        // Create MongoDB frame (clean frame with only consolidated regions when needed)
+        cv::Mat mongoFrame;
+        if (saveOnlyConsolidatedRegions && !consolidatedRegions.empty()) {
+            // For MongoDB: clean frame with only consolidated regions in red
+            mongoFrame = frame.clone();
+            for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
+                const auto& region = consolidatedRegions[i];
+                cv::Scalar regionColor = cv::Scalar(0, 0, 255); // Red for consolidated regions (BGR format)
+                cv::rectangle(mongoFrame, region.boundingBox, regionColor, 3);
+                
+                std::string regionInfo = "Region:" + std::to_string(i) + " (" + std::to_string(region.trackedObjectIds.size()) + " objs)";
+                cv::putText(mongoFrame, regionInfo, cv::Point(region.boundingBox.x, region.boundingBox.y - 30),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
+            }
+        } else {
+            // Use the display frame (with both types of regions)
+            mongoFrame = displayFrame;
+        }
 
         // Auto-save frame every 1 second
         if (currentTime - lastSaveTime >= saveInterval) {
-            try {
+            // Check if we should save this frame based on configuration
+            bool shouldSaveFrame = !saveOnlyConsolidatedRegions || !consolidatedRegions.empty();
+            
+            // Debug output
+            LOG_DEBUG("Frame {}: saveOnlyConsolidatedRegions={}, consolidatedRegions.size()={}, shouldSaveFrame={}", 
+                     frameCount, saveOnlyConsolidatedRegions, consolidatedRegions.size(), shouldSaveFrame);
+            
+            if (shouldSaveFrame) {
+                try {
                 // Create metadata JSON with motion detection info and consolidated regions
                 std::string metadata = "{\"source\":\"motion_detection_cpp\",\"frame_count\":" + 
                                      std::to_string(frameCount) + ",\"timestamp\":\"" + 
@@ -204,7 +283,7 @@ int main(int argc, char** argv) {
                 metadata += "}";
                 
                 // Try to save directly to MongoDB using Python bindings
-                std::string result = save_frame_to_mongodb(displayFrame, metadata);
+                std::string result = save_frame_to_mongodb(mongoFrame, metadata);
                 if (!result.empty()) {
                     std::cout << "💾 Frame saved to MongoDB with UUID: " << result << std::endl;
                     LOG_INFO("Frame saved to MongoDB: {}", result);
@@ -213,9 +292,14 @@ int main(int argc, char** argv) {
                     LOG_ERROR("Failed to save frame to MongoDB");
                 }
                 
-            } catch (const std::exception& e) {
-                std::cerr << "Error saving frame: " << e.what() << std::endl;
-                LOG_ERROR("Error saving frame to MongoDB: {}", e.what());
+                } catch (const std::exception& e) {
+                    std::cerr << "Error saving frame: " << e.what() << std::endl;
+                    LOG_ERROR("Error saving frame to MongoDB: {}", e.what());
+                }
+            } else {
+                // Frame skipped because no consolidated regions and save_only_consolidated_regions is enabled
+                LOG_DEBUG("Frame {} skipped - no consolidated regions (save_only_consolidated_regions=true)", frameCount);
+                std::cout << "⏭️  Frame skipped - no consolidated regions" << std::endl;
             }
             
             lastSaveTime = currentTime;
@@ -224,8 +308,13 @@ int main(int argc, char** argv) {
         // Add status overlay
         std::string status = "Frame: " + std::to_string(frameCount) + 
                            " | Motions: " + std::to_string(processingResult.detectedBounds.size()) +
-                           " | Regions: " + std::to_string(consolidatedRegions.size());
+                           " | Regions: " + std::to_string(consolidatedRegions.size()) +
+                           " | Save: " + (saveOnlyConsolidatedRegions ? "Consolidated Only" : "All Motion");
         cv::putText(displayFrame, status, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+        
+        // Add legend
+        cv::putText(displayFrame, "Gray: Individual Motion | Red: Consolidated Regions", 
+                   cv::Point(10, displayFrame.rows - 20), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
 
         // Show the live feed
         cv::imshow("🐦 Birds of Play - Motion Detection", displayFrame);

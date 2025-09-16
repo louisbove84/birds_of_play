@@ -63,7 +63,23 @@ cleanup_old_data: true          # Delete old data on startup
 image_format: "png"             # Format for saving images
 min_tracking_confidence: 0.6    # Minimum confidence for tracking
 
+# ===============================
+# REGION CONSOLIDATION
+# ===============================
+# Consolidation parameters for grouping nearby motion detections
+max_distance_threshold: 150.0        # Max distance between objects to group (pixels)
+min_objects_per_region: 1            # Min objects to form a region (1 = any motion)
+overlap_threshold: 0.2               # Min overlap ratio to merge regions
+grid_cell_size: 150.0                # Cell size for grid-based grouping
+max_frames_without_update: 10        # Max frames before removing region
+min_region_area: 200.0               # Min area for consolidated region
+max_region_area: 1000000.0           # Max area for consolidated region (640x640 = 409,600)
+region_expansion_factor: 1.1         # Factor to expand bounding box
+ideal_model_region_size: 640         # Ideal region size for YOLOv11
+size_tolerance_percent: 30           # Size tolerance percentage (regions within this % of ideal size are kept as-is)
+
 # MongoDB Configuration
 mongodb_uri: "mongodb://localhost:27017"
 database_name: "birds_of_play"
 collection_prefix: "motion_tracking"
+save_only_consolidated_regions: true  # Only save frames that have consolidated regions (reduces noise)

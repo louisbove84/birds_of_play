@@ -30,6 +30,7 @@ struct ConsolidationConfig {
     // Region size configuration
     cv::Size frameSize = cv::Size(1920, 1080); // Frame size for boundary checking
     int idealModelRegionSize = 640;          // Ideal region size for YOLOv11 (e.g., 640x640)
+    int sizeTolerancePercent = 30;           // Size tolerance percentage (regions within this % of ideal size are kept as-is)
     
     // Grid-based grouping
     double gridCellSize = 100.0;             // Cell size for grid-based grouping
@@ -110,6 +111,10 @@ private:
                                const cv::Mat& inputImage) const;
     void drawMotionBoxes(cv::Mat& image, const std::vector<TrackedObject>& trackedObjects) const;
     void drawConsolidatedRegions(cv::Mat& image, const std::vector<ConsolidatedRegion>& regions) const;
+    
+    // Region optimization methods
+    std::vector<ConsolidatedRegion> splitLargeRegions(const std::vector<ConsolidatedRegion>& regions);
+    std::vector<ConsolidatedRegion> removeOverlappingRegions(const std::vector<ConsolidatedRegion>& regions);
 
     ConsolidationConfig config_;
     std::vector<ConsolidatedRegion> consolidatedRegions_;
