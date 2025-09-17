@@ -14,13 +14,13 @@ project_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from src.unsupervised_ml.object_data_manager import ObjectDataManager
-    from src.unsupervised_ml.feature_extractor import FeatureExtractor, FeaturePipeline
-    from src.unsupervised_ml.bird_clusterer import BirdClusterer, ClusteringExperiment
-    from src.unsupervised_ml.cluster_visualizer import ClusterVisualizer
+    from object_data_manager import ObjectDataManager
+    from feature_extractor import FeatureExtractor, FeaturePipeline
+    from bird_clusterer import BirdClusterer, ClusteringExperiment
+    from cluster_visualizer import ClusterVisualizer
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Please ensure all dependencies are installed: make ml-install")
+    print("Please ensure all dependencies are installed and run from the unsupervised_ml directory")
 
 app = Flask(__name__)
 CORS(app)
@@ -571,12 +571,17 @@ def create_cluster_dashboard_html(clusters, cluster_stats):
     return html
 
 if __name__ == '__main__':
-    if '--initialize' in sys.argv:
-        print("Auto-initializing system...")
-        initialize_system()
+    # Don't auto-initialize - let it be done manually via web interface
+    # if '--initialize' in sys.argv:
+    #     print("Auto-initializing system...")
+    #     initialize_system()
     
     port = 3002
-    print(f"🔬 Starting Bird Clustering Server on http://localhost:{{port}}")
+    print(f"🔬 Starting Bird Clustering Server on http://localhost:{port}")
     print("📊 Navigate to http://localhost:3002 to explore clustering results")
     
-    app.run(host='0.0.0.0', port=port, debug=True)
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False)  # Disable debug mode for faster startup
+    except Exception as e:
+        print(f"Error starting server: {e}")
+        print("Make sure port 3002 is available")

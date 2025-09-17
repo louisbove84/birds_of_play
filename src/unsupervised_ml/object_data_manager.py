@@ -22,7 +22,7 @@ class ObjectDataManager:
         self.mongodb_uri = mongodb_uri
         self.db_name = db_name
         self.project_root = project_root
-        self.objects_dir = self.project_root / "data" / "objects"
+        self.objects_dir = Path(__file__).parent.parent.parent / "data" / "objects"
         
         # Connect to MongoDB
         self.client = MongoClient(mongodb_uri)
@@ -31,7 +31,7 @@ class ObjectDataManager:
         
     def load_bird_objects(self, min_confidence: float = 0.5) -> pd.DataFrame:
         """Load all bird objects with their metadata."""
-        # Use high_confidence_detections collection instead
+        # Use high_confidence_detections collection
         high_conf_collection = self.db['high_confidence_detections']
         cursor = high_conf_collection.find({})
         
@@ -42,6 +42,7 @@ class ObjectDataManager:
             confidence = detection_info.get('confidence', 0.0)
             class_name = detection_info.get('class_name', 'unknown')
             
+            # Check if it's a bird with sufficient confidence
             if confidence >= min_confidence and class_name.lower() == 'bird':
                 detection_id = detection_doc.get('detection_id')
                 region_id = detection_doc.get('region_id')
