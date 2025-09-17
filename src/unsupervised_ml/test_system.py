@@ -19,14 +19,13 @@ def main():
     
     expected_files = [
         "__init__.py",
-        "requirements.txt",
-        "data/object_data_manager.py",
-        "models/feature_extractor.py", 
-        "clustering/bird_clusterer.py",
-        "visualization/cluster_visualizer.py",
-        "analysis/cluster_analyzer.py",
-        "web/cluster_server.py",
-        "run_clustering_analysis.py"
+        "object_data_manager.py",
+        "feature_extractor.py", 
+        "bird_clusterer.py",
+        "cluster_visualizer.py",
+        "cluster_analyzer.py",
+        "cluster_server.py",
+        "test_system.py"
     ]
     
     files_found = 0

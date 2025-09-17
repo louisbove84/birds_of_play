@@ -14,10 +14,10 @@ project_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from src.unsupervised_ml.data.object_data_manager import ObjectDataManager
-    from src.unsupervised_ml.models.feature_extractor import FeatureExtractor, FeaturePipeline
-    from src.unsupervised_ml.clustering.bird_clusterer import BirdClusterer, ClusteringExperiment
-    from src.unsupervised_ml.visualization.cluster_visualizer import ClusterVisualizer
+    from src.unsupervised_ml.object_data_manager import ObjectDataManager
+    from src.unsupervised_ml.feature_extractor import FeatureExtractor, FeaturePipeline
+    from src.unsupervised_ml.bird_clusterer import BirdClusterer, ClusteringExperiment
+    from src.unsupervised_ml.cluster_visualizer import ClusterVisualizer
 except ImportError as e:
     print(f"Import error: {e}")
     print("Please ensure all dependencies are installed: make ml-install")
