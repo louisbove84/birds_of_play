@@ -176,8 +176,8 @@ def api_bird_image(object_id):
     import os
     from pathlib import Path
     
-    # Get project root and construct image path
-    project_root = Path(__file__).parent.parent.parent.parent
+    # Get project root and construct image path  
+    project_root = Path(__file__).parent.parent.parent
     image_path = project_root / "data" / "objects" / f"{object_id}.jpg"
     
     if image_path.exists():
