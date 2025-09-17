@@ -1,0 +1,26 @@
+# Birds of Play - Object Detection Configuration
+# =============================================
+
+# Detection thresholds
+detection:
+  # Minimum confidence threshold for high-confidence detections (0.0 to 1.0)
+  high_confidence_threshold: 0.93
+
+# Object classes to display (only these will be shown to users)
+# Based on COCO dataset class names used by YOLO11
+display_classes:
+  - "bird"
+
+# Optional: Object class aliases (alternative names for display)
+class_aliases:
+  bird: "Bird"
+
+# Model configuration
+model:
+  type: "yolo11n"  # yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
+  path: "models/yolo11n.pt"
+
+# Processing configuration  
+processing:
+  batch_size: 10  # Number of regions to process in parallel (future enhancement)
+  max_regions: 1000  # Maximum regions to process in one batch

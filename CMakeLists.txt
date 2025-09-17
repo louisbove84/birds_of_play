@@ -47,8 +47,7 @@ endif()
 # Create main executable using the motion detection library
 add_executable(birds_of_play src/main.cpp src/mongodb_functions.cpp)
 
-# Create test executable for Python bindings
-add_executable(test_python_bindings test_python_bindings.cpp)
+# Python bindings test removed - not part of main workflow
 
 # Link against the motion detection library
 target_link_libraries(birds_of_play
@@ -60,24 +59,11 @@ target_link_libraries(birds_of_play
         Python3::Python
 )
 
-# Link test executable
-target_link_libraries(test_python_bindings
-    PRIVATE
-        pybind11::embed
-        Python3::Python
-)
-
 # Include directories for main executable
 target_include_directories(birds_of_play
     PRIVATE
         src/motion_detection/include
         ${OpenCV_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIR}
-        ${pybind11_INCLUDE_DIRS}
-)
-
-# Include directories for test executable
-target_include_directories(test_python_bindings
-    PRIVATE
         ${pybind11_INCLUDE_DIRS}
 )

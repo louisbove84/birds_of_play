@@ -1,15 +1,17 @@
-# Birds of Play: Motion Detection System
+# Birds of Play: Motion Detection & Object Recognition System
 
-A real-time motion detection and region consolidation system built with C++ and OpenCV.
+A real-time motion detection and object recognition system built with C++ and OpenCV, featuring web-based visualization and YOLO11 integration.
 
 ## 🎯 Features
 
 - **Real-time motion detection** using frame differencing and background subtraction
-- **Region consolidation** to group nearby motion areas
-- **Live webcam processing** with visual feedback
+- **Region consolidation** to group nearby motion areas into optimal detection zones
+- **YOLO11 object detection** on consolidated motion regions
+- **Web-based interface** with dual viewers for motion and object detection
+- **MongoDB integration** for frame storage and detection results
+- **Cross-navigation** between motion detection and object detection interfaces
+- **Configurable detection thresholds** and object class filtering
 - **Comprehensive test suite** with integration testing
-- **Modular architecture** for easy extension
-- **Scalable src/ directory structure** for multi-component development
 
 ## 🚀 Quick Start
 
@@ -17,12 +19,12 @@ A real-time motion detection and region consolidation system built with C++ and 
 
 **macOS (Apple Silicon):**
 ```bash
-brew install cmake opencv yaml-cpp
+brew install cmake opencv yaml-cpp mongodb-community
 ```
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt install build-essential cmake libopencv-dev libyaml-cpp-dev
+sudo apt install build-essential cmake libopencv-dev libyaml-cpp-dev mongodb
 ```
 
 ### Build and Run
@@ -33,44 +35,61 @@ git clone <your-repo-url>
 cd birds_of_play
 
 # Build the project
-mkdir build && cd build
-cmake .. -DBUILD_TESTING=ON
-make -j8
+make rebuild
 
-# Run the main webcam demo
-./birds_of_play
+# Install web dependencies
+make web-install
 
-# Run tests (from build directory)
-make test-motion-processor
-make test-motion-consolidator
-make test-integration
+# Start MongoDB (if not running)
+brew services start mongodb/brew/mongodb-community  # macOS
+# or
+sudo systemctl start mongod  # Ubuntu
+
+# Start web interfaces
+make web-start
+
+# Visit the interfaces
+# Motion Detection: http://localhost:3000
+# Object Detection: http://localhost:3001
 ```
 
 ## 📁 Project Structure
 
 ```
 birds_of_play/
-├── src/                        # Source code directory
-│   ├── main.cpp               # Main webcam application
-│   └── motion_detection/      # Core motion detection component
-│       ├── src/               # Source files
-│       │   ├── motion_processor.cpp
-│       │   ├── motion_region_consolidator.cpp
-│       │   ├── motion_pipeline.cpp
-│       │   └── motion_visualization.cpp
-│       ├── include/           # Header files
-│       ├── tests/             # Test suite
-│       ├── libs/              # Dependencies (spdlog)
-│       ├── CMakeLists.txt     # Component build configuration
-│       └── config.yaml        # Component configuration
-├── build/                     # Build output directory
-├── CMakeLists.txt            # Root build configuration
-└── README.md                 # This file
+├── src/                           # Source code directory
+│   ├── main.cpp                  # Main C++ application
+│   ├── main.py                   # Python orchestrator (alternative)
+│   ├── motion_detection/         # Core motion detection component
+│   │   ├── src/                  # Motion detection source files
+│   │   ├── include/              # Header files
+│   │   ├── tests/                # Test suite
+│   │   ├── config.yaml           # Motion detection configuration
+│   │   └── CMakeLists.txt        # Component build configuration
+│   ├── image_detection/          # Object detection pipeline
+│   │   ├── models/               # YOLO11 model files
+│   │   │   └── yolo11n.pt       # YOLO11 nano model
+│   │   ├── batch_detect_regions.py   # Batch detection processor
+│   │   ├── detection_config.yaml     # Detection configuration
+│   │   └── *.py                  # Detection utilities
+│   └── mongodb/                  # Database utilities and migration tools
+├── web/                          # Web interface
+│   ├── simple_viewer.js          # Motion detection viewer (port 3000)
+│   ├── region_viewer.js          # Object detection viewer (port 3001)
+│   └── package.json              # Node.js dependencies
+├── data/                         # Generated data
+│   ├── frames/                   # Original and processed frames
+│   ├── regions/                  # Consolidated region cutouts
+│   ├── objects/                  # Individual object crops
+│   └── highlighted_frames/       # Frames with highlighted regions
+├── build/                        # Build output directory
+├── Makefile                      # Simplified build system
+└── README.md                     # This file
 ```
 
 ## 🔧 Configuration
 
-Edit `src/motion_detection/config.yaml` to customize:
+### Motion Detection (`src/motion_detection/config.yaml`)
 
 ```yaml
 motion_detection:
@@ -81,134 +100,167 @@ motion_detection:
 
 region_consolidation:
   max_distance_threshold: 50.0  # Max distance for grouping regions
-  objectDetectionModelMinInputSize: 320  # Min input size for object detection
-  objectDetectionModelMaxInputSize: 640  # Max input size for object detection
+  ideal_model_region_size: 640  # Optimal size for object detection
+  size_tolerance_percent: 30    # Size tolerance for region optimization
 ```
+
+### Object Detection (`src/image_detection/detection_config.yaml`)
+
+```yaml
+detection:
+  high_confidence_threshold: 0.93  # Minimum confidence for display
+
+display_classes:
+  - "bird"                      # Object classes to detect and display
+
+model:
+  type: "yolo11n"              # YOLO11 model variant
+  path: "models/yolo11n.pt"    # Model file location
+```
+
+## 🌐 Web Interface
+
+The system provides two web interfaces with seamless navigation:
+
+### Motion Detection Viewer (Port 3000)
+- View processed frames with motion regions highlighted
+- Toggle between processed and original images
+- Navigate to object detection results
+
+### Object Detection Viewer (Port 3001)
+- View individual detected objects with confidence scores
+- See highlighted regions in context of full frames
+- Filter by configurable confidence thresholds
+- Automatic YOLO11 processing of motion regions
+
+**Navigation:** Click the navigation links at the top of each page to switch between viewers.
 
 ## 🧪 Testing
 
-The project includes comprehensive tests:
-
-- **Unit Tests**: Test individual components
-- **Integration Tests**: Test the complete pipeline with real images
-- **Visual Output**: All tests generate visualization images for inspection
-
 ```bash
-# Run all tests (from build directory)
-make test-all
+# Run all tests
+make test
 
 # Run specific test suites
-make test-motion-processor           # Motion detection tests
-make test-motion-consolidator        # Region consolidation tests
-make test-integration               # End-to-end pipeline tests
+make motion-tests              # Motion detection tests
+make test-python              # Python bindings tests
+make test-detection           # YOLO11 detection pipeline tests
 
-# Clean rebuild and test
-make clean-rebuild
-make run-all-tests
+# Build system tests
+make rebuild                  # Clean rebuild
+make web-start               # Test web interface startup
+make web-stop                # Stop web servers
 ```
-
-Test results and visualizations are saved in `test_results/` folders within the build directory.
 
 ## 🎮 Usage
 
-### Webcam Demo
+### Video Processing Pipeline
 
-Run the main application to see live motion detection:
+1. **Start the system:**
+   ```bash
+   make web-start
+   ```
+
+2. **Run motion detection** (processes video and saves to MongoDB):
+   ```bash
+   # Process webcam
+   ./build/birds_of_play
+   
+   # Process video file
+   ./build/birds_of_play --video path/to/video.mp4
+   ```
+
+3. **View results:**
+   - **Motion Detection**: http://localhost:3000
+   - **Object Detection**: http://localhost:3001
+
+4. **Object detection** runs automatically when viewing the object detection interface
+
+### Makefile Commands
 
 ```bash
-./birds_of_play
-```
+# Build system
+make build                    # Build the project
+make rebuild                  # Clean and rebuild
+make clean                    # Remove build artifacts
+make deep-clean              # Remove all artifacts including dependencies
 
-**Controls:**
-- `q` or `ESC`: Quit
-- `s`: Save current frame
+# Web interface
+make web-install             # Install web dependencies
+make web-start               # Start both web servers
+make web-stop                # Stop web servers
 
-### Library Usage
-
-```cpp
-#include "src/motion_detection/include/motion_pipeline.hpp"
-
-// Initialize components
-MotionProcessor motionProcessor("src/motion_detection/config.yaml");
-MotionRegionConsolidator regionConsolidator;
-
-// Process frame
-cv::Mat frame = // ... get your frame
-auto [result, regions] = processFrameAndConsolidate(
-    motionProcessor, regionConsolidator, frame, "output.jpg");
-
-// Use results
-std::cout << "Detected " << result.detectedBounds.size() << " motion areas" << std::endl;
-std::cout << "Consolidated to " << regions.size() << " regions" << std::endl;
+# Testing
+make motion-tests            # Run motion detection tests
+make test-python             # Test Python bindings
+make test-detection          # Test YOLO11 pipeline
 ```
 
 ## 📊 Performance
 
 - **Processing Speed**: ~3-5ms per frame (1920x1080)
-- **Memory Usage**: ~40-50MB typical
+- **Memory Usage**: ~40-50MB for motion detection + ~200MB for YOLO11
+- **Detection Accuracy**: 93%+ confidence threshold for bird detection
 - **Supported Formats**: Any OpenCV-compatible image/video format
 - **Platform Support**: macOS, Linux (Windows untested)
 
 ## 🛠️ Development
 
-### Project Architecture
+### Adding New Object Detection Models
 
-The project uses a scalable `src/` directory structure designed for multi-component development:
+1. Place model file in `src/image_detection/models/`
+2. Update `detection_config.yaml`:
+   ```yaml
+   model:
+     type: "your_model"
+     path: "models/your_model.pt"
+   ```
+3. Modify `batch_detect_regions.py` if needed for model-specific handling
 
+### Customizing Detection Classes
+
+Edit `src/image_detection/detection_config.yaml`:
+```yaml
+display_classes:
+  - "bird"
+  - "cat"
+  - "dog"
+  # Add more COCO classes as needed
+
+class_aliases:
+  bird: "Bird"
+  cat: "Cat"
+  # Custom display names
 ```
-src/
-├── motion_detection/          # Current motion detection component
-├── image_classification/      # Future: YOLO, ResNet, etc.
-├── object_tracking/           # Future: Kalman filters, etc.
-├── audio_processing/          # Future: Bird song detection
-└── main.cpp                   # Orchestrates all components
-```
 
-### Adding New Components
+### Web Interface Customization
 
-1. Create component directory: `mkdir -p src/new_component/{include,src,tests}`
-2. Add component to root `CMakeLists.txt`: `add_subdirectory(src/new_component)`
-3. Create component `CMakeLists.txt` with library and test targets
-4. Link in `main.cpp` and other components as needed
+- **Motion Detection UI**: Edit `web/simple_viewer.js`
+- **Object Detection UI**: Edit `web/region_viewer.js`
+- **Navigation**: Both files include cross-navigation links
+- **Styling**: CSS is embedded in each JavaScript file
 
-### Adding Features to Existing Components
+## 🔧 Troubleshooting
 
-1. Add source files to `src/motion_detection/src/`
-2. Add headers to `src/motion_detection/include/`
-3. Update `src/motion_detection/CMakeLists.txt`
-4. Add tests in `src/motion_detection/tests/`
+### Common Issues
 
-### Code Style
+1. **Web servers won't start**: Install dependencies with `make web-install`
+2. **No images in web interface**: Ensure MongoDB is running and data exists
+3. **YOLO11 model not found**: Check `src/image_detection/models/yolo11n.pt` exists
+4. **Detection not working**: Verify Python virtual environment and dependencies
 
-- Follow existing naming conventions
-- Use meaningful variable names
-- Add logging for important operations
-- Include tests for new functionality
-- Use the shared `motion_pipeline.hpp` for common functionality
-
-## 🔧 Build System
-
-### Custom Make Targets
+### Debug Commands
 
 ```bash
-# Build targets
-make clean-rebuild          # Clean and rebuild everything
-make fresh-build           # Fresh CMake configuration and build
-make run-all-tests         # Build and run all tests
+# Check system status
+make help                     # Show all available commands
+curl http://localhost:3000/api/frames | jq '.frames | length'  # Check frame count
+curl http://localhost:3001/api/objects | jq '.objects | length'  # Check detection count
 
-# Test targets
-make test-all              # Run all test suites
-make test-motion-processor # Motion processor tests only
-make test-motion-consolidator # Region consolidator tests only
-make test-integration      # Integration tests only
-```
-
-### Debug Build
-
-```bash
-mkdir build_debug && cd build_debug
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-make -j8
+# Check MongoDB
+mongosh birds_of_play
+> db.captured_frames.countDocuments()
+> db.region_detections.countDocuments()
 ```
 
 ## 📄 License
@@ -220,9 +272,10 @@ MIT License - see LICENSE.md for details.
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+4. Ensure all tests pass: `make test`
+5. Test web interfaces: `make web-start`
+6. Submit a pull request
 
 ---
 
-*Built with ❤️ for real-time motion detection*
+*Built with ❤️ for real-time motion detection and object recognition*

@@ -1,0 +1,28 @@
+{
+  "region_id": "71a82e01-cb20-4134-b6e2-46574636ef57_3",
+  "frame_id": "71a82e01-cb20-4134-b6e2-46574636ef57",
+  "region_index": 3,
+  "region_metadata": {
+    "x": 0,
+    "y": 640,
+    "width": 640,
+    "height": 440,
+    "object_count": 16417
+  },
+  "detections": [
+    {
+      "class_id": 14,
+      "class_name": "bird",
+      "confidence": 0.8336172699928284,
+      "bbox": [
+        256,
+        0,
+        639,
+        186
+      ]
+    }
+  ],
+  "detection_count": 1,
+  "model": "yolo11n",
+  "confidence_threshold": 0.25
+}

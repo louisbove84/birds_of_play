@@ -1,0 +1,50 @@
+{
+  "region_id": "3f8d58d2-6588-4a75-b923-fddd0b773f26_1",
+  "frame_id": "3f8d58d2-6588-4a75-b923-fddd0b773f26",
+  "region_index": 1,
+  "region_metadata": {
+    "x": 640,
+    "y": 0,
+    "width": 640,
+    "height": 640,
+    "object_count": 2041
+  },
+  "detections": [
+    {
+      "class_id": 14,
+      "class_name": "bird",
+      "confidence": 0.7747056484222412,
+      "bbox": [
+        0,
+        471,
+        50,
+        637
+      ]
+    },
+    {
+      "class_id": 14,
+      "class_name": "bird",
+      "confidence": 0.4821273386478424,
+      "bbox": [
+        505,
+        459,
+        639,
+        639
+      ]
+    },
+    {
+      "class_id": 44,
+      "class_name": "spoon",
+      "confidence": 0.3457137942314148,
+      "bbox": [
+        385,
+        467,
+        508,
+        639
+      ]
+    }
+  ],
+  "detection_count": 3,
+  "model": "yolo11n",
+  "confidence_threshold": 0.25
+}

@@ -104,11 +104,49 @@ app.get('/', (req, res) => {
             cursor: pointer; 
         }
         .stats { text-align: center; margin-bottom: 20px; color: #4CAF50; }
+        .nav-links {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 8px;
+        }
+        .nav-link {
+            color: #4CAF50;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .nav-link:hover {
+            background: #4CAF50;
+            color: #1a1a1a;
+        }
+        .nav-current {
+            color: #FF6B35;
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        .nav-separator {
+            color: #666;
+            margin: 0 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🐦 Birds of Play - Motion Detection Viewer</h1>
+        <p style="text-align: center; color: #ccc;">Consolidated motion regions with original thumbnails</p>
+        
+        <nav class="nav-links">
+            <span class="nav-current">📹 Motion Detection Frames</span>
+            <span class="nav-separator">|</span>
+            <a href="http://localhost:3001" class="nav-link" target="_self">
+                🎯 Object Detections
+            </a>
+        </nav>
+        
         <div class="stats" id="stats">Loading...</div>
         <div id="frames" class="loading">Loading frames...</div>
     </div>

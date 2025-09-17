@@ -149,20 +149,82 @@ app.get('/', (req, res) => {
             border-radius: 3px;
             margin-top: 5px;
         }
+        .detection-results {
+            margin-top: 8px;
+            padding: 8px;
+            background: #333;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .detection-loading {
+            color: #FF6B35;
+            text-align: center;
+            font-style: italic;
+        }
+        .detection-item {
+            background: #444;
+            padding: 4px 6px;
+            margin: 2px 0;
+            border-radius: 3px;
+            border-left: 3px solid #4CAF50;
+        }
+        .detection-confidence {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .no-detections {
+            color: #888;
+            text-align: center;
+            font-style: italic;
+        }
+        .nav-links {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 8px;
+        }
+        .nav-link {
+            color: #4CAF50;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .nav-link:hover {
+            background: #4CAF50;
+            color: #1a1a1a;
+        }
+        .nav-current {
+            color: #FF6B35;
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        .nav-separator {
+            color: #666;
+            margin: 0 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔍 Birds of Play - Consolidated Regions Viewer</h1>
-        <p style="text-align: center; color: #ccc;">Individual consolidated motion regions extracted from frames - toggle to see motion detection context</p>
+        <h1>🎯 Birds of Play - Object Detection Viewer</h1>
+        <p style="text-align: center; color: #ccc;">Individual detected objects cropped from consolidated motion regions</p>
         
         <nav class="nav-links">
-            <a href="http://localhost:3000" class="nav-link">
+            <a href="http://localhost:3000" class="nav-link" target="_self">
                 📹 Motion Detection Frames
             </a>
             <span class="nav-separator">|</span>
-            <span class="nav-current">🔍 Consolidated Regions</span>
+            <span class="nav-current">🎯 Object Detections</span>
         </nav>
+        
+        <div class="controls" style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <button class="btn" onclick="runBatchDetection()" id="batchBtn">🚀 Run YOLO11 on All Regions</button>
+            <button class="btn secondary" onclick="loadRegions()" id="refreshBtn">🔄 Refresh</button>
+            <button class="btn secondary" onclick="loadHighConfidenceDetections()" id="detectionBtn">🎯 View High-Confidence Detections</button>
+        </div>
         
         <div class="stats" id="stats">Loading...</div>
         <div id="regions" class="loading">Loading regions...</div>
@@ -179,39 +241,45 @@ app.get('/', (req, res) => {
     <script>
         async function loadRegions() {
             try {
-                const response = await fetch('/api/regions');
+                const response = await fetch('/api/objects');
                 const data = await response.json();
                 
                 document.getElementById('stats').innerHTML = 
-                    \`📊 Total Regions: \${data.regions.length} | 🎯 From \${data.frameCount} frames\`;
+                    \`🔥 High-Confidence Objects: \${data.objects.length} | 🎯 From \${data.regionCount} regions (≥93%)\`;
                 
                 const regionsContainer = document.getElementById('regions');
                 regionsContainer.innerHTML = '';
                 regionsContainer.className = 'region-grid';
                 
-                data.regions.forEach(region => {
+                data.objects.forEach(object => {
                     const card = document.createElement('div');
                     card.className = 'region-card';
                     
-                    const timestamp = new Date(region.timestamp).toLocaleString();
+                    const timestamp = new Date(object.timestamp).toLocaleString();
+                    const confidence = (object.confidence * 100).toFixed(1);
                     
                     card.innerHTML = \`
-                        <img id="img-\${region.id}" src="/api/region-image/\${region.id}" 
-                             alt="Region \${region.id}" 
-                             onclick="openModal('/api/region-image/\${region.id}')"
-                             onerror="this.src='/api/fallback/\${region.id}'">
+                        <img id="img-\${object.id}" src="/api/object-image/\${object.id}" 
+                             alt="Object \${object.id}" 
+                             onclick="openModal('/api/object-image/\${object.id}')"
+                             onerror="this.src='/api/fallback/\${object.id}'">
                         <div class="region-info">
-                            <strong>Region:</strong> \${region.regionIndex + 1} of \${region.totalRegions}<br>
-                            <strong>Size:</strong> \${region.width}×\${region.height}px<br>
-                            <strong>Position:</strong> (\${region.x}, \${region.y})<br>
+                            <strong>🔥 \${object.displayName}:</strong> \${confidence}%<br>
+                            <strong>Region:</strong> \${object.regionIndex + 1}<br>
+                            <strong>Position:</strong> [\${object.bbox[0]}, \${object.bbox[1]}, \${object.bbox[2]}, \${object.bbox[3]}]<br>
                             <strong>Time:</strong> \${timestamp}
                         </div>
                         <div class="frame-ref">
-                            Frame: \${region.frameId.substring(0, 8)}...
+                            Frame: \${object.frameId.substring(0, 8)}...
                         </div>
                         <div class="region-actions">
-                            <button class="btn" onclick="toggleImage('\${region.id}', 'region')">🔍 Region</button>
-                            <button class="btn secondary" onclick="toggleImage('\${region.id}', 'frame')">📷 Motion Frame</button>
+                            <button class="btn" onclick="toggleImage('\${object.id}', 'object')">🎯 Object</button>
+                            <button class="btn secondary" onclick="toggleImage('\${object.id}', 'frame')">📷 Motion Frame</button>
+                        </div>
+                        <div class="detection-results" style="display: block;">
+                            <div class="detection-item">
+                                🔥 \${object.displayName} - <span class="detection-confidence">\${confidence}%</span>
+                            </div>
                         </div>
                     \`;
                     
@@ -219,14 +287,14 @@ app.get('/', (req, res) => {
                 });
                 
             } catch (error) {
-                console.error('Error loading regions:', error);
+                console.error('Error loading objects:', error);
                 document.getElementById('regions').innerHTML = 
-                    '<div style="color: red; text-align: center;">Error loading regions. Check console for details.</div>';
+                    '<div style="color: red; text-align: center;">Error loading objects. Check console for details.</div>';
             }
         }
         
-        function toggleImage(regionId, type) {
-            const img = document.getElementById(\`img-\${regionId}\`);
+        function toggleImage(objectId, type) {
+            const img = document.getElementById(\`img-\${objectId}\`);
             if (!img) return;
             
             // Update button states
@@ -244,9 +312,115 @@ app.get('/', (req, res) => {
             
             // Update image source
             if (type === 'frame') {
-                img.src = \`/api/frame-thumbnail/\${regionId}\`;
+                img.src = \`/api/frame-thumbnail/\${objectId}\`;  // Pass objectId for highlighting
             } else {
-                img.src = \`/api/region-image/\${regionId}\`;
+                // Default to object view
+                img.src = \`/api/object-image/\${objectId}\`;
+            }
+        }
+        
+        async function runBatchDetection() {
+            const batchBtn = document.getElementById('batchBtn');
+            const statsDiv = document.getElementById('stats');
+            
+            // Show loading state
+            batchBtn.disabled = true;
+            batchBtn.textContent = '⏳ Running YOLO11...';
+            statsDiv.innerHTML = '🔍 Running YOLO11 detection on all regions...';
+            
+            try {
+                const response = await fetch('/api/batch-detection', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    statsDiv.innerHTML = \`✅ Detection completed! \${result.processed} regions processed, \${result.highConfidence} high-confidence detections\`;
+                    await loadRegions(); // Refresh the view
+                } else {
+                    statsDiv.innerHTML = \`❌ Batch detection failed: \${result.error}\`;
+                }
+            } catch (error) {
+                console.error('Batch detection error:', error);
+                statsDiv.innerHTML = '❌ Batch detection failed. Check console for details.';
+            } finally {
+                batchBtn.disabled = false;
+                batchBtn.textContent = '🚀 Run YOLO11 on All Regions';
+            }
+        }
+        
+        
+        async function loadHighConfidenceDetections() {
+            try {
+                const response = await fetch('/api/high-confidence-detections');
+                const data = await response.json();
+                
+                document.getElementById('stats').innerHTML = 
+                    \`🔥 High-Confidence Detections: \${data.detections.length} (>90% confidence)\`;
+                
+                const regionsContainer = document.getElementById('regions');
+                regionsContainer.innerHTML = '';
+                regionsContainer.className = 'region-grid';
+                
+                if (data.detections.length === 0) {
+                    regionsContainer.innerHTML = '<div style="text-align: center; color: #888; padding: 50px;">No high-confidence detections found. Run batch detection first.</div>';
+                    return;
+                }
+                
+                data.detections.forEach(detection => {
+                    const card = document.createElement('div');
+                    card.className = 'region-card';
+                    
+                    const timestamp = new Date(detection.timestamp).toLocaleString();
+                    const confidence = (detection.detection_info.confidence * 100).toFixed(1);
+                    
+                    card.innerHTML = \`
+                        <img src="/api/detection-image/\${detection.detection_id}" 
+                             alt="Detection \${detection.detection_id}" 
+                             onclick="openModal('/api/detection-image/\${detection.detection_id}')"
+                             onerror="this.src='/api/fallback/\${detection.detection_id}'">
+                        <div class="region-info">
+                            <strong>Object:</strong> \${detection.detection_info.class_name}<br>
+                            <strong>Confidence:</strong> <span class="detection-confidence">\${confidence}%</span><br>
+                            <strong>Region:</strong> \${detection.region_index + 1}<br>
+                            <strong>Time:</strong> \${timestamp}
+                        </div>
+                        <div class="frame-ref">
+                            Frame: \${detection.frame_id.substring(0, 8)}...
+                        </div>
+                    \`;
+                    
+                    regionsContainer.appendChild(card);
+                });
+                
+            } catch (error) {
+                console.error('Error loading high-confidence detections:', error);
+                document.getElementById('regions').innerHTML = 
+                    '<div style="color: red; text-align: center;">Error loading high-confidence detections. Check console for details.</div>';
+            }
+        }
+        
+        async function loadDetectionResults(regionId) {
+            try {
+                const response = await fetch(\`/api/detection-results/\${regionId}\`);
+                const results = await response.json();
+                
+                const resultsDiv = document.getElementById(\`detection-results-\${regionId}\`);
+                
+                if (results.detections && results.detections.length > 0) {
+                    let html = \`<strong>🎯 Objects Found (\${results.detections.length}):</strong><br>\`;
+                    results.detections.forEach(detection => {
+                        const confidence = (detection.confidence * 100).toFixed(1);
+                        html += \`<div class="detection-item">
+                            \${detection.class_name} - <span class="detection-confidence">\${confidence}%</span>
+                        </div>\`;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="no-detections">No objects detected</div>';
+                }
+            } catch (error) {
+                console.error('Error loading detection results:', error);
+                const resultsDiv = document.getElementById(\`detection-results-\${regionId}\`);
+                resultsDiv.innerHTML = '<div class="no-detections">Error loading results</div>';
             }
         }
         
@@ -272,49 +446,54 @@ app.get('/', (req, res) => {
     `);
 });
 
-// API endpoint to get all consolidated regions from all frames
-app.get('/api/regions', async (req, res) => {
+// API endpoint to get individual object detections
+app.get('/api/objects', async (req, res) => {
     try {
-        console.log('🔍 Fetching frames from MongoDB...');
-        const collection = db.collection('captured_frames');
-        const frames = await collection.find({})
-            .sort({ timestamp: 1 }) // FIFO order
-            .toArray();
+        console.log('🔍 Fetching individual object detections...');
+        const detectionCollection = db.collection('region_detections');
         
-        console.log(`📊 Found ${frames.length} frames in MongoDB`);
+        // Get all regions that have detections
+        const regionsWithDetections = await detectionCollection.find({
+            detection_count: { $gt: 0 }
+        }).sort({ timestamp: 1 }).toArray();
         
-        const regions = [];
-        let regionIdCounter = 0;
+        console.log(`📊 Found ${regionsWithDetections.length} regions with detections`);
         
-        frames.forEach((frame, frameIndex) => {
-            const consolidatedRegions = frame.metadata?.consolidated_regions || [];
-            console.log(`Frame ${frameIndex + 1}: ${frame._id} has ${consolidatedRegions.length} consolidated regions`);
+        const objects = [];
+        
+        regionsWithDetections.forEach(regionData => {
+            const regionId = regionData.region_id;
+            const [frameId, regionIndex] = regionId.split('_');
             
-            consolidatedRegions.forEach((region, index) => {
-                console.log(`  Region ${index}: ${region.width}x${region.height} at (${region.x}, ${region.y})`);
-                regions.push({
-                    id: `${frame._id}_${index}`,
-                    frameId: frame._id,
-                    regionIndex: index,
-                    totalRegions: consolidatedRegions.length,
-                    x: region.x,
-                    y: region.y,
-                    width: region.width,
-                    height: region.height,
-                    timestamp: frame.timestamp
+            // Create individual object cards for each detection
+            regionData.detections.forEach((detection, detectionIndex) => {
+                const objectId = `${regionId}_obj_${detectionIndex}`;
+                
+                objects.push({
+                    id: objectId,
+                    regionId: regionId,
+                    frameId: frameId,
+                    regionIndex: parseInt(regionIndex),
+                    detectionIndex: detectionIndex,
+                    objectClass: detection.class_name,
+                    displayName: detection.display_name || detection.class_name,
+                    confidence: detection.confidence,
+                    bbox: detection.bbox,
+                    regionMetadata: regionData.region_metadata,
+                    timestamp: regionData.timestamp
                 });
             });
         });
         
-        console.log(`✅ Total consolidated regions extracted: ${regions.length}`);
+        console.log(`✅ Returning ${objects.length} individual object detections`);
         
         res.json({ 
-            regions: regions,
-            frameCount: frames.length
+            objects: objects,
+            regionCount: regionsWithDetections.length
         });
     } catch (error) {
-        console.error('❌ Error fetching regions:', error);
-        res.status(500).json({ error: 'Failed to fetch regions' });
+        console.error('❌ Error fetching object detections:', error);
+        res.status(500).json({ error: 'Failed to fetch object detections' });
     }
 });
 
@@ -348,7 +527,7 @@ app.get('/api/region-image/:regionId', async (req, res) => {
         
         // Generate region image using Python script
         const { spawn } = require('child_process');
-        const pythonScript = path.resolve(__dirname, 'extract_region.py');
+        const pythonScript = path.resolve(__dirname, '..', 'src', 'image_detection', 'extract_region.py');
         
         console.log(`🔍 Attempting to extract region ${regionId}`);
         console.log(`📄 Python script: ${pythonScript}`);
@@ -400,59 +579,343 @@ app.get('/api/region-image/:regionId', async (req, res) => {
     }
 });
 
-// API endpoint to serve frame thumbnail (with motion detection boxes)
-app.get('/api/frame-thumbnail/:regionId', async (req, res) => {
+// API endpoint to serve frame thumbnail with highlighted region
+app.get('/api/frame-thumbnail/:objectId', async (req, res) => {
     try {
-        const { regionId } = req.params;
-        const [frameId] = regionId.split('_');
+        const { objectId } = req.params;
         
-        const collection = db.collection('captured_frames');
-        const frame = await collection.findOne({ _id: frameId });
+        // Check if highlighted frame already exists
+        const highlightedPath = path.resolve(__dirname, '..', 'data', 'highlighted_frames', `${objectId}_highlighted_frame.jpg`);
         
-        if (!frame) {
-            return res.status(404).send('Frame not found');
+        if (fs.existsSync(highlightedPath)) {
+            console.log(`✅ Serving highlighted frame: ${objectId}`);
+            res.sendFile(highlightedPath);
+            return;
         }
         
-        // Use processed image path (with motion detection boxes) instead of original
-        const imagePath = frame.processed_image_path || frame.original_image_path;
-        if (!imagePath) {
-            return res.status(404).send('No processed image path found');
-        }
+        // Generate highlighted frame using Python script
+        const { spawn } = require('child_process');
+        const venvPython = path.resolve(__dirname, '..', 'venv', 'bin', 'python');
+        const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const scriptPath = path.resolve(__dirname, '..', 'src', 'image_detection', 'highlight_region_in_frame.py');
         
-        const absolutePath = path.resolve(__dirname, '..', imagePath);
+        console.log(`🔍 Generating highlighted frame for ${objectId}`);
         
-        if (!fs.existsSync(absolutePath)) {
-            console.log(`❌ Processed image not found: ${absolutePath}, trying original...`);
+        if (!fs.existsSync(scriptPath)) {
+            // Fallback to regular processed frame
+            const regionId = objectId.split('_obj_')[0];
+            const [frameId] = regionId.split('_');
             
-            // Fallback to original if processed doesn't exist
-            const originalPath = frame.original_image_path;
-            if (originalPath) {
-                const originalAbsolutePath = path.resolve(__dirname, '..', originalPath);
-                if (fs.existsSync(originalAbsolutePath)) {
-                    res.sendFile(originalAbsolutePath);
+            const collection = db.collection('captured_frames');
+            const frame = await collection.findOne({ _id: frameId });
+            
+            if (frame && frame.processed_image_path) {
+                const absolutePath = path.resolve(__dirname, '..', frame.processed_image_path);
+                if (fs.existsSync(absolutePath)) {
+                    res.sendFile(absolutePath);
                     return;
                 }
             }
             
-            return res.status(404).send('Motion detection image file not found');
+            return res.status(404).send('Highlight script not found and no fallback available');
         }
         
-        console.log(`✅ Serving motion detection frame: ${frameId}`);
-        res.sendFile(absolutePath);
+        const pythonProcess = spawn(pythonCmd, [scriptPath, objectId], {
+            cwd: __dirname,
+            stdio: 'pipe'
+        });
+        
+        pythonProcess.stdout.on('data', (data) => {
+            console.log(`Highlight generation: ${data}`);
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+            console.error(`Highlight generation error: ${data}`);
+        });
+        
+        pythonProcess.on('close', (code) => {
+            if (code === 0 && fs.existsSync(highlightedPath)) {
+                console.log(`✅ Highlighted frame generated: ${objectId}`);
+                res.sendFile(highlightedPath);
+            } else {
+                console.log(`❌ Highlight generation failed: ${objectId}`);
+                
+                // Fallback to regular processed frame
+                const regionId = objectId.split('_obj_')[0];
+                const [frameId] = regionId.split('_');
+                
+                db.collection('captured_frames').findOne({ _id: frameId }).then(frame => {
+                    if (frame && frame.processed_image_path) {
+                        const absolutePath = path.resolve(__dirname, '..', frame.processed_image_path);
+                        if (fs.existsSync(absolutePath)) {
+                            res.sendFile(absolutePath);
+                        } else {
+                            res.status(404).send('Could not generate highlighted frame');
+                        }
+                    } else {
+                        res.status(404).send('Could not generate highlighted frame');
+                    }
+                });
+            }
+        });
+        
+        pythonProcess.on('error', (error) => {
+            console.error(`Highlight process error: ${error}`);
+            res.status(500).send(`Highlight generation error: ${error.message}`);
+        });
         
     } catch (error) {
-        console.error('Error serving frame thumbnail:', error);
-        res.status(500).send('Error serving frame thumbnail');
+        console.error('Error serving highlighted frame:', error);
+        res.status(500).send('Error serving highlighted frame');
+    }
+});
+
+// API endpoint to run batch detection on all regions
+app.post('/api/batch-detection', async (req, res) => {
+    try {
+        console.log(`🚀 Starting batch detection on all regions`);
+        
+        // Run the batch detection Python script
+        const { spawn } = require('child_process');
+        const venvPython = path.resolve(__dirname, '..', 'venv', 'bin', 'python');
+        const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const scriptPath = path.resolve(__dirname, '..', 'src', 'image_detection', 'batch_detect_regions.py');
+        
+        if (!fs.existsSync(scriptPath)) {
+            return res.status(500).json({ success: false, error: 'Batch detection script not found' });
+        }
+        
+        const pythonProcess = spawn(pythonCmd, [scriptPath], {  // Uses config file for thresholds
+            cwd: __dirname,
+            stdio: 'pipe'
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        pythonProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+            console.log(`Batch detection: ${data}`);
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+            console.error(`Batch detection stderr: ${data}`);
+        });
+        
+        pythonProcess.on('close', (code) => {
+            if (code === 0) {
+                console.log(`✅ Batch detection completed successfully`);
+                
+                // Parse results from stdout to get counts
+                const processedMatch = stdout.match(/Processed (\d+)\/\d+ regions/);
+                const highConfMatch = stdout.match(/Found (\d+) high-confidence detections/);
+                
+                const processed = processedMatch ? parseInt(processedMatch[1]) : 0;
+                const highConfidence = highConfMatch ? parseInt(highConfMatch[1]) : 0;
+                
+                res.json({ 
+                    success: true, 
+                    message: 'Batch detection completed',
+                    processed: processed,
+                    highConfidence: highConfidence
+                });
+            } else {
+                console.log(`❌ Batch detection failed with code ${code}`);
+                res.status(500).json({ success: false, error: `Batch detection failed with exit code ${code}` });
+            }
+        });
+        
+        pythonProcess.on('error', (error) => {
+            console.error(`Batch detection process error: ${error}`);
+            res.status(500).json({ success: false, error: error.message });
+        });
+        
+    } catch (error) {
+        console.error('Error running batch detection:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API endpoint to get detection results for a region
+app.get('/api/detection-results/:regionId', async (req, res) => {
+    try {
+        const { regionId } = req.params;
+        
+        // First try to get from MongoDB
+        const collection = db.collection('region_detections');
+        const mongoResults = await collection.findOne({ region_id: regionId });
+        
+        if (mongoResults) {
+            res.json(mongoResults);
+            return;
+        }
+        
+        // Fallback to JSON file
+        const resultsPath = path.resolve(__dirname, '..', 'data', 'regions', `${regionId}_results.json`);
+        
+        if (fs.existsSync(resultsPath)) {
+            const fileContent = fs.readFileSync(resultsPath, 'utf8');
+            const results = JSON.parse(fileContent);
+            res.json(results);
+        } else {
+            res.status(404).json({ error: 'Detection results not found' });
+        }
+        
+    } catch (error) {
+        console.error('Error getting detection results:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API endpoint to serve detection overlay images
+app.get('/api/detection-overlay/:regionId', async (req, res) => {
+    try {
+        const { regionId } = req.params;
+        
+        // Check for detection overlay image
+        const overlayPath = path.resolve(__dirname, '..', 'data', 'regions', `${regionId}_detection.jpg`);
+        
+        if (fs.existsSync(overlayPath)) {
+            console.log(`✅ Serving detection overlay: ${regionId}`);
+            res.sendFile(overlayPath);
+        } else {
+            // Fallback to original region image
+            const originalPath = path.resolve(__dirname, '..', 'data', 'regions', `${regionId}.jpg`);
+            if (fs.existsSync(originalPath)) {
+                res.sendFile(originalPath);
+            } else {
+                res.status(404).send('Detection overlay not found');
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error serving detection overlay:', error);
+        res.status(500).send('Error serving detection overlay');
+    }
+});
+
+// API endpoint to get high-confidence detections
+app.get('/api/high-confidence-detections', async (req, res) => {
+    try {
+        const collection = db.collection('high_confidence_detections');
+        const detections = await collection.find({})
+            .sort({ timestamp: 1 })  // FIFO order
+            .toArray();
+            
+        res.json({ detections });
+    } catch (error) {
+        console.error('Error fetching high-confidence detections:', error);
+        res.status(500).json({ error: 'Failed to fetch high-confidence detections' });
+    }
+});
+
+// API endpoint to serve detection images for individual high-confidence detections
+app.get('/api/detection-image/:detectionId', async (req, res) => {
+    try {
+        const { detectionId } = req.params;
+        
+        // Parse detection ID to get region ID
+        const regionId = detectionId.split('_det_')[0];
+        
+        // Check for detection overlay image
+        const overlayPath = path.resolve(__dirname, '..', 'data', 'regions', `${regionId}_detection.jpg`);
+        
+        if (fs.existsSync(overlayPath)) {
+            console.log(`✅ Serving detection image: ${detectionId}`);
+            res.sendFile(overlayPath);
+        } else {
+            // Fallback to original region image
+            const originalPath = path.resolve(__dirname, '..', 'data', 'regions', `${regionId}.jpg`);
+            if (fs.existsSync(originalPath)) {
+                res.sendFile(originalPath);
+            } else {
+                res.status(404).send('Detection image not found');
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error serving detection image:', error);
+        res.status(500).send('Error serving detection image');
+    }
+});
+
+// API endpoint to serve individual object images (cropped to bounding box)
+app.get('/api/object-image/:objectId', async (req, res) => {
+    try {
+        const { objectId } = req.params;
+        
+        // Parse object ID: regionId_obj_detectionIndex
+        const parts = objectId.split('_obj_');
+        if (parts.length !== 2) {
+            return res.status(400).send('Invalid object ID format');
+        }
+        
+        const regionId = parts[0];
+        const detectionIndex = parseInt(parts[1]);
+        
+        console.log(`🔍 Extracting object ${objectId} (region: ${regionId}, detection: ${detectionIndex})`);
+        
+        // Check if object image already exists
+        const objectImagePath = path.resolve(__dirname, '..', 'data', 'objects', `${objectId}.jpg`);
+        
+        if (fs.existsSync(objectImagePath)) {
+            console.log(`✅ Serving cached object image: ${objectId}`);
+            res.sendFile(objectImagePath);
+            return;
+        }
+        
+        // Generate object image using Python script
+        const { spawn } = require('child_process');
+        const venvPython = path.resolve(__dirname, '..', 'venv', 'bin', 'python');
+        const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const scriptPath = path.resolve(__dirname, '..', 'src', 'image_detection', 'extract_object.py');
+        
+        if (!fs.existsSync(scriptPath)) {
+            return res.status(500).send('Object extraction script not found');
+        }
+        
+        const pythonProcess = spawn(pythonCmd, [scriptPath, objectId], {
+            cwd: __dirname,
+            stdio: 'pipe'
+        });
+        
+        pythonProcess.stdout.on('data', (data) => {
+            console.log(`Object extraction: ${data}`);
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+            console.error(`Object extraction error: ${data}`);
+        });
+        
+        pythonProcess.on('close', (code) => {
+            if (code === 0 && fs.existsSync(objectImagePath)) {
+                console.log(`✅ Object extracted successfully: ${objectId}`);
+                res.sendFile(objectImagePath);
+            } else {
+                console.log(`❌ Object extraction failed: ${objectId}`);
+                res.status(404).send('Could not extract object');
+            }
+        });
+        
+        pythonProcess.on('error', (error) => {
+            console.error(`Object extraction process error: ${error}`);
+            res.status(500).send(`Object extraction error: ${error.message}`);
+        });
+        
+    } catch (error) {
+        console.error('Error serving object image:', error);
+        res.status(500).send('Error serving object image');
     }
 });
 
 // Fallback endpoint for missing images
-app.get('/api/fallback/:regionId', (req, res) => {
+app.get('/api/fallback/:objectId', (req, res) => {
     res.send(`
         <svg width="280" height="150" xmlns="http://www.w3.org/2000/svg">
             <rect width="100%" height="100%" fill="#333"/>
             <text x="50%" y="50%" text-anchor="middle" fill="white" font-family="Arial" font-size="12">
-                Region not found
+                Object not found
             </text>
         </svg>
     `);
