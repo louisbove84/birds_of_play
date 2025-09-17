@@ -42,18 +42,18 @@ std::string save_frame_to_mongodb(const cv::Mat& frame, const std::string& metad
         
         // Import our MongoDB modules
         py::module db_manager_module = py::module::import("mongodb.database_manager");
-        py::module frame_db_module = py::module::import("mongodb.frame_database");
+        py::module frame_db_v2_module = py::module::import("mongodb.frame_database_v2");
         
         // Get the classes
         py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
-        py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+        py::object FrameDatabaseV2 = frame_db_v2_module.attr("FrameDatabaseV2");
         
         // Create database manager and connect
         py::object db_manager = DatabaseManager();
         db_manager.attr("connect")();
         
-        // Create frame database
-        py::object frame_db = FrameDatabase(db_manager);
+        // Create frame database V2 with file storage (default path: data/frames)
+        py::object frame_db = FrameDatabaseV2(db_manager, py::str("data/frames"));
         
         // Convert metadata JSON to Python dict
         py::module json = py::module::import("json");
@@ -95,18 +95,18 @@ std::string save_frames_to_mongodb(const cv::Mat& original_frame, const cv::Mat&
         
         // Import our MongoDB modules
         py::module db_manager_module = py::module::import("mongodb.database_manager");
-        py::module frame_db_module = py::module::import("mongodb.frame_database");
+        py::module frame_db_v2_module = py::module::import("mongodb.frame_database_v2");
         
         // Get the classes
         py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
-        py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+        py::object FrameDatabaseV2 = frame_db_v2_module.attr("FrameDatabaseV2");
         
         // Create database manager and connect
         py::object db_manager = DatabaseManager();
         db_manager.attr("connect")();
         
-        // Create frame database
-        py::object frame_db = FrameDatabase(db_manager);
+        // Create frame database V2 with file storage (default path: data/frames)
+        py::object frame_db = FrameDatabaseV2(db_manager, py::str("data/frames"));
         
         // Convert metadata JSON to Python dict
         py::module json = py::module::import("json");

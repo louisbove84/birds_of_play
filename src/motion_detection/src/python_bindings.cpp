@@ -89,9 +89,12 @@ PYBIND11_MODULE(birds_of_play_python, m) {
         .def("reset", &MotionProcessorWrapper::reset, "Reset the processor state")
         .def("get_last_result", &MotionProcessorWrapper::get_last_result, "Get the last processing result");
     
-    // Function to save frames directly to MongoDB
-    m.def("save_frame_to_mongodb", [](const cv::Mat& frame, const std::string& metadata_json) {
+    // Function to save frames directly to MongoDB with file storage and thumbnails
+    m.def("save_frame_to_mongodb", [](py::array_t<unsigned char>& frame_array, const std::string& metadata_json) {
         try {
+            // Convert numpy array to cv::Mat first
+            cv::Mat frame = numpy_to_cv_mat(frame_array);
+            
             // Import Python modules
             py::module sys = py::module::import("sys");
             py::module os = py::module::import("os");
@@ -102,18 +105,18 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             
             // Import our MongoDB modules
             py::module db_manager_module = py::module::import("mongodb.database_manager");
-            py::module frame_db_module = py::module::import("mongodb.frame_database");
+            py::module frame_db_v2_module = py::module::import("mongodb.frame_database_v2");
             
             // Get the classes
             py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
-            py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+            py::object FrameDatabaseV2 = frame_db_v2_module.attr("FrameDatabaseV2");
             
             // Create database manager and connect
             py::object db_manager = DatabaseManager();
             db_manager.attr("connect")();
             
-            // Create frame database
-            py::object frame_db = FrameDatabase(db_manager);
+            // Create frame database V2 with file storage (default path: data/frames)
+            py::object frame_db = FrameDatabaseV2(db_manager, py::str("data/frames"));
             
             // Convert metadata JSON to Python dict
             py::module json = py::module::import("json");
@@ -122,7 +125,7 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             // Convert cv::Mat to numpy array for Python
             py::array_t<unsigned char> numpy_frame = cv_mat_to_numpy(frame);
             
-            // Save frame
+            // Save frame with automatic thumbnail generation and file storage
             py::object result = frame_db.attr("save_frame")(numpy_frame, metadata);
             
             // Disconnect
@@ -137,11 +140,15 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             std::cerr << "C++ error: " << e.what() << std::endl;
             return std::string("");
         }
-    }, "Save a frame directly to MongoDB");
+    }, "Save a frame directly to MongoDB with file storage and thumbnails");
     
-    // Function to save both original and processed frames to MongoDB
-    m.def("save_frames_to_mongodb", [](const cv::Mat& original_frame, const cv::Mat& processed_frame, const std::string& metadata_json) {
+    // Function to save both original and processed frames to MongoDB with file storage and thumbnails
+    m.def("save_frames_to_mongodb", [](py::array_t<unsigned char>& original_frame_array, py::array_t<unsigned char>& processed_frame_array, const std::string& metadata_json) {
         try {
+            // Convert numpy arrays to cv::Mat first
+            cv::Mat original_frame = numpy_to_cv_mat(original_frame_array);
+            cv::Mat processed_frame = numpy_to_cv_mat(processed_frame_array);
+            
             // Import Python modules
             py::module sys = py::module::import("sys");
             py::module os = py::module::import("os");
@@ -152,18 +159,18 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             
             // Import our MongoDB modules
             py::module db_manager_module = py::module::import("mongodb.database_manager");
-            py::module frame_db_module = py::module::import("mongodb.frame_database");
+            py::module frame_db_v2_module = py::module::import("mongodb.frame_database_v2");
             
             // Get the classes
             py::object DatabaseManager = db_manager_module.attr("DatabaseManager");
-            py::object FrameDatabase = frame_db_module.attr("FrameDatabase");
+            py::object FrameDatabaseV2 = frame_db_v2_module.attr("FrameDatabaseV2");
             
             // Create database manager and connect
             py::object db_manager = DatabaseManager();
             db_manager.attr("connect")();
             
-            // Create frame database
-            py::object frame_db = FrameDatabase(db_manager);
+            // Create frame database V2 with file storage (default path: data/frames)
+            py::object frame_db = FrameDatabaseV2(db_manager, py::str("data/frames"));
             
             // Convert metadata JSON to Python dict
             py::module json = py::module::import("json");
@@ -173,7 +180,7 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             py::array_t<unsigned char> numpy_original = cv_mat_to_numpy(original_frame);
             py::array_t<unsigned char> numpy_processed = cv_mat_to_numpy(processed_frame);
             
-            // Save both frames
+            // Save both frames with automatic thumbnail generation and file storage
             py::object result = frame_db.attr("save_frame_with_original")(numpy_original, numpy_processed, metadata);
             
             // Disconnect
@@ -188,5 +195,5 @@ PYBIND11_MODULE(birds_of_play_python, m) {
             std::cerr << "C++ error: " << e.what() << std::endl;
             return std::string("");
         }
-    }, "Save both original and processed frames to MongoDB");
+    }, "Save both original and processed frames to MongoDB with file storage and thumbnails");
 }

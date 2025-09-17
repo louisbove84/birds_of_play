@@ -118,6 +118,11 @@ class ImageDetectionProcessor:
         # Store results in MongoDB
         stored_count = self.detection_db.store_detection_results(frame_results)
         
+        # Clean up full-resolution images after processing to save disk space
+        # Keep thumbnails for quick preview in web browsers
+        if stored_count > 0:
+            self._cleanup_processed_frames(frame_results)
+        
         end_time = datetime.now(timezone.utc)
         
         # Create summary
@@ -138,6 +143,33 @@ class ImageDetectionProcessor:
         print(f"📈 Success rate: {summary.success_rate:.1%}")
         
         return summary
+    
+    def _cleanup_processed_frames(self, frame_results: List[FrameDetectionResult]):
+        """
+        Clean up full-resolution images after they've been processed.
+        This saves disk space while keeping thumbnails for quick preview.
+        
+        Args:
+            frame_results: List of processed frame results
+        """
+        try:
+            from mongodb.frame_database_v2 import FrameDatabaseV2
+            frame_db_v2 = FrameDatabaseV2(self.frame_db.db_manager)
+            
+            cleanup_count = 0
+            for frame_result in frame_results:
+                if frame_result.processing_success:
+                    cleanup_success = frame_db_v2.cleanup_after_processing(
+                        frame_result.frame_uuid, keep_thumbnails=True
+                    )
+                    if cleanup_success:
+                        cleanup_count += 1
+            
+            if cleanup_count > 0:
+                print(f"🧹 Cleaned up full-resolution images for {cleanup_count} frames (thumbnails kept)")
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to cleanup processed frames: {e}")
     
     def process_single_frame(self, frame_data: Dict[str, Any]) -> FrameDetectionResult:
         """

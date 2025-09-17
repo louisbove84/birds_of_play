@@ -228,11 +228,25 @@ int main(int argc, char** argv) {
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
         }
         
-        // Create MongoDB frame (clean frame with only consolidated regions when needed)
+        // Create MongoDB frame (clean frame with individual motion detections and consolidated regions)
         cv::Mat mongoFrame;
         if (saveOnlyConsolidatedRegions && !consolidatedRegions.empty()) {
-            // For MongoDB: clean frame with only consolidated regions in red
+            // For MongoDB: clean frame with both individual motion detections and consolidated regions
             mongoFrame = frame.clone();
+            
+            // Draw individual motion detections in gray (lower priority)
+            for (size_t i = 0; i < processingResult.detectedBounds.size(); ++i) {
+                const auto& bounds = processingResult.detectedBounds[i];
+                cv::Scalar color = cv::Scalar(200, 200, 200); // Light gray for individual motion detections (BGR format)
+                cv::rectangle(mongoFrame, bounds, color, 1);
+                
+                // Add motion detection label
+                std::string info = "M:" + std::to_string(i);
+                cv::putText(mongoFrame, info, cv::Point(bounds.x, bounds.y - 5),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.4, color, 1);
+            }
+            
+            // Draw consolidated regions in red (higher priority - drawn on top)
             for (size_t i = 0; i < consolidatedRegions.size(); ++i) {
                 const auto& region = consolidatedRegions[i];
                 cv::Scalar regionColor = cv::Scalar(0, 0, 255); // Red for consolidated regions (BGR format)
