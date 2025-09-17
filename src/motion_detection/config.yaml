@@ -75,7 +75,7 @@ max_frames_without_update: 10        # Max frames before removing region
 min_region_area: 200.0               # Min area for consolidated region
 max_region_area: 1000000.0           # Max area for consolidated region (640x640 = 409,600)
 region_expansion_factor: 1.1         # Factor to expand bounding box
-ideal_model_region_size: 640         # Ideal region size for YOLOv11
+push: 640         # Ideal region size for YOLOv11
 size_tolerance_percent: 30           # Size tolerance percentage (regions within this % of ideal size are kept as-is)
 
 # MongoDB Configuration

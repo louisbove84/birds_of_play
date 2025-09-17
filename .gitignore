@@ -52,6 +52,15 @@ Thumbs.db
 # Test output files
 motion_frame_*.jpg
 saved_detection_frame_*.jpg
-*.log # YOLO model files
+*.log
+
+# YOLO model files
 *.pt
 yolo11*.pt
+
+# Generated data files (should not be in version control)
+data/frames/
+data/regions/
+data/objects/
+data/highlighted_frames/
+data/visualizations/

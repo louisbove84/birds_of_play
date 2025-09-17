@@ -218,6 +218,10 @@ app.get('/', (req, res) => {
             </a>
             <span class="nav-separator">|</span>
             <span class="nav-current">🎯 Object Detections</span>
+            <span class="nav-separator">|</span>
+            <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
+                🔬 Bird Clustering
+            </a>
         </nav>
         
         <div class="controls" style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">

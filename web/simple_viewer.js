@@ -145,6 +145,10 @@ app.get('/', (req, res) => {
             <a href="http://localhost:3001" class="nav-link" target="_self">
                 🎯 Object Detections
             </a>
+            <span class="nav-separator">|</span>
+            <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
+                🔬 Bird Clustering
+            </a>
         </nav>
         
         <div class="stats" id="stats">Loading...</div>
