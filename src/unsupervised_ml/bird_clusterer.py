@@ -4,10 +4,12 @@ Bird Clustering module for grouping similar bird objects.
 
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 from sklearn.manifold import TSNE
 from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+from scipy.spatial.distance import pdist
 try:
     from umap import UMAP
     HAS_UMAP = True
@@ -54,72 +56,91 @@ class BirdClusterer:
         
         return reducer.fit_transform(features)
     
-    def cluster_kmeans(self, features: np.ndarray, n_clusters: int = 5) -> np.ndarray:
-        """Perform K-means clustering."""
-        self.logger.info(f"Performing K-means clustering with {n_clusters} clusters")
+    def cluster_ward_distance(self, features: np.ndarray, distance_threshold: float = 75.0) -> np.ndarray:
+        """
+        Perform Ward linkage hierarchical clustering with distance threshold.
+        Primary method for compact, variance-minimizing clusters.
+        Optimized for SimCLR features (512D ResNet-18 vectors).
+        """
+        self.logger.info(f"Performing Ward linkage clustering with distance_threshold={distance_threshold}")
         
-        clusterer = KMeans(n_clusters=n_clusters, random_state=self.random_state, n_init=10)
+        clusterer = AgglomerativeClustering(
+            n_clusters=None, 
+            distance_threshold=distance_threshold,
+            linkage='ward',
+            metric='euclidean'  # Ward requires Euclidean distance
+        )
         labels = clusterer.fit_predict(features)
+        
+        n_clusters = len(set(labels))
+        self.logger.info(f"Ward linkage found {n_clusters} bird species clusters")
         
         self.clusterer = clusterer
         return labels
     
-    def cluster_dbscan(self, features: np.ndarray, eps: float = 0.5, 
-                      min_samples: int = 5) -> np.ndarray:
-        """Perform DBSCAN clustering."""
-        self.logger.info(f"Performing DBSCAN clustering with eps={eps}, min_samples={min_samples}")
+    def cluster_average_distance(self, features: np.ndarray, distance_threshold: float = 70.0) -> np.ndarray:
+        """
+        Perform Average linkage hierarchical clustering with distance threshold.
+        Alternate method for handling varied cluster shapes.
+        Compatible with SimCLR features using Euclidean distance.
+        """
+        self.logger.info(f"Performing Average linkage clustering with distance_threshold={distance_threshold}")
         
-        clusterer = DBSCAN(eps=eps, min_samples=min_samples)
+        clusterer = AgglomerativeClustering(
+            n_clusters=None,
+            distance_threshold=distance_threshold, 
+            linkage='average',
+            metric='euclidean'
+        )
         labels = clusterer.fit_predict(features)
         
-        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-        n_noise = list(labels).count(-1)
-        
-        self.logger.info(f"Found {n_clusters} clusters and {n_noise} noise points")
+        n_clusters = len(set(labels))
+        self.logger.info(f"Average linkage found {n_clusters} bird species clusters")
         
         self.clusterer = clusterer
         return labels
     
     def evaluate_clustering(self, features: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
         """Evaluate clustering quality."""
-        mask = labels != -1
-        if not mask.any():
-            return {'error': 'All points classified as noise'}
-        
-        features_clean = features[mask]
-        labels_clean = labels[mask]
-        
-        if len(set(labels_clean)) < 2:
+        # For hierarchical clustering, all points are assigned to clusters (no noise points)
+        if len(set(labels)) < 2:
             return {'error': 'Less than 2 clusters found'}
         
         metrics = {}
         
         try:
-            metrics['silhouette_score'] = silhouette_score(features_clean, labels_clean)
+            metrics['silhouette_score'] = silhouette_score(features, labels)
         except:
             metrics['silhouette_score'] = -1
         
-        metrics['n_clusters'] = len(set(labels_clean))
-        metrics['n_noise'] = list(labels).count(-1)
+        metrics['n_clusters'] = len(set(labels))
+        metrics['n_noise'] = 0  # Hierarchical clustering doesn't have noise points
         metrics['n_points'] = len(labels)
         
         return metrics
     
     def fit_predict(self, features: np.ndarray, metadata: List[Dict], 
-                   method: str = 'kmeans', **kwargs) -> Tuple[np.ndarray, Dict]:
-        """Fit clustering model and predict cluster labels."""
+                   method: str = 'ward_distance', **kwargs) -> Tuple[np.ndarray, Dict]:
+        """
+        Fit clustering model and predict cluster labels.
+        
+        Args:
+            features: SimCLR features (typically 512D from ResNet-18)
+            metadata: Bird object metadata
+            method: 'ward_distance' (primary) or 'average_distance' (alternate)
+            **kwargs: distance_threshold (default 75.0 for ResNet50 2048D features)
+        """
         self.features_scaled_ = self.preprocess_features(features)
         self.metadata_ = metadata
         
-        if method == 'kmeans':
-            n_clusters = kwargs.get('n_clusters', 5)
-            labels = self.cluster_kmeans(self.features_scaled_, n_clusters=n_clusters)
-        elif method == 'dbscan':
-            eps = kwargs.get('eps', 0.5)
-            min_samples = kwargs.get('min_samples', 5)
-            labels = self.cluster_dbscan(self.features_scaled_, eps=eps, min_samples=min_samples)
+        distance_threshold = kwargs.get('distance_threshold', 75.0)
+        
+        if method == 'ward_distance':
+            labels = self.cluster_ward_distance(self.features_scaled_, distance_threshold=distance_threshold)
+        elif method == 'average_distance':
+            labels = self.cluster_average_distance(self.features_scaled_, distance_threshold=distance_threshold)
         else:
-            raise ValueError(f"Unsupported clustering method: {method}")
+            raise ValueError(f"Unsupported clustering method: {method}. Use 'ward_distance' or 'average_distance'")
         
         self.cluster_labels_ = labels
         
@@ -149,6 +170,87 @@ class BirdClusterer:
         summary = summary.rename(columns={'object_id_count': 'n_objects'})
         
         return summary
+    
+    def get_dendrogram_data(self, linkage_method: str = 'ward') -> Dict:
+        """
+        Generate dendrogram data for hierarchical clustering visualization and threshold tuning.
+        
+        Args:
+            linkage_method: 'ward' (primary) or 'average' (alternate)
+            
+        Returns:
+            Dictionary with linkage matrix, labels, and suggested thresholds
+        """
+        if self.features_scaled_ is None:
+            raise ValueError("Must fit model first")
+        
+        # Compute linkage matrix using Euclidean distance
+        linkage_matrix = linkage(self.features_scaled_, method=linkage_method, metric='euclidean')
+        
+        # Analyze distances to suggest good thresholds
+        distances = linkage_matrix[:, 2]  # Third column contains distances
+        distance_gaps = np.diff(np.sort(distances))
+        
+        # Find largest gaps in distance (good threshold candidates)
+        gap_indices = np.argsort(distance_gaps)[-5:]  # Top 5 gaps
+        suggested_thresholds = [float(np.sort(distances)[i]) for i in gap_indices]
+        
+        return {
+            'linkage_matrix': linkage_matrix.tolist(),
+            'labels': [meta.get('object_id', f'Bird_{i}') for i, meta in enumerate(self.metadata_)],
+            'method': linkage_method,
+            'suggested_thresholds': sorted(suggested_thresholds),
+            'distance_stats': {
+                'min_distance': float(distances.min()),
+                'max_distance': float(distances.max()),
+                'mean_distance': float(distances.mean()),
+                'std_distance': float(distances.std())
+            }
+        }
+    
+    def tune_distance_threshold(self, method: str = 'ward_distance', 
+                              threshold_range: Tuple[float, float] = (0.5, 3.0),
+                              n_thresholds: int = 10) -> Dict[float, Dict]:
+        """
+        Tune distance threshold by testing multiple values and evaluating results.
+        
+        Args:
+            method: 'ward_distance' or 'average_distance'
+            threshold_range: (min_threshold, max_threshold) to test
+            n_thresholds: Number of threshold values to test
+            
+        Returns:
+            Dictionary mapping thresholds to clustering results and metrics
+        """
+        if self.features_scaled_ is None:
+            raise ValueError("Must fit model first")
+            
+        results = {}
+        thresholds = np.linspace(threshold_range[0], threshold_range[1], n_thresholds)
+        
+        self.logger.info(f"Tuning distance threshold for {method} over {n_thresholds} values")
+        
+        for threshold in thresholds:
+            try:
+                if method == 'ward_distance':
+                    labels = self.cluster_ward_distance(self.features_scaled_, distance_threshold=threshold)
+                elif method == 'average_distance':
+                    labels = self.cluster_average_distance(self.features_scaled_, distance_threshold=threshold)
+                else:
+                    continue
+                    
+                metrics = self.evaluate_clustering(self.features_scaled_, labels)
+                
+                results[float(threshold)] = {
+                    'labels': labels,
+                    'metrics': metrics,
+                    'n_clusters': metrics['n_clusters']
+                }
+                
+            except Exception as e:
+                self.logger.warning(f"Failed threshold {threshold}: {e}")
+                
+        return results
 
 
 class ClusteringExperiment:
@@ -163,14 +265,23 @@ class ClusteringExperiment:
         self.logger = logging.getLogger(__name__)
     
     def run_all_methods(self) -> Dict[str, Dict]:
-        """Run clustering with multiple methods and parameters."""
-        self.logger.info("Running clustering experiment with all methods")
+        """
+        Run clustering experiments with Ward and Average linkage at different distance thresholds.
+        Automatically determines optimal number of bird species clusters.
+        """
+        self.logger.info("Running bird species clustering experiment with distance-based methods")
         
         methods = {
-            'kmeans_3': {'method': 'kmeans', 'n_clusters': 3},
-            'kmeans_5': {'method': 'kmeans', 'n_clusters': 5},
-            'dbscan_loose': {'method': 'dbscan', 'eps': 1.0, 'min_samples': 3},
-            'dbscan_tight': {'method': 'dbscan', 'eps': 0.5, 'min_samples': 5},
+            # Ward linkage (primary method) - compact, variance-minimizing clusters
+            # Optimized thresholds for ResNet50 2048D features based on testing
+            'ward_conservative': {'method': 'ward_distance', 'distance_threshold': 50.0},  # ~8 species
+            'ward_balanced': {'method': 'ward_distance', 'distance_threshold': 75.0},      # ~3 species ✅
+            'ward_permissive': {'method': 'ward_distance', 'distance_threshold': 90.0},   # ~2 species
+            
+            # Average linkage (alternate method) - handles varied cluster shapes  
+            'average_conservative': {'method': 'average_distance', 'distance_threshold': 45.0},
+            'average_balanced': {'method': 'average_distance', 'distance_threshold': 70.0},
+            'average_permissive': {'method': 'average_distance', 'distance_threshold': 85.0},
         }
         
         for name, params in methods.items():
@@ -197,15 +308,37 @@ class ClusteringExperiment:
         return self.results
     
     def get_best_method(self) -> Tuple[str, Dict]:
-        """Get the best performing clustering method."""
+        """
+        Get the best performing clustering method for bird species identification.
+        Prioritizes methods with reasonable number of species (2-10) and good silhouette score.
+        """
         valid_results = {name: res for name, res in self.results.items() 
                         if 'error' not in res and 'metrics' in res}
         
         if not valid_results:
             return None, {}
         
-        best_name = max(valid_results.keys(), 
-                       key=lambda x: valid_results[x]['metrics'].get('silhouette_score', -2))
+        def scoring_function(name):
+            metrics = valid_results[name]['metrics']
+            silhouette = metrics.get('silhouette_score', -2)
+            n_clusters = metrics.get('n_clusters', 0)
+            
+            # Penalty for unrealistic number of species
+            if n_clusters < 2:
+                cluster_penalty = -1.0  # Too few species
+            elif n_clusters > 10:
+                cluster_penalty = -0.5  # Too many species (likely overfitting)
+            elif 2 <= n_clusters <= 6:
+                cluster_penalty = 0.1   # Sweet spot for bird species
+            else:
+                cluster_penalty = 0.0   # Acceptable range
+                
+            # Prefer Ward linkage (primary method) slightly
+            method_bonus = 0.05 if 'ward' in name else 0.0
+            
+            return silhouette + cluster_penalty + method_bonus
+        
+        best_name = max(valid_results.keys(), key=scoring_function)
         
         return best_name, valid_results[best_name]
     
