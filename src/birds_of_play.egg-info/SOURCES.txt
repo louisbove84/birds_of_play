@@ -23,8 +23,10 @@ src/mongodb/test_frame_database.py
 src/mongodb/test_thumbnail_system.py
 src/motion_detection/libs/spdlog/scripts/extract_version.py
 src/unsupervised_ml/__init__.py
-src/unsupervised_ml/bird_clustering.py
-src/unsupervised_ml/cluster_visualization.py
+src/unsupervised_ml/bird_clusterer.py
+src/unsupervised_ml/cluster_analyzer.py
+src/unsupervised_ml/cluster_server.py
+src/unsupervised_ml/cluster_visualizer.py
+src/unsupervised_ml/feature_extractor.py
+src/unsupervised_ml/object_data_manager.py
 src/unsupervised_ml/test_system.py
-src/unsupervised_ml/web/__init__.py
-src/unsupervised_ml/web/cluster_server.py

@@ -134,6 +134,29 @@ performance:
   n_jobs: -1                    # Number of CPU cores (-1 = all available)
 
 # =============================================================================
+# SUPERVISED LEARNING SETTINGS
+# =============================================================================
+supervised_learning:
+  # Training configuration
+  phase1_epochs: 10             # Epochs for frozen backbone training
+  phase1_lr: 0.001             # Learning rate for phase 1
+  phase2_epochs: 5             # Epochs for full fine-tuning
+  phase2_lr: 0.0001           # Learning rate for phase 2
+  
+  # Data splits
+  test_size: 0.2              # Fraction for test set
+  val_size: 0.1               # Fraction for validation set
+  
+  # Model architecture
+  dropout_rate: 0.5           # Dropout rate in classification head
+  hidden_dim: 512             # Hidden layer dimension
+  
+  # Fine-tuning server
+  fine_tuning_port: 3003      # Port for fine-tuning interface
+  low_confidence_threshold: 0.7  # Threshold for low-confidence predictions
+  max_samples_for_labeling: 50   # Maximum samples to show for labeling
+
+# =============================================================================
 # LOGGING SETTINGS  
 # =============================================================================
 logging:
