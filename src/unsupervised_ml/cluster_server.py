@@ -18,6 +18,7 @@ try:
     from feature_extractor import FeatureExtractor, FeaturePipeline
     from bird_clusterer import BirdClusterer, ClusteringExperiment
     from cluster_visualizer import ClusterVisualizer
+    from config_loader import load_clustering_config
 except ImportError as e:
     print(f"Import error: {e}")
     print("Please ensure all dependencies are installed and run from the unsupervised_ml directory")
@@ -25,7 +26,15 @@ except ImportError as e:
 app = Flask(__name__)
 CORS(app)
 
-logging.basicConfig(level=logging.INFO)
+# Load configuration
+try:
+    clustering_config = load_clustering_config()
+    logging.basicConfig(level=getattr(logging, clustering_config.log_level.upper(), logging.INFO))
+except Exception as e:
+    print(f"Warning: Could not load configuration, using defaults: {e}")
+    clustering_config = None
+    logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 # Global variables for caching
@@ -33,19 +42,23 @@ cached_features = None
 cached_metadata = None
 cached_clusterer = None
 cached_visualizer = None
+cached_config = clustering_config
 
 def initialize_system():
     """Initialize the clustering system with data and models."""
-    global cached_features, cached_metadata, cached_clusterer, cached_visualizer
+    global cached_features, cached_metadata, cached_clusterer, cached_visualizer, cached_config
     
     logger.info("Initializing bird clustering system...")
     
     try:
+        # Use configuration for all parameters
+        config = cached_config if cached_config else load_clustering_config()
+        
         with ObjectDataManager() as data_manager:
-            feature_extractor = FeatureExtractor(model_name='resnet50')
+            feature_extractor = FeatureExtractor(model_name=config.model_name)
             pipeline = FeaturePipeline(data_manager, feature_extractor)
             
-            features, metadata = pipeline.extract_all_features(min_confidence=0.7)
+            features, metadata = pipeline.extract_all_features(min_confidence=config.min_confidence)
             
             if len(features) == 0:
                 logger.warning("No bird objects found for clustering")
@@ -56,7 +69,7 @@ def initialize_system():
             
             logger.info(f"Loaded {len(features)} bird objects for clustering")
             
-            experiment = ClusteringExperiment(features, metadata)
+            experiment = ClusteringExperiment(features, metadata, config=config)
             results = experiment.run_all_methods()
             
             best_method, best_result = experiment.get_best_method()
@@ -571,17 +584,24 @@ def create_cluster_dashboard_html(clusters, cluster_stats):
     return html
 
 if __name__ == '__main__':
-    # Don't auto-initialize - let it be done manually via web interface
-    # if '--initialize' in sys.argv:
-    #     print("Auto-initializing system...")
-    #     initialize_system()
+    # Use configuration for server settings
+    config = cached_config if cached_config else load_clustering_config()
     
-    port = 3002
+    # Auto-initialize if configured to do so
+    if config and config.auto_initialize:
+        print("Auto-initializing system...")
+        initialize_system()
+    
+    port = config.port if config else 3002
+    host = config.host if config else '0.0.0.0'
+    debug_mode = config.debug_mode if config else False
+    
     print(f"🔬 Starting Bird Clustering Server on http://localhost:{port}")
     print("📊 Navigate to http://localhost:3002 to explore clustering results")
+    print(f"⚙️  Configuration: auto_initialize={config.auto_initialize if config else False}, debug={debug_mode}")
     
     try:
-        app.run(host='0.0.0.0', port=port, debug=False)  # Disable debug mode for faster startup
+        app.run(host=host, port=port, debug=debug_mode)
     except Exception as e:
         print(f"Error starting server: {e}")
-        print("Make sure port 3002 is available")
+        print(f"Make sure port {port} is available")

@@ -58,6 +58,8 @@ ml = [
     # Web interface
     "flask>=2.0.0",
     "flask-cors>=3.0.0",
+    # Configuration
+    "pyyaml>=6.0.0",
 ]
 
 [project.urls]

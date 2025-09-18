@@ -1,0 +1,143 @@
+# Birds of Play - Unsupervised ML Clustering Configuration
+# This file contains all tunable parameters for bird species clustering
+
+# =============================================================================
+# FEATURE EXTRACTION SETTINGS
+# =============================================================================
+feature_extraction:
+  # CNN model for feature extraction
+  model_name: "resnet50"  # Options: resnet50, resnet18, resnet101
+  
+  # GPU usage (set to false if no GPU available)
+  use_gpu: true
+  
+  # Minimum confidence threshold for including bird detections
+  min_confidence: 0.5
+  
+  # Batch size for feature extraction (adjust based on available memory)
+  batch_size: 32
+  
+  # Image preprocessing settings
+  image_size: 224  # Input size for CNN (224x224 is standard)
+
+# =============================================================================
+# CLUSTERING ALGORITHM SETTINGS  
+# =============================================================================
+clustering:
+  # Random seed for reproducible results
+  random_state: 42
+  
+  # Primary clustering method: Ward linkage (compact, variance-minimizing clusters)
+  ward_linkage:
+    # Distance thresholds for different granularity levels
+    conservative_threshold: 50.0   # More species (~8 clusters)
+    balanced_threshold: 75.0       # Balanced species count (~3 clusters) 
+    permissive_threshold: 90.0     # Fewer species (~2 clusters)
+  
+  # Alternate clustering method: Average linkage (handles varied cluster shapes)
+  average_linkage:
+    conservative_threshold: 45.0   # More species
+    balanced_threshold: 70.0       # Balanced species count
+    permissive_threshold: 85.0     # Fewer species
+  
+  # Distance-based clustering (automatic threshold detection)
+  auto_threshold:
+    enabled: true
+    min_threshold: 30.0      # Minimum distance threshold to test
+    max_threshold: 120.0     # Maximum distance threshold to test
+    n_test_points: 15        # Number of thresholds to test in range
+
+# =============================================================================
+# CLUSTER EVALUATION SETTINGS
+# =============================================================================
+evaluation:
+  # Preferred number of bird species (for scoring function)
+  ideal_species_range:
+    min_species: 2          # Minimum reasonable number of bird species
+    max_species: 6          # Maximum reasonable number of bird species  
+    sweet_spot_min: 2       # Ideal minimum (gets bonus in scoring)
+    sweet_spot_max: 6       # Ideal maximum (gets bonus in scoring)
+  
+  # Scoring weights for best method selection
+  scoring_weights:
+    silhouette_weight: 1.0      # Weight for silhouette score
+    species_count_bonus: 0.1    # Bonus for ideal species count
+    ward_method_bonus: 0.05     # Slight preference for Ward linkage
+    
+  # Penalties for unrealistic clustering
+  penalties:
+    too_few_species: -1.0       # Penalty for < min_species
+    too_many_species: -0.5      # Penalty for > max_species (overfitting)
+
+# =============================================================================
+# VISUALIZATION SETTINGS
+# =============================================================================
+visualization:
+  # Dimensionality reduction for 2D visualization
+  reduction_method: "tsne"    # Options: tsne, umap
+  n_components: 2             # Always 2 for web visualization
+  
+  # t-SNE specific settings
+  tsne:
+    perplexity_auto: true     # Automatically set perplexity based on data size
+    perplexity_max: 30        # Maximum perplexity (will use min(30, n_samples-1))
+    
+  # UMAP specific settings (if available)
+  umap:
+    n_neighbors_auto: true    # Automatically set neighbors based on data size  
+    n_neighbors_max: 15       # Maximum neighbors (will use min(15, n_samples-1))
+
+# =============================================================================
+# WEB INTERFACE SETTINGS
+# =============================================================================
+web_interface:
+  # Server configuration
+  host: "0.0.0.0"
+  port: 3002
+  debug_mode: false           # Set to true for development
+  
+  # Auto-initialization on server start
+  auto_initialize: false      # Set to true to auto-run clustering on startup
+  
+  # Image serving settings
+  image_cache_headers: true   # Enable cache control headers
+  placeholder_enabled: true  # Show bird emoji if image not found
+
+# =============================================================================
+# DATA MANAGEMENT SETTINGS
+# =============================================================================
+data:
+  # MongoDB connection
+  mongodb_uri: "mongodb://localhost:27017/"
+  database_name: "birds_of_play"
+  
+  # Collections to use for bird data
+  collections:
+    high_confidence: "high_confidence_detections"  # Primary source
+    region_detections: "region_detections"         # Backup source
+  
+  # File paths (relative to project root)
+  objects_directory: "data/objects"
+  visualizations_directory: "data/visualizations"
+
+# =============================================================================
+# PERFORMANCE SETTINGS
+# =============================================================================
+performance:
+  # Memory management
+  max_objects_per_batch: 100    # Limit for large datasets
+  
+  # Feature caching
+  cache_features: true          # Cache extracted features to avoid recomputation
+  
+  # Parallel processing
+  n_jobs: -1                    # Number of CPU cores (-1 = all available)
+
+# =============================================================================
+# LOGGING SETTINGS  
+# =============================================================================
+logging:
+  level: "INFO"                 # Options: DEBUG, INFO, WARNING, ERROR
+  log_clustering_steps: true    # Log each clustering step
+  log_feature_extraction: true # Log feature extraction progress
+  log_evaluation_metrics: true # Log silhouette scores and cluster counts

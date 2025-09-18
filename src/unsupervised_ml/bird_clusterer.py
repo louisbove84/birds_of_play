@@ -15,14 +15,18 @@ try:
     HAS_UMAP = True
 except ImportError:
     HAS_UMAP = False
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import logging
+from config_loader import load_clustering_config, ClusteringConfig
 
 class BirdClusterer:
     """Clustering algorithms for grouping similar bird images."""
     
-    def __init__(self, random_state: int = 42):
-        self.random_state = random_state
+    def __init__(self, config: Optional[ClusteringConfig] = None):
+        # Load configuration
+        self.config = config if config is not None else load_clustering_config()
+        
+        self.random_state = 42  # Will be configurable in YAML
         self.scaler = StandardScaler()
         self.clusterer = None
         self.cluster_labels_ = None
@@ -30,7 +34,9 @@ class BirdClusterer:
         self.features_2d_ = None
         self.metadata_ = None
         
-        logging.basicConfig(level=logging.INFO)
+        # Set up logging
+        log_level = getattr(logging, self.config.log_level.upper(), logging.INFO)
+        logging.basicConfig(level=log_level)
         self.logger = logging.getLogger(__name__)
     
     def preprocess_features(self, features: np.ndarray) -> np.ndarray:
@@ -56,12 +62,16 @@ class BirdClusterer:
         
         return reducer.fit_transform(features)
     
-    def cluster_ward_distance(self, features: np.ndarray, distance_threshold: float = 75.0) -> np.ndarray:
+    def cluster_ward_distance(self, features: np.ndarray, distance_threshold: Optional[float] = None) -> np.ndarray:
         """
         Perform Ward linkage hierarchical clustering with distance threshold.
         Primary method for compact, variance-minimizing clusters.
         Optimized for SimCLR features (512D ResNet-18 vectors).
         """
+        # Use config value if not provided
+        if distance_threshold is None:
+            distance_threshold = self.config.ward_balanced
+            
         self.logger.info(f"Performing Ward linkage clustering with distance_threshold={distance_threshold}")
         
         clusterer = AgglomerativeClustering(
@@ -78,12 +88,16 @@ class BirdClusterer:
         self.clusterer = clusterer
         return labels
     
-    def cluster_average_distance(self, features: np.ndarray, distance_threshold: float = 70.0) -> np.ndarray:
+    def cluster_average_distance(self, features: np.ndarray, distance_threshold: Optional[float] = None) -> np.ndarray:
         """
         Perform Average linkage hierarchical clustering with distance threshold.
         Alternate method for handling varied cluster shapes.
         Compatible with SimCLR features using Euclidean distance.
         """
+        # Use config value if not provided
+        if distance_threshold is None:
+            distance_threshold = self.config.average_balanced
+            
         self.logger.info(f"Performing Average linkage clustering with distance_threshold={distance_threshold}")
         
         clusterer = AgglomerativeClustering(
@@ -102,20 +116,23 @@ class BirdClusterer:
     
     def evaluate_clustering(self, features: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
         """Evaluate clustering quality."""
+        n_clusters = len(set(labels))
+        metrics = {
+            'n_clusters': n_clusters,
+            'n_noise': 0,  # Hierarchical clustering doesn't have noise points
+            'n_points': len(labels)
+        }
+        
         # For hierarchical clustering, all points are assigned to clusters (no noise points)
-        if len(set(labels)) < 2:
-            return {'error': 'Less than 2 clusters found'}
-        
-        metrics = {}
-        
-        try:
-            metrics['silhouette_score'] = silhouette_score(features, labels)
-        except:
-            metrics['silhouette_score'] = -1
-        
-        metrics['n_clusters'] = len(set(labels))
-        metrics['n_noise'] = 0  # Hierarchical clustering doesn't have noise points
-        metrics['n_points'] = len(labels)
+        if n_clusters < 2:
+            metrics['silhouette_score'] = -1.0  # Invalid clustering
+            metrics['error'] = 'Less than 2 clusters found'
+        else:
+            try:
+                metrics['silhouette_score'] = silhouette_score(features, labels)
+            except Exception as e:
+                self.logger.warning(f"Silhouette score calculation failed: {e}")
+                metrics['silhouette_score'] = -1.0
         
         return metrics
     
@@ -133,7 +150,7 @@ class BirdClusterer:
         self.features_scaled_ = self.preprocess_features(features)
         self.metadata_ = metadata
         
-        distance_threshold = kwargs.get('distance_threshold', 75.0)
+        distance_threshold = kwargs.get('distance_threshold', self.config.ward_balanced)
         
         if method == 'ward_distance':
             labels = self.cluster_ward_distance(self.features_scaled_, distance_threshold=distance_threshold)
@@ -256,12 +273,15 @@ class BirdClusterer:
 class ClusteringExperiment:
     """Run clustering experiments with multiple algorithms."""
     
-    def __init__(self, features: np.ndarray, metadata: List[Dict]):
+    def __init__(self, features: np.ndarray, metadata: List[Dict], config: Optional[ClusteringConfig] = None):
         self.features = features
         self.metadata = metadata
         self.results = {}
+        self.config = config if config is not None else load_clustering_config()
         
-        logging.basicConfig(level=logging.INFO)
+        # Set up logging
+        log_level = getattr(logging, self.config.log_level.upper(), logging.INFO)
+        logging.basicConfig(level=log_level)
         self.logger = logging.getLogger(__name__)
     
     def run_all_methods(self) -> Dict[str, Dict]:
@@ -273,20 +293,20 @@ class ClusteringExperiment:
         
         methods = {
             # Ward linkage (primary method) - compact, variance-minimizing clusters
-            # Optimized thresholds for ResNet50 2048D features based on testing
-            'ward_conservative': {'method': 'ward_distance', 'distance_threshold': 50.0},  # ~8 species
-            'ward_balanced': {'method': 'ward_distance', 'distance_threshold': 75.0},      # ~3 species ✅
-            'ward_permissive': {'method': 'ward_distance', 'distance_threshold': 90.0},   # ~2 species
+            # Thresholds loaded from configuration file
+            'ward_conservative': {'method': 'ward_distance', 'distance_threshold': self.config.ward_conservative},
+            'ward_balanced': {'method': 'ward_distance', 'distance_threshold': self.config.ward_balanced},
+            'ward_permissive': {'method': 'ward_distance', 'distance_threshold': self.config.ward_permissive},
             
             # Average linkage (alternate method) - handles varied cluster shapes  
-            'average_conservative': {'method': 'average_distance', 'distance_threshold': 45.0},
-            'average_balanced': {'method': 'average_distance', 'distance_threshold': 70.0},
-            'average_permissive': {'method': 'average_distance', 'distance_threshold': 85.0},
+            'average_conservative': {'method': 'average_distance', 'distance_threshold': self.config.average_conservative},
+            'average_balanced': {'method': 'average_distance', 'distance_threshold': self.config.average_balanced},
+            'average_permissive': {'method': 'average_distance', 'distance_threshold': self.config.average_permissive},
         }
         
         for name, params in methods.items():
             try:
-                clusterer = BirdClusterer()
+                clusterer = BirdClusterer(config=self.config)
                 method = params.pop('method')
                 labels, metrics = clusterer.fit_predict(self.features, self.metadata, 
                                                        method=method, **params)
@@ -323,20 +343,20 @@ class ClusteringExperiment:
             silhouette = metrics.get('silhouette_score', -2)
             n_clusters = metrics.get('n_clusters', 0)
             
-            # Penalty for unrealistic number of species
-            if n_clusters < 2:
-                cluster_penalty = -1.0  # Too few species
-            elif n_clusters > 10:
-                cluster_penalty = -0.5  # Too many species (likely overfitting)
-            elif 2 <= n_clusters <= 6:
-                cluster_penalty = 0.1   # Sweet spot for bird species
+            # Penalty for unrealistic number of species (from config)
+            if n_clusters < self.config.min_species:
+                cluster_penalty = self.config.too_few_penalty
+            elif n_clusters > self.config.max_species:
+                cluster_penalty = self.config.too_many_penalty
+            elif self.config.sweet_spot_min <= n_clusters <= self.config.sweet_spot_max:
+                cluster_penalty = self.config.species_count_bonus
             else:
                 cluster_penalty = 0.0   # Acceptable range
                 
             # Prefer Ward linkage (primary method) slightly
-            method_bonus = 0.05 if 'ward' in name else 0.0
+            method_bonus = self.config.ward_method_bonus if 'ward' in name else 0.0
             
-            return silhouette + cluster_penalty + method_bonus
+            return (silhouette * self.config.silhouette_weight) + cluster_penalty + method_bonus
         
         best_name = max(valid_results.keys(), key=scoring_function)
         
