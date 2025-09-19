@@ -279,7 +279,7 @@ def create_cluster_dashboard_html(clusters, cluster_stats):
             }}
             
             h1 {{ 
-                color: #9C27B0; 
+                color: #FF6B35; 
                 text-align: center; 
             }}
             
@@ -489,6 +489,10 @@ def create_cluster_dashboard_html(clusters, cluster_stats):
                 </a>
                 <span class="nav-separator">|</span>
                 <span class="nav-current">🔬 Bird Clustering</span>
+                <span class="nav-separator">|</span>
+                <a href="http://localhost:3003" class="nav-link" target="_self">
+                    🧠 Fine-Tuning
+                </a>
             </nav>
         </div>
         

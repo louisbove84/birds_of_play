@@ -43,7 +43,7 @@ app.get('/', (req, res) => {
             color: white; 
         }
         .container { max-width: 1200px; margin: 0 auto; }
-        h1 { color: #4CAF50; text-align: center; }
+        h1 { color: #FF6B35; text-align: center; }
         .frame-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
@@ -148,6 +148,10 @@ app.get('/', (req, res) => {
             <span class="nav-separator">|</span>
             <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
                 🔬 Bird Clustering
+            </a>
+            <span class="nav-separator">|</span>
+            <a href="http://localhost:3003" class="nav-link" target="_self">
+                🧠 Fine-Tuning
             </a>
         </nav>
         

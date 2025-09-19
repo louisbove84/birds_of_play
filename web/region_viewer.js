@@ -39,7 +39,7 @@ app.get('/', (req, res) => {
             color: white; 
         }
         .container { max-width: 1200px; margin: 0 auto; }
-        h1 { color: #9C27B0; text-align: center; }
+        h1 { color: #FF6B35; text-align: center; }
         .nav-links {
             margin-top: 1rem;
             font-size: 0.9em;
@@ -74,12 +74,12 @@ app.get('/', (req, res) => {
             font-weight: bold;
         }
         .nav-current {
-            color: #9C27B0;
+            color: #FF6B35;
             font-weight: bold;
-            background: rgba(156, 39, 176, 0.1);
+            background: rgba(255, 107, 53, 0.1);
             padding: 0.5rem 1rem;
             border-radius: 4px;
-            border: 1px solid rgba(156, 39, 176, 0.3);
+            border: 1px solid rgba(255, 107, 53, 0.3);
         }
         .region-grid { 
             display: grid; 
@@ -221,6 +221,10 @@ app.get('/', (req, res) => {
             <span class="nav-separator">|</span>
             <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
                 🔬 Bird Clustering
+            </a>
+            <span class="nav-separator">|</span>
+            <a href="http://localhost:3003" class="nav-link" target="_self">
+                🧠 Fine-Tuning
             </a>
         </nav>
         
