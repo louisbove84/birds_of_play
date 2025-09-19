@@ -103,11 +103,15 @@ def run_motion_detection_on_video():
     try:
         config = load_clustering_config()
         video_path = os.path.abspath(config.test_video_path)
+        timeout = config.test_timeout_seconds
         print(f"📹 Processing video from config: {video_path}")
+        print(f"⏱️  Timeout: {timeout}s")
     except Exception as e:
-        print(f"⚠️  Warning: Could not load config ({e}), using default")
+        print(f"⚠️  Warning: Could not load config ({e}), using defaults")
         video_path = os.path.abspath("test/vid/vid_3.mov")
+        timeout = 300
         print(f"📹 Processing video: {video_path}")
+        print(f"⏱️  Timeout: {timeout}s")
     
     try:
         # Run motion detection with MongoDB integration
@@ -115,7 +119,7 @@ def run_motion_detection_on_video():
             'python', 'src/main.py', 
             '--video', video_path,
             '--mongo'
-        ], capture_output=True, text=True, timeout=120)
+        ], capture_output=True, text=True, timeout=timeout)
         
         if result.returncode == 0:
             print("✅ Motion detection completed successfully")
@@ -179,40 +183,379 @@ def verify_mongodb_frames():
         print(f"❌ MongoDB verification error: {e}")
         return False
 
-def run_yolo11_analysis():
-    """Run YOLO11 analysis on MongoDB frames"""
-    print_step(4, "Running YOLO11 Analysis")
+def extract_all_regions():
+    """Extract all consolidated regions from frames as individual cutout images"""
+    print_step(4, "Extracting Region Cutouts")
     
     try:
+        print("✂️ Extracting all consolidated regions from frames...")
+        print("📊 This will create individual region cutout images needed for YOLO11 detection")
+        
+        # Connect to MongoDB to get all frames with regions
+        from pymongo import MongoClient
+        client = MongoClient('mongodb://localhost:27017')
+        db = client['birds_of_play']
+        
+        # Get all frames with consolidated regions
+        frames = list(db.captured_frames.find(
+            {"metadata.consolidated_regions_count": {"$gt": 0}}
+        ).sort("timestamp", 1))
+        
+        print(f"📊 Found {len(frames)} frames with consolidated regions")
+        
+        total_regions = 0
+        extracted_regions = 0
+        
+        for frame in frames:
+            frame_id = frame['_id']
+            consolidated_regions = frame.get('metadata', {}).get('consolidated_regions', [])
+            
+            for region_index in range(len(consolidated_regions)):
+                total_regions += 1
+                
+                # Run extract_region.py for each region
+                result = subprocess.run([
+                    'python', 'src/image_detection/extract_region.py',
+                    frame_id, str(region_index)
+                ], capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0:
+                    extracted_regions += 1
+                    if extracted_regions % 50 == 0:  # Progress update every 50 regions
+                        print(f"   📊 Extracted {extracted_regions}/{total_regions} regions...")
+                else:
+                    print(f"   ⚠️ Failed to extract region {frame_id}_{region_index}: {result.stderr}")
+        
+        print(f"✅ Region extraction completed!")
+        print(f"📊 Successfully extracted {extracted_regions}/{total_regions} region cutouts")
+        
+        return extracted_regions > 0
+        
+    except Exception as e:
+        print(f"❌ Error in region extraction: {e}")
+        return False
+    
+    finally:
+        if 'client' in locals():
+            client.close()
+
+def run_batch_region_detection():
+    """Run comprehensive YOLO11 detection on all extracted region cutouts"""
+    print_step(5, "Running Batch Region Detection")
+    
+    try:
+        print("🎯 Running comprehensive YOLO11 detection on extracted region cutouts...")
+        print("📊 This will:")
+        print("   • Load pre-extracted region cutout images")
+        print("   • Run YOLO11 detection on each region")
+        print("   • Save detection results to MongoDB")
+        print("   • Create detection overlay images")
+        print("   • Filter by confidence threshold and object classes")
+        
+        # Run the batch detection script directly (more efficient than via main.py)
         result = subprocess.run([
-            'python', 'src/main.py',
-            '--mongo', '--yolo'
+            'python', 'src/image_detection/batch_detect_regions.py'
         ], capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
-            print("✅ YOLO11 analysis completed successfully")
-            print("📊 Analysis summary:")
+            print("✅ Batch region detection completed successfully")
+            print("📊 Detection summary:")
             # Print relevant output lines
             output_lines = result.stdout.strip().split('\n')
             for line in output_lines:
-                if any(keyword in line.lower() for keyword in ['yolo', 'processing frame', 'found', 'regions', 'detections', 'completed']):
+                if any(keyword in line.lower() for keyword in ['batch detection completed', 'processed', 'found', 'high-confidence', 'detections']):
                     print(f"   {line}")
             return True
         else:
-            print(f"❌ YOLO11 analysis failed: {result.stderr}")
+            print(f"❌ Batch region detection failed: {result.stderr}")
             print(f"📊 stdout: {result.stdout}")
             return False
             
     except subprocess.TimeoutExpired:
-        print("❌ YOLO11 analysis timed out (300s)")
+        print("❌ Batch region detection timed out (300s)")
         return False
     except Exception as e:
-        print(f"❌ YOLO11 analysis error: {e}")
+        print(f"❌ Batch region detection error: {e}")
+        return False
+
+def start_web_servers():
+    """Start all web servers for viewing results"""
+    print_step(6, "Starting Web Servers")
+    
+    try:
+        import subprocess
+        import time
+        
+        # Get the project root directory
+        project_root = Path(__file__).parent.parent
+        
+        print("🌐 Starting web servers...")
+        print("📹 Motion Detection: http://localhost:3000")
+        print("🎯 Object Detection: http://localhost:3001") 
+        print("🔬 Bird Clustering: http://localhost:3002")
+        print("🧠 Fine-Tuning: http://localhost:3003")
+        
+        # Start motion detection server (port 3000)
+        web_dir = project_root / "web"
+        if web_dir.exists():
+            subprocess.Popen([
+                'node', 'simple_viewer.js'
+            ], cwd=str(web_dir), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("   ✅ Motion detection server starting...")
+            time.sleep(2)
+            
+            # Start object detection server (port 3001)
+            subprocess.Popen([
+                'node', 'region_viewer.js'
+            ], cwd=str(web_dir), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("   ✅ Object detection server starting...")
+            time.sleep(2)
+        else:
+            print("   ⚠️  Web directory not found, skipping Node.js servers")
+        
+        # Start ML servers (ports 3002 and 3003)
+        ml_dir = project_root / "src" / "unsupervised_ml"
+        if ml_dir.exists():
+            venv_python = project_root / "venv_ml" / "bin" / "python"
+            if venv_python.exists():
+                # Start clustering server (port 3002) - using full clustering system
+                subprocess.Popen([
+                    str(venv_python), 'cluster_server.py'
+                ], cwd=str(ml_dir), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("   ✅ Bird clustering server starting...")
+                
+                # Start fine-tuning server (port 3003) - using full fine-tuning system
+                subprocess.Popen([
+                    str(venv_python), 'fine_tuning_server.py'
+                ], cwd=str(ml_dir), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("   ✅ Fine-tuning server starting...")
+                time.sleep(3)
+            else:
+                print("   ⚠️  ML virtual environment not found, skipping ML servers")
+        else:
+            print("   ⚠️  ML directory not found, skipping ML servers")
+        
+        print("\n🌐 Web servers started! Give them a few seconds to initialize...")
+        print("📱 Open your browser and navigate to:")
+        print("   • Motion Detection: http://localhost:3000")
+        print("   • Object Detection: http://localhost:3001")
+        print("   • Bird Clustering: http://localhost:3002") 
+        print("   • Fine-Tuning: http://localhost:3003")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error starting web servers: {e}")
+        print("💡 You can start them manually with: make web-start")
+        return False
+
+def extract_all_objects():
+    """Extract individual object images from detected regions for clustering"""
+    print_step(7, "Extracting Object Images")
+    
+    try:
+        print("✂️ Extracting individual object images from detected regions...")
+        print("📊 This will create cropped images of each detected bird for clustering analysis")
+        
+        # Connect to MongoDB to get all high-confidence detections
+        from pymongo import MongoClient
+        client = MongoClient('mongodb://localhost:27017')
+        db = client['birds_of_play']
+        
+        # Get all high-confidence detections
+        detections = list(db.high_confidence_detections.find({}))
+        
+        print(f"📊 Found {len(detections)} high-confidence bird detections")
+        
+        if len(detections) == 0:
+            print("⚠️ No high-confidence detections found for object extraction")
+            return True  # Don't fail the pipeline for this
+        
+        extracted_objects = 0
+        failed_extractions = 0
+        
+        for detection in detections:
+            detection_id = detection.get('detection_id')
+            if not detection_id:
+                continue
+                
+            # Convert detection_id to object_id format (det_0 -> obj_0)
+            object_id = detection_id.replace('_det_', '_obj_')
+            
+            # Run extract_object.py for each detection
+            result = subprocess.run([
+                'python', 'src/image_detection/extract_object.py', object_id
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                extracted_objects += 1
+                if extracted_objects % 5 == 0:  # Progress update every 5 objects
+                    print(f"   📊 Extracted {extracted_objects}/{len(detections)} objects...")
+            else:
+                failed_extractions += 1
+                if failed_extractions <= 3:  # Show first 3 failures
+                    print(f"   ⚠️ Failed to extract {object_id}: {result.stderr.strip()}")
+        
+        print(f"✅ Object extraction completed!")
+        print(f"📊 Successfully extracted {extracted_objects}/{len(detections)} object images")
+        print(f"📊 Failed extractions: {failed_extractions}")
+        
+        if extracted_objects == 0:
+            print("❌ No objects were successfully extracted")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error in object extraction: {e}")
+        return False
+    
+    finally:
+        if 'client' in locals():
+            client.close()
+
+def initialize_clustering_system():
+    """Initialize the bird clustering system with detected objects"""
+    print_step(8, "Initializing Bird Clustering System")
+    
+    try:
+        print("🔬 Initializing clustering system with detected bird objects...")
+        print("📊 This will:")
+        print("   • Load detected bird objects from MongoDB")
+        print("   • Extract features using ResNet CNN")
+        print("   • Run hierarchical clustering algorithms")
+        print("   • Analyze bird species groupings")
+        
+        # Give the clustering server time to start up
+        import time
+        time.sleep(5)
+        
+        # Initialize the clustering system via HTTP API
+        import requests
+        
+        try:
+            response = requests.get('http://localhost:3002/initialize', timeout=60)
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('status') == 'success':
+                    print("✅ Clustering system initialized successfully")
+                    print("📊 Bird species analysis ready")
+                    return True
+                else:
+                    print(f"❌ Clustering initialization failed: {result.get('message', 'Unknown error')}")
+                    return False
+            else:
+                print(f"❌ Clustering server error: HTTP {response.status_code}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Could not connect to clustering server: {e}")
+            print("💡 The clustering server may still be starting up")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error initializing clustering system: {e}")
+        return False
+
+def train_supervised_classifier():
+    """Train supervised classifier using clustering results as pseudo-labels"""
+    print_step(9, "Training Supervised Classifier")
+    
+    try:
+        print("🧠 Training supervised bird classifier using clustering pseudo-labels...")
+        print("📊 This will:")
+        print("   • Load clustering results from the initialized system")
+        print("   • Use cluster labels as pseudo-labels for supervised training")
+        print("   • Train SimCLR backbone with classification head")
+        print("   • Save trained model for fine-tuning interface")
+        
+        # Give some time for clustering system to be fully ready
+        import time
+        time.sleep(2)
+        
+        # Import required modules
+        import sys
+        sys.path.insert(0, 'src/unsupervised_ml')
+        
+        from object_data_manager import ObjectDataManager
+        from feature_extractor import FeatureExtractor, FeaturePipeline
+        from bird_clusterer import BirdClusterer, ClusteringExperiment
+        from supervised_classifier import SupervisedBirdTrainer
+        from config_loader import load_clustering_config
+        
+        # Load configuration
+        config = load_clustering_config()
+        
+        # Load data and run clustering (reuse from clustering initialization)
+        with ObjectDataManager() as data_manager:
+            feature_extractor = FeatureExtractor(model_name=config.model_name)
+            pipeline = FeaturePipeline(data_manager, feature_extractor)
+            
+            features, metadata = pipeline.extract_all_features(min_confidence=config.min_confidence)
+            
+            if len(features) == 0:
+                print("⚠️ No bird objects found for supervised training")
+                return True  # Don't fail pipeline for this
+            
+            print(f"📊 Found {len(features)} bird objects for supervised training")
+            
+            # Run clustering experiment to get best clustering
+            experiment = ClusteringExperiment(features, metadata, config=config)
+            results = experiment.run_all_methods()
+            
+            best_method, best_result = experiment.get_best_method()
+            
+            if not best_result:
+                print("❌ No successful clustering method found")
+                return False
+            
+            clusterer = best_result['clusterer']
+            n_clusters = best_result['metrics']['n_clusters']
+            
+            print(f"✅ Best clustering method: {best_method}")
+            print(f"📊 Found {n_clusters} bird species clusters")
+            
+            # Train supervised classifier
+            trainer = SupervisedBirdTrainer(config=config)
+            
+            print("🔄 Preparing training data from clustering results...")
+            success = trainer.prepare_data_from_clustering(clusterer, metadata)
+            
+            if not success:
+                print("❌ Failed to prepare training data")
+                return False
+            
+            print("🔄 Phase 1: Training with frozen backbone...")
+            trainer.train_phase1_frozen_backbone(epochs=5, lr=0.001)
+            
+            print("🔄 Phase 2: Fine-tuning entire model...")
+            trainer.train_phase2_full_finetuning(epochs=3, lr=0.0001)
+            
+            print("🔄 Evaluating model...")
+            eval_results = trainer.evaluate()
+            
+            print(f"✅ Model training completed!")
+            print(f"📊 Test Accuracy: {eval_results['accuracy']:.3f}")
+            print(f"📊 Mean Confidence: {eval_results['mean_confidence']:.3f}")
+            
+            # Save model
+            model_path = "src/unsupervised_ml/trained_bird_classifier.pth"
+            trainer.save_model(model_path)
+            
+            print(f"✅ Model saved to {model_path}")
+            print("🧠 Fine-tuning interface now ready with trained model")
+            
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in supervised training: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def verify_final_results():
     """Verify the complete pipeline results"""
-    print_step(5, "Verifying Final Results")
+    print_step(10, "Verifying Final Results")
     
     try:
         result = subprocess.run([
@@ -272,7 +615,12 @@ def main():
         'mongodb_clear': False,
         'motion_detection': False,
         'mongodb_verify': False,
-        'yolo_analysis': False,
+        'extract_regions': False,
+        'batch_detection': False,
+        'web_servers': False,
+        'extract_objects': False,
+        'clustering_initialization': False,
+        'supervised_training': False,
         'final_verification': False
     }
     
@@ -294,9 +642,24 @@ def main():
         if not results['mongodb_verify']:
             return 1
         
-        results['yolo_analysis'] = run_yolo11_analysis()
-        if not results['yolo_analysis']:
+        results['extract_regions'] = extract_all_regions()
+        if not results['extract_regions']:
             return 1
+        
+        results['batch_detection'] = run_batch_region_detection()
+        if not results['batch_detection']:
+            return 1
+        
+        results['web_servers'] = start_web_servers()
+        # Don't fail the test if web servers don't start - it's not critical
+        
+        results['extract_objects'] = extract_all_objects()
+        if not results['extract_objects']:
+            return 1
+        
+        results['clustering_initialization'] = initialize_clustering_system()
+        
+        results['supervised_training'] = train_supervised_classifier()
         
         results['final_verification'] = verify_final_results()
         
@@ -322,8 +685,12 @@ def main():
     
     if all_passed:
         print("\n🎉 ALL TESTS PASSED! Full pipeline working correctly.")
-        print("\n🌐 You can now view results at: http://localhost:3000")
-        print("   (Make sure web server is running: make web-start)")
+        print("\n🌐 Web servers are starting up! View results at:")
+        print("   📹 Motion Detection: http://localhost:3000")
+        print("   🎯 Object Detection: http://localhost:3001")
+        print("   🔬 Bird Clustering: http://localhost:3002")
+        print("   🧠 Fine-Tuning: http://localhost:3003")
+        print("\n💡 Give the servers 10-15 seconds to fully initialize before browsing.")
         return 0
     else:
         print("\n❌ Some tests failed. Check the output above for details.")

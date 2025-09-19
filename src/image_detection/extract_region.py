@@ -87,8 +87,9 @@ def extract_region(frame_id: str, region_index: int) -> bool:
             print(f"❌ Empty region after cropping")
             return False
         
-        # Create output directory
-        output_dir = Path(__file__).parent.parent / "data" / "regions"
+        # Create output directory (consistent with batch_detect_regions.py)
+        project_root = Path(__file__).parent.parent.parent
+        output_dir = project_root / "data" / "regions"
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Save region image

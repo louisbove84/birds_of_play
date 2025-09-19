@@ -1,5 +1,6 @@
-# Motion Detection Configuration - Cleaned Version
+# Motion Detection Configuration - Bird-Focused Version
 # This config file contains only the variables that are actually used by the codebase
+# OPTIMIZED FOR BIRD DETECTION: Reduced background noise sensitivity, increased filtering for bird-sized objects
 
 # ===============================
 # LOGGING CONFIGURATION
@@ -19,12 +20,12 @@ contrast_enhancement: true        # Apply CLAHE contrast enhancement
 clahe_clip_limit: 3.0            # CLAHE clip limit (1.0-5.0, higher = more contrast)
 clahe_tile_size: 8               # CLAHE tile size (4-16, must be even)
 
-# Blur Parameters
-gaussian_blur_size: 7            # Gaussian blur kernel size (3-15, odd numbers only)
-median_blur_size: 5              # Median blur kernel size (3-15, odd numbers only)
-bilateral_d: 15                  # Bilateral filter diameter (5-25)
-bilateral_sigma_color: 75        # Bilateral filter sigma color (10-150)
-bilateral_sigma_space: 75        # Bilateral filter sigma space (10-150)
+# Blur Parameters - Increased to reduce background noise sensitivity
+gaussian_blur_size: 11           # Gaussian blur kernel size (3-15, odd numbers only) - INCREASED to reduce noise
+median_blur_size: 7              # Median blur kernel size (3-15, odd numbers only) - INCREASED to reduce noise
+bilateral_d: 19                  # Bilateral filter diameter (5-25) - INCREASED for better noise reduction
+bilateral_sigma_color: 100       # Bilateral filter sigma color (10-150) - INCREASED for smoother backgrounds
+bilateral_sigma_space: 100       # Bilateral filter sigma space (10-150) - INCREASED for smoother backgrounds
 
 # ===============================
 # MOTION DETECTION
@@ -50,10 +51,10 @@ contour_approximation: true     # Simplify contour shapes
 contour_epsilon_factor: 0.03    # Approximation accuracy (0.01-0.1, lower = more accurate)
 contour_filtering: true         # Enable contour filtering
 
-# Contour Filtering Parameters
-min_contour_area: 200           # Minimum contour area to keep (100-2000)
-max_contour_aspect_ratio: 3.0   # Maximum width/height ratio (1.5-5.0)
-min_contour_solidity: 0.3       # Minimum solidity ratio (0.3-0.9)
+# Contour Filtering Parameters - Tuned for bird-sized objects
+min_contour_area: 800           # Minimum contour area to keep (INCREASED from 200 to filter small noise)
+max_contour_aspect_ratio: 2.5   # Maximum width/height ratio (DECREASED for more compact bird shapes)
+min_contour_solidity: 0.5       # Minimum solidity ratio (INCREASED to filter irregular background noise)
 
 # ===============================
 # DATA COLLECTION
@@ -61,18 +62,18 @@ min_contour_solidity: 0.3       # Minimum solidity ratio (0.3-0.9)
 data_collection: true           # Enable data collection and saving
 cleanup_old_data: true          # Delete old data on startup
 image_format: "png"             # Format for saving images
-min_tracking_confidence: 0.6    # Minimum confidence for tracking
+min_tracking_confidence: 0.75   # Minimum confidence for tracking (INCREASED to filter low-confidence detections)
 
 # ===============================
 # REGION CONSOLIDATION
 # ===============================
-# Consolidation parameters for grouping nearby motion detections
-max_distance_threshold: 150.0        # Max distance between objects to group (pixels)
-min_objects_per_region: 1            # Min objects to form a region (1 = any motion)
-overlap_threshold: 0.2               # Min overlap ratio to merge regions
-grid_cell_size: 150.0                # Cell size for grid-based grouping
-max_frames_without_update: 10        # Max frames before removing region
-min_region_area: 200.0               # Min area for consolidated region
+# Consolidation parameters for grouping nearby motion detections - Tuned for birds
+max_distance_threshold: 100.0        # Max distance between objects to group (REDUCED for tighter grouping)
+min_objects_per_region: 2            # Min objects to form a region (INCREASED to require multiple detections)
+overlap_threshold: 0.3               # Min overlap ratio to merge regions (INCREASED for stricter merging)
+grid_cell_size: 120.0                # Cell size for grid-based grouping (REDUCED for finer tracking)
+max_frames_without_update: 5         # Max frames before removing region (REDUCED to remove transient noise faster)
+min_region_area: 1000.0              # Min area for consolidated region (INCREASED from 200 to filter small noise)
 max_region_area: 1000000.0           # Max area for consolidated region (640x640 = 409,600)
 region_expansion_factor: 1.1         # Factor to expand bounding box
 push: 640         # Ideal region size for YOLOv11

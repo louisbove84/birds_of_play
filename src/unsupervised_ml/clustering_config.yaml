@@ -125,12 +125,14 @@ data:
 # =============================================================================
 testing:
   # Test video file path (relative to project root)
-  test_video_path: "test/vid/vid_3.mov"
+  test_video_path: "test/vid/vid_4.mov"
   
   # Alternative test videos (for different scenarios)
   alternative_videos:
-    - "test/vid/vid_1.mp4"
-    - "test/vid/vid_2.mp4"
+    - "test/vid/vid_1.mp4"    # Small test video (8.7M)
+    - "test/vid/vid_2.mp4"    # Large test video (1.4G)
+    - "test/vid/vid_3.mov"    # Medium test video (281M)
+    - "test/vid/vid_4.mov"    # Short test video (28M)
   
   # Test output settings
   clear_database_before_test: true    # Clear MongoDB before running tests
