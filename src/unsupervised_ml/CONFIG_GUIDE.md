@@ -142,6 +142,35 @@ feature_extraction:
   use_gpu: true               # Enable if GPU available
 ```
 
+## 🧪 **Testing Configuration**
+
+### Test Video Selection
+```yaml
+testing:
+  test_video_path: "test/vid/vid_3.mov"    # Main test video
+  alternative_videos:                      # Other available test videos
+    - "test/vid/vid_1.mp4"
+    - "test/vid/vid_2.mp4"
+```
+
+### Test Behavior
+```yaml
+testing:
+  clear_database_before_test: true    # Clean MongoDB before each test
+  save_test_results: true            # Keep test outputs for inspection
+  test_timeout_seconds: 300          # Maximum test duration
+```
+
+**📝 How to Change Test Video:**
+1. **Edit config file**: Update `test_video_path` in `clustering_config.yaml`
+2. **Add new video**: Place video file in `test/vid/` directory
+3. **Run tests**: The pipeline will automatically use the configured video
+
+**💡 Pro Tip**: Use different videos for different test scenarios:
+- `vid_1.mp4`: Short test video for quick validation
+- `vid_2.mp4`: Longer video for performance testing  
+- `vid_3.mov`: High-quality video for accuracy testing
+
 ## 🔄 **Common Adjustments**
 
 ### Too Many Species (Over-clustering)

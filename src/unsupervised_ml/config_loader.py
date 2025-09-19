@@ -67,6 +67,12 @@ class ClusteringConfig:
     # Logging
     log_level: str
     log_clustering_steps: bool
+    
+    # Testing
+    test_video_path: str
+    clear_database_before_test: bool
+    save_test_results: bool
+    test_timeout_seconds: int
 
 
 class ConfigLoader:
@@ -105,6 +111,7 @@ class ConfigLoader:
             data_config = config_data.get('data', {})
             perf_config = config_data.get('performance', {})
             log_config = config_data.get('logging', {})
+            test_config = config_data.get('testing', {})
             
             # Create configuration object
             config = ClusteringConfig(
@@ -162,7 +169,13 @@ class ConfigLoader:
                 
                 # Logging
                 log_level=log_config.get('level', 'INFO'),
-                log_clustering_steps=log_config.get('log_clustering_steps', True)
+                log_clustering_steps=log_config.get('log_clustering_steps', True),
+                
+                # Testing
+                test_video_path=test_config.get('test_video_path', 'test/vid/vid_1.mp4'),
+                clear_database_before_test=test_config.get('clear_database_before_test', True),
+                save_test_results=test_config.get('save_test_results', True),
+                test_timeout_seconds=test_config.get('test_timeout_seconds', 300)
             )
             
             self._validate_config(config)

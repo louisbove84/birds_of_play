@@ -21,6 +21,10 @@ import time
 import json
 from pathlib import Path
 
+# Add the src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'unsupervised_ml'))
+from config_loader import load_clustering_config
+
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
 
@@ -44,8 +48,16 @@ def check_prerequisites():
         print("❌ Error: Must run from birds_of_play root directory")
         return False
     
+    # Load configuration
+    try:
+        config = load_clustering_config()
+        video_path = config.test_video_path
+        print(f"📋 Using test video from config: {video_path}")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load config ({e}), using default")
+        video_path = "test/vid/vid_3.mov"
+    
     # Check if video file exists
-    video_path = "test/vid/vid_1.mp4"
     if not os.path.exists(video_path):
         print(f"❌ Error: Video file not found: {video_path}")
         return False
@@ -87,8 +99,15 @@ def run_motion_detection_on_video():
     """Run C++ motion detection on the test video"""
     print_step(2, "Running Motion Detection on Video")
     
-    video_path = os.path.abspath("test/vid/vid_1.mp4")
-    print(f"📹 Processing video: {video_path}")
+    # Load configuration to get video path
+    try:
+        config = load_clustering_config()
+        video_path = os.path.abspath(config.test_video_path)
+        print(f"📹 Processing video from config: {video_path}")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load config ({e}), using default")
+        video_path = os.path.abspath("test/vid/vid_3.mov")
+        print(f"📹 Processing video: {video_path}")
     
     try:
         # Run motion detection with MongoDB integration

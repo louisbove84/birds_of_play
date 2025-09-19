@@ -121,6 +121,23 @@ data:
   visualizations_directory: "data/visualizations"
 
 # =============================================================================
+# TESTING SETTINGS
+# =============================================================================
+testing:
+  # Test video file path (relative to project root)
+  test_video_path: "test/vid/vid_3.mov"
+  
+  # Alternative test videos (for different scenarios)
+  alternative_videos:
+    - "test/vid/vid_1.mp4"
+    - "test/vid/vid_2.mp4"
+  
+  # Test output settings
+  clear_database_before_test: true    # Clear MongoDB before running tests
+  save_test_results: true            # Save test outputs for inspection
+  test_timeout_seconds: 300          # Maximum time for pipeline tests
+
+# =============================================================================
 # PERFORMANCE SETTINGS
 # =============================================================================
 performance:
