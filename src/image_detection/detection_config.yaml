@@ -4,7 +4,7 @@
 # Detection thresholds
 detection:
   # Minimum confidence threshold for high-confidence detections (0.0 to 1.0)
-  high_confidence_threshold: 0.80
+  high_confidence_threshold: 0.50
 
 # Object classes to display (only these will be shown to users)
 # Based on COCO dataset class names used by YOLO11

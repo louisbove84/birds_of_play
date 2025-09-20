@@ -73,6 +73,15 @@ class ClusteringConfig:
     clear_database_before_test: bool
     save_test_results: bool
     test_timeout_seconds: int
+    
+    # Fine-tuning
+    max_samples: int
+    uncertainty_threshold: float
+    force_manual_mode: bool
+    allow_class_expansion: bool
+    epochs: int
+    learning_rate: float
+    batch_size_ft: int
 
 
 class ConfigLoader:
@@ -175,7 +184,16 @@ class ConfigLoader:
                 test_video_path=test_config.get('test_video_path', 'test/vid/vid_1.mp4'),
                 clear_database_before_test=test_config.get('clear_database_before_test', True),
                 save_test_results=test_config.get('save_test_results', True),
-                test_timeout_seconds=test_config.get('test_timeout_seconds', 300)
+                test_timeout_seconds=test_config.get('test_timeout_seconds', 300),
+                
+                # Fine-tuning
+                max_samples=config_data.get('fine_tuning', {}).get('max_samples', 25),
+                uncertainty_threshold=config_data.get('fine_tuning', {}).get('uncertainty_threshold', 0.95),
+                force_manual_mode=config_data.get('fine_tuning', {}).get('force_manual_mode', False),
+                allow_class_expansion=config_data.get('fine_tuning', {}).get('allow_class_expansion', True),
+                epochs=config_data.get('fine_tuning', {}).get('epochs', 5),
+                learning_rate=config_data.get('fine_tuning', {}).get('learning_rate', 0.0001),
+                batch_size_ft=config_data.get('fine_tuning', {}).get('batch_size', 8)
             )
             
             self._validate_config(config)

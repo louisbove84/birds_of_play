@@ -14,6 +14,7 @@ from PIL import Image
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import logging
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import json
@@ -144,6 +145,14 @@ class SupervisedBirdTrainer:
             'val_loss': [],
             'val_acc': []
         }
+        
+        # Image transformation pipeline
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                               std=[0.229, 0.224, 0.225])
+        ])
         
     def prepare_data_from_clustering(self, clusterer, metadata: List[Dict], 
                                    test_size: float = 0.2, val_size: float = 0.1) -> bool:
@@ -548,6 +557,163 @@ class SupervisedBirdTrainer:
         self.train_history = checkpoint['train_history']
         
         self.logger.info(f"Model loaded from {filepath}")
+    
+    def expand_model_classes(self, new_n_classes: int):
+        """Expand the model to accommodate more classes."""
+        try:
+            if self.model is None:
+                self.logger.error("No model loaded to expand")
+                return False
+            
+            current_classes = self.model.n_classes
+            if new_n_classes <= current_classes:
+                self.logger.info(f"Model already has {current_classes} classes, no expansion needed")
+                return True
+            
+            self.logger.info(f"Expanding model from {current_classes} to {new_n_classes} classes")
+            
+            # Get the current classifier weights and bias
+            old_classifier = self.model.classifier
+            old_weight = old_classifier.weight.data
+            old_bias = old_classifier.bias.data
+            
+            # Create new classifier with expanded classes
+            new_classifier = nn.Linear(old_classifier.in_features, new_n_classes)
+            
+            # Copy old weights and bias
+            new_classifier.weight.data[:current_classes] = old_weight
+            new_classifier.bias.data[:current_classes] = old_bias
+            
+            # Initialize new class weights randomly (small values)
+            nn.init.xavier_uniform_(new_classifier.weight.data[current_classes:])
+            nn.init.constant_(new_classifier.bias.data[current_classes:], 0)
+            
+            # Replace the classifier
+            self.model.classifier = new_classifier
+            self.model.n_classes = new_n_classes
+            
+            # Move to device
+            self.model.to(self.device)
+            
+            self.logger.info(f"Model successfully expanded to {new_n_classes} classes")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error expanding model classes: {e}")
+            return False
+    
+    def fine_tune_with_corrections(self, corrections_data: List[Dict], epochs: int = 3, lr: float = 0.0001):
+        """Fine-tune the model using user corrections.
+        
+        Args:
+            corrections_data: List of corrections with image_path, correct_class_id, correct_class_name
+            epochs: Number of fine-tuning epochs
+            lr: Learning rate for fine-tuning
+            
+        Returns:
+            bool: True if fine-tuning succeeded, False otherwise
+        """
+        try:
+            self.logger.info(f"Starting fine-tuning with {len(corrections_data)} corrections")
+            
+            # Prepare correction dataset
+            correction_images = []
+            correction_labels = []
+            
+            for correction in corrections_data:
+                image_path = correction['image_path']
+                correct_class_id = correction['correct_class_id']
+                
+                # Load and preprocess image
+                try:
+                    if os.path.exists(image_path):
+                        image = Image.open(image_path).convert('RGB')
+                        image_tensor = self.transform(image)
+                        correction_images.append(image_tensor)
+                        correction_labels.append(correct_class_id)
+                    else:
+                        self.logger.warning(f"Image not found: {image_path}")
+                except Exception as img_error:
+                    self.logger.warning(f"Error loading image {image_path}: {img_error}")
+                    continue
+            
+            if not correction_images:
+                self.logger.error("No valid images found for fine-tuning")
+                return False
+            
+            # Convert to tensors
+            correction_images = torch.stack(correction_images).to(self.device)
+            correction_labels = torch.tensor(correction_labels, dtype=torch.long).to(self.device)
+            
+            self.logger.info(f"Prepared {len(correction_images)} images for fine-tuning")
+            
+            # Create DataLoader for corrections
+            correction_dataset = torch.utils.data.TensorDataset(correction_images, correction_labels)
+            correction_loader = torch.utils.data.DataLoader(
+                correction_dataset, 
+                batch_size=min(8, len(correction_images)),  # Small batch size
+                shuffle=True
+            )
+            
+            # Set up optimizer for fine-tuning (lower learning rate)
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=1e-4)
+            criterion = nn.CrossEntropyLoss()
+            
+            # Fine-tune the model
+            self.model.train()
+            total_loss = 0.0
+            
+            for epoch in range(epochs):
+                epoch_loss = 0.0
+                correct_predictions = 0
+                total_predictions = 0
+                
+                for batch_images, batch_labels in correction_loader:
+                    optimizer.zero_grad()
+                    
+                    # Forward pass
+                    outputs = self.model(batch_images)
+                    loss = criterion(outputs, batch_labels)
+                    
+                    # Backward pass
+                    loss.backward()
+                    optimizer.step()
+                    
+                    epoch_loss += loss.item()
+                    
+                    # Calculate accuracy
+                    _, predicted = torch.max(outputs.data, 1)
+                    total_predictions += batch_labels.size(0)
+                    correct_predictions += (predicted == batch_labels).sum().item()
+                
+                accuracy = correct_predictions / total_predictions
+                avg_loss = epoch_loss / len(correction_loader)
+                total_loss += avg_loss
+                
+                self.logger.info(f"Fine-tuning Epoch {epoch+1}/{epochs}: Loss={avg_loss:.4f}, Accuracy={accuracy:.3f}")
+            
+            # Update training history
+            if not hasattr(self, 'train_history'):
+                self.train_history = {'fine_tuning_epochs': []}
+            
+            if 'fine_tuning_epochs' not in self.train_history:
+                self.train_history['fine_tuning_epochs'] = []
+            
+            self.train_history['fine_tuning_epochs'].append({
+                'corrections_count': len(corrections_data),
+                'epochs': epochs,
+                'final_loss': total_loss / epochs,
+                'learning_rate': lr
+            })
+            
+            self.logger.info(f"Fine-tuning completed successfully with {len(corrections_data)} corrections")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error during fine-tuning: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 
 # Example usage and testing

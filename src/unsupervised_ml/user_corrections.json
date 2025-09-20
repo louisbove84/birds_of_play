@@ -1,0 +1,98 @@
+{
+  "corrections": [
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/ae6c529f-780e-43a3-b6f6-f1e094bf749a_0_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.9982538819313049
+      },
+      "corrected_class_id": 1,
+      "corrected_class_name": "Species_1",
+      "timestamp": "2025-09-20T11:50:24.720Z",
+      "confidence_at_time": 0.9982538819313049
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/2e8f34a9-d1fa-4446-b176-2291ce175ef3_0_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.999890923500061
+      },
+      "corrected_class_id": 1,
+      "corrected_class_name": "Species_1",
+      "timestamp": "2025-09-20T11:50:28.474Z",
+      "confidence_at_time": 0.999890923500061
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/5d91ccbc-68e2-4eca-a0f8-51211931f2f4_0_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.9999004602432251
+      },
+      "corrected_class_id": 0,
+      "corrected_class_name": "Species_0",
+      "timestamp": "2025-09-20T11:50:30.570Z",
+      "confidence_at_time": 0.9999004602432251
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/d1840ecf-0e45-4906-9c05-9541c1abfc6e_5_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.9999220371246338
+      },
+      "corrected_class_id": 1,
+      "corrected_class_name": "Species_1",
+      "timestamp": "2025-09-20T11:50:33.271Z",
+      "confidence_at_time": 0.9999220371246338
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a06fd920-b483-4d97-9c25-21bc4e1907d6_0_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.9999611377716064
+      },
+      "corrected_class_id": 0,
+      "corrected_class_name": "Species_0",
+      "timestamp": "2025-09-20T11:50:35.387Z",
+      "confidence_at_time": 0.9999611377716064
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/4052a8a1-fffd-4639-a296-f3ee563d8c1d_0_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.9999761581420898
+      },
+      "corrected_class_id": 0,
+      "corrected_class_name": "Species_0",
+      "timestamp": "2025-09-20T11:50:37.187Z",
+      "confidence_at_time": 0.9999761581420898
+    },
+    {
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/b3e5ec30-2a07-4b89-8a58-357573d91724_2_obj_0.jpg",
+      "original_prediction": {
+        "class_id": 0,
+        "class_name": "Species_0",
+        "confidence": 0.6526978015899658
+      },
+      "corrected_class_id": 0,
+      "corrected_class_name": "Species_0",
+      "timestamp": "2025-09-20T11:58:58.007Z",
+      "confidence_at_time": 0.6526978015899658
+    }
+  ],
+  "processed_images": [
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a06fd920-b483-4d97-9c25-21bc4e1907d6_0_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/d1840ecf-0e45-4906-9c05-9541c1abfc6e_5_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/4052a8a1-fffd-4639-a296-f3ee563d8c1d_0_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/5d91ccbc-68e2-4eca-a0f8-51211931f2f4_0_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/2e8f34a9-d1fa-4446-b176-2291ce175ef3_0_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/b3e5ec30-2a07-4b89-8a58-357573d91724_2_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/ae6c529f-780e-43a3-b6f6-f1e094bf749a_0_obj_0.jpg"
+  ],
+  "timestamp": 1758369544.0792792
+}

@@ -178,6 +178,18 @@ supervised_learning:
 # =============================================================================
 # LOGGING SETTINGS  
 # =============================================================================
+# FINE-TUNING CONFIGURATION
+# =============================================================================
+fine_tuning:
+  max_samples: 25               # Maximum number of images to evaluate for fine-tuning
+  uncertainty_threshold: 0.95   # Confidence threshold for uncertain predictions (demo mode - show all)
+  force_manual_mode: true       # Force manual labeling regardless of confidence
+  allow_class_expansion: true   # Allow user to add new classes during labeling
+  epochs: 5                     # Number of fine-tuning epochs
+  learning_rate: 0.0001         # Learning rate for fine-tuning
+  batch_size: 8                 # Batch size for fine-tuning
+
+# =============================================================================
 logging:
   level: "INFO"                 # Options: DEBUG, INFO, WARNING, ERROR
   log_clustering_steps: true    # Log each clustering step

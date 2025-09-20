@@ -75,14 +75,65 @@ def check_prerequisites():
     print("✅ All prerequisites met")
     return True
 
+def clear_data_images():
+    """Clear all images from the data directory and user corrections"""
+    print_step(1, "Clearing Data Directory Images & User Corrections")
+    
+    try:
+        import shutil
+        
+        data_dir = Path("data")
+        removed_count = 0
+        
+        # Clear data directory if it exists
+        if data_dir.exists():
+            # Remove all subdirectories and files in data/
+            for item in data_dir.iterdir():
+                if item.is_dir():
+                    print(f"   🗑️  Removing directory: {item.name}")
+                    shutil.rmtree(item)
+                    removed_count += 1
+                elif item.is_file():
+                    print(f"   🗑️  Removing file: {item.name}")
+                    item.unlink()
+                    removed_count += 1
+        
+        # Clear user corrections from fine-tuning
+        corrections_file = Path("src/unsupervised_ml/user_corrections.json")
+        if corrections_file.exists():
+            print(f"   🗑️  Clearing user corrections: {corrections_file.name}")
+            corrections_file.unlink()
+            removed_count += 1
+        
+        # Clear trained model to force retraining
+        model_file = Path("src/unsupervised_ml/trained_bird_classifier.pth")
+        if model_file.exists():
+            print(f"   🗑️  Removing previous model: {model_file.name}")
+            model_file.unlink()
+            removed_count += 1
+        
+        print(f"✅ Data and corrections cleared successfully - removed {removed_count} items")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Data directory clear error: {e}")
+        return False
+
 def clear_mongodb():
     """Clear MongoDB collection"""
-    print_step(1, "Clearing MongoDB")
+    print_step(2, "Clearing MongoDB")
     
     try:
         result = subprocess.run([
             'mongosh', 'birds_of_play', '--eval', 
-            'db.captured_frames.deleteMany({}); print("Cleared", db.captured_frames.countDocuments({}), "frames");'
+            '''
+            db.captured_frames.deleteMany({}); 
+            db.high_confidence_detections.deleteMany({});
+            db.region_detections.deleteMany({});
+            print("Cleared captured_frames:", db.captured_frames.countDocuments({}));
+            print("Cleared detections:", db.high_confidence_detections.countDocuments({}));
+            print("Cleared regions:", db.region_detections.countDocuments({}));
+            '''
         ], capture_output=True, text=True, timeout=10)
         
         if result.returncode == 0:
@@ -97,7 +148,7 @@ def clear_mongodb():
 
 def run_motion_detection_on_video():
     """Run C++ motion detection on the test video"""
-    print_step(2, "Running Motion Detection on Video")
+    print_step(3, "Running Motion Detection on Video")
     
     # Load configuration to get video path
     try:
@@ -144,7 +195,7 @@ def run_motion_detection_on_video():
 
 def verify_mongodb_frames():
     """Verify frames were saved to MongoDB"""
-    print_step(3, "Verifying MongoDB Frames")
+    print_step(4, "Verifying MongoDB Frames")
     
     try:
         result = subprocess.run([
@@ -185,7 +236,7 @@ def verify_mongodb_frames():
 
 def extract_all_regions():
     """Extract all consolidated regions from frames as individual cutout images"""
-    print_step(4, "Extracting Region Cutouts")
+    print_step(5, "Extracting Region Cutouts")
     
     try:
         print("✂️ Extracting all consolidated regions from frames...")
@@ -241,7 +292,7 @@ def extract_all_regions():
 
 def run_batch_region_detection():
     """Run comprehensive YOLO11 detection on all extracted region cutouts"""
-    print_step(5, "Running Batch Region Detection")
+    print_step(6, "Running Batch Region Detection")
     
     try:
         print("🎯 Running comprehensive YOLO11 detection on extracted region cutouts...")
@@ -280,7 +331,7 @@ def run_batch_region_detection():
 
 def start_web_servers():
     """Start all web servers for viewing results"""
-    print_step(6, "Starting Web Servers")
+    print_step(7, "Starting Web Servers")
     
     try:
         import subprocess
@@ -351,7 +402,7 @@ def start_web_servers():
 
 def extract_all_objects():
     """Extract individual object images from detected regions for clustering"""
-    print_step(7, "Extracting Object Images")
+    print_step(8, "Extracting Object Images")
     
     try:
         print("✂️ Extracting individual object images from detected regions...")
@@ -416,7 +467,7 @@ def extract_all_objects():
 
 def initialize_clustering_system():
     """Initialize the bird clustering system with detected objects"""
-    print_step(8, "Initializing Bird Clustering System")
+    print_step(9, "Initializing Bird Clustering System")
     
     try:
         print("🔬 Initializing clustering system with detected bird objects...")
@@ -459,7 +510,7 @@ def initialize_clustering_system():
 
 def train_supervised_classifier():
     """Train supervised classifier using clustering results as pseudo-labels"""
-    print_step(9, "Training Supervised Classifier")
+    print_step(10, "Training Supervised Classifier")
     
     try:
         print("🧠 Training supervised bird classifier using clustering pseudo-labels...")
@@ -555,7 +606,7 @@ def train_supervised_classifier():
 
 def verify_final_results():
     """Verify the complete pipeline results"""
-    print_step(10, "Verifying Final Results")
+    print_step(11, "Verifying Final Results")
     
     try:
         result = subprocess.run([
@@ -612,6 +663,7 @@ def main():
     # Track results
     results = {
         'prerequisites': False,
+        'clear_data_images': False,
         'mongodb_clear': False,
         'motion_detection': False,
         'mongodb_verify': False,
@@ -628,6 +680,10 @@ def main():
     try:
         results['prerequisites'] = check_prerequisites()
         if not results['prerequisites']:
+            return 1
+        
+        results['clear_data_images'] = clear_data_images()
+        if not results['clear_data_images']:
             return 1
         
         results['mongodb_clear'] = clear_mongodb()
