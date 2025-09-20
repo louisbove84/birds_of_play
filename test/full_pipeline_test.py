@@ -377,8 +377,8 @@ def start_web_servers():
                 
                 # Start fine-tuning server (port 3003) - using full fine-tuning system
                 subprocess.Popen([
-                    str(venv_python), 'fine_tuning_server.py'
-                ], cwd=str(ml_dir), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    str(venv_python), 'fine_tuning_viewer.py'
+                ], cwd=str(project_root / "web"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 print("   ✅ Fine-tuning server starting...")
                 time.sleep(3)
             else:

@@ -117,8 +117,9 @@ class BirdClassifier(nn.Module):
 class SupervisedBirdTrainer:
     """Trainer for supervised bird classification using clustering pseudo-labels."""
     
-    def __init__(self, config: Optional[ClusteringConfig] = None):
+    def __init__(self, config: Optional[ClusteringConfig] = None, n_classes: Optional[int] = None):
         self.config = config if config is not None else load_clustering_config()
+        self.n_classes_override = n_classes
         
         # Set up logging
         log_level = getattr(logging, self.config.log_level.upper(), logging.INFO)
@@ -196,7 +197,7 @@ class SupervisedBirdTrainer:
         self.logger.info(f"Found {len(image_paths)} images with {len(set(labels))} clusters")
         
         # Create model with correct number of classes
-        n_classes = len(set(labels))
+        n_classes = self.n_classes_override if self.n_classes_override is not None else len(set(labels))
         self.model = BirdClassifier(
             n_classes=n_classes,
             model_name=self.config.model_name,
@@ -572,24 +573,71 @@ class SupervisedBirdTrainer:
             
             self.logger.info(f"Expanding model from {current_classes} to {new_n_classes} classes")
             
-            # Get the current classifier weights and bias
+            # Get the current classifier - handle both Linear and Sequential cases
             old_classifier = self.model.classifier
-            old_weight = old_classifier.weight.data
-            old_bias = old_classifier.bias.data
             
-            # Create new classifier with expanded classes
-            new_classifier = nn.Linear(old_classifier.in_features, new_n_classes)
+            # If classifier is Sequential, get the last Linear layer
+            if isinstance(old_classifier, nn.Sequential):
+                # Find the last Linear layer in the Sequential
+                linear_layer = None
+                for layer in reversed(old_classifier):
+                    if isinstance(layer, nn.Linear):
+                        linear_layer = layer
+                        break
+                
+                if linear_layer is None:
+                    raise ValueError("No Linear layer found in classifier Sequential")
+                
+                old_weight = linear_layer.weight.data
+                old_bias = linear_layer.bias.data
+                in_features = linear_layer.in_features
+                
+                # Create new classifier with expanded classes
+                # Use the backbone's actual output features, not the classifier's in_features
+                backbone_features = self.model.backbone.fc.in_features if hasattr(self.model.backbone, 'fc') else 2048
+                new_linear = nn.Linear(backbone_features, new_n_classes)
+                
+                # Copy old weights and bias
+                new_linear.weight.data[:current_classes] = old_weight
+                new_linear.bias.data[:current_classes] = old_bias
+                
+                # Initialize new class weights randomly (small values)
+                nn.init.xavier_uniform_(new_linear.weight.data[current_classes:])
+                nn.init.constant_(new_linear.bias.data[current_classes:], 0)
+                
+                # Replace the last Linear layer in Sequential
+                new_layers = []
+                for layer in old_classifier:
+                    if isinstance(layer, nn.Linear):
+                        new_layers.append(new_linear)
+                        break  # Replace only the first Linear layer found
+                    else:
+                        new_layers.append(layer)
+                
+                self.model.classifier = nn.Sequential(*new_layers)
+                
+            elif isinstance(old_classifier, nn.Linear):
+                # Handle simple Linear classifier
+                old_weight = old_classifier.weight.data
+                old_bias = old_classifier.bias.data
+                
+                # Create new classifier with expanded classes
+                new_classifier = nn.Linear(old_classifier.in_features, new_n_classes)
+                
+                # Copy old weights and bias
+                new_classifier.weight.data[:current_classes] = old_weight
+                new_classifier.bias.data[:current_classes] = old_bias
+                
+                # Initialize new class weights randomly (small values)
+                nn.init.xavier_uniform_(new_classifier.weight.data[current_classes:])
+                nn.init.constant_(new_classifier.bias.data[current_classes:], 0)
+                
+                # Replace the classifier
+                self.model.classifier = new_classifier
+            else:
+                raise ValueError(f"Unsupported classifier type: {type(old_classifier)}")
             
-            # Copy old weights and bias
-            new_classifier.weight.data[:current_classes] = old_weight
-            new_classifier.bias.data[:current_classes] = old_bias
-            
-            # Initialize new class weights randomly (small values)
-            nn.init.xavier_uniform_(new_classifier.weight.data[current_classes:])
-            nn.init.constant_(new_classifier.bias.data[current_classes:], 0)
-            
-            # Replace the classifier
-            self.model.classifier = new_classifier
+            # Update model class count
             self.model.n_classes = new_n_classes
             
             # Move to device
