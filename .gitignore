@@ -65,14 +65,12 @@ data/objects/
 data/highlighted_frames/
 data/visualizations/
 
-# Large files
+# Large files (non-LFS)
 *.pth
 *.pt
-*.mp4
-*.mov
 *.avi
 *.mkv
-test/vid/*.mp4
-test/vid/*.mov
 src/unsupervised_ml/*.pth
 src/unsupervised_ml/*.pt
+
+# Note: *.mp4 and *.mov files are now handled by Git LFS
