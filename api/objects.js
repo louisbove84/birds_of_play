@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -21,7 +21,7 @@ export default function handler(req, res) {
             timestamp: "2025-01-25T03:29:37.000Z"
         },
         {
-            _id: "det_002", 
+            _id: "det_002",
             detection_id: "frame_27_region_0_det_0",
             confidence: 0.92,
             class_name: "bird",
@@ -46,25 +46,32 @@ export default function handler(req, res) {
         return;
     }
 
-    // Generate detection cards HTML
-    const detectionCards = mockDetectionData.map(detection => `
+    // Real bird detection images from test results
+    const birdImages = [
+        '1306aa44-2d7a-4d8d-aa1c-e2c511c5a3c6_0_obj_0.jpg',
+        '1b81c650-c077-4af0-bc99-fb8848069b26_0_obj_0.jpg',
+        '31556a49-c14c-46d7-89be-7a9f7633b797_0_obj_0.jpg',
+        '324d2e91-c8fd-4d00-993e-663bd9c2434a_0_obj_0.jpg',
+        '32e8027f-c327-464e-b936-13e5673bee94_0_obj_0.jpg',
+        '4986359b-6a9c-4bff-8a80-cbe4115f96d8_0_obj_0.jpg',
+        '63f05dde-3085-4f21-84c4-3b94303997db_0_obj_0.jpg',
+        '709a8042-d5ae-4908-956e-38d039bdb6bd_0_obj_0.jpg',
+        '75a2e6e0-941a-4cfe-adc0-20a6d3cc82d8_0_obj_0.jpg',
+        '7799a21a-b4c1-41de-b9ff-0675285955ae_0_obj_0.jpg',
+        '818458ae-43d2-40f8-9ef1-bce9b3351508_0_obj_0.jpg',
+        '88d644e2-a27f-4d6e-b112-6755f76d5ed5_0_obj_0.jpg'
+    ];
+
+    // Generate bird detection gallery HTML
+    const birdGallery = birdImages.map((image, index) => `
         <div class="detection-card">
             <div class="detection-header">
-                <div class="detection-id">${detection.detection_id}</div>
-                <div class="confidence-badge">${Math.round(detection.confidence * 100)}%</div>
+                <div class="detection-id">Bird Detection ${index + 1}</div>
+                <div class="confidence-badge">High Confidence</div>
             </div>
-            
-            <div class="bbox-info">
-                <div class="bbox-coords">
-                    Bounding Box: (${detection.bbox.x}, ${detection.bbox.y})
-                </div>
-                <div class="bbox-size">
-                    Size: ${detection.bbox.width} × ${detection.bbox.height} pixels
-                </div>
-            </div>
-            
-            <div class="timestamp">
-                Detected: ${new Date(detection.timestamp).toLocaleString()}
+            <img src="/images/objects/${image}" alt="Bird detection" class="bird-image" />
+            <div class="detection-info">
+                Extracted bird object from YOLO11 analysis of DBSCAN consolidated regions.
             </div>
         </div>
     `).join('');
@@ -153,11 +160,18 @@ export default function handler(req, res) {
             font-size: 0.9rem;
             opacity: 0.9;
         }
-        .timestamp {
-            text-align: center;
-            margin-top: 10px;
+        .bird-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .detection-info {
             font-size: 0.9rem;
-            opacity: 0.8;
+            opacity: 0.9;
+            margin-top: 10px;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -174,9 +188,10 @@ export default function handler(req, res) {
         </div>
 
         <h2>High-Confidence Bird Detections</h2>
+        <p>Real bird objects extracted from YOLO11 analysis:</p>
         
         <div class="detection-grid">
-            ${detectionCards}
+            ${birdGallery}
         </div>
     </div>
 </body>

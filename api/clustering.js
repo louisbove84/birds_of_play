@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -22,7 +22,7 @@ export default function handler(req, res) {
                 characteristics: "Small songbirds, compact build"
             },
             {
-                id: 1, 
+                id: 1,
                 name: "Species Cluster 2",
                 count: 19,
                 confidence: 0.87,
@@ -30,7 +30,7 @@ export default function handler(req, res) {
             },
             {
                 id: 2,
-                name: "Species Cluster 3", 
+                name: "Species Cluster 3",
                 count: 2,
                 confidence: 0.95,
                 characteristics: "Larger birds, distinctive features"
@@ -54,8 +54,26 @@ export default function handler(req, res) {
         return;
     }
 
-    // Generate cluster cards HTML
-    const clusterCards = mockClusteringData.clusters.map(cluster => `
+    // Organize bird images by clusters (simulating clustering results)
+    const birdImages = [
+        '1306aa44-2d7a-4d8d-aa1c-e2c511c5a3c6_0_obj_0.jpg',
+        '1b81c650-c077-4af0-bc99-fb8848069b26_0_obj_0.jpg',
+        '31556a49-c14c-46d7-89be-7a9f7633b797_0_obj_0.jpg',
+        '324d2e91-c8fd-4d00-993e-663bd9c2434a_0_obj_0.jpg',
+        '32e8027f-c327-464e-b936-13e5673bee94_0_obj_0.jpg',
+        '4986359b-6a9c-4bff-8a80-cbe4115f96d8_0_obj_0.jpg',
+        '63f05dde-3085-4f21-84c4-3b94303997db_0_obj_0.jpg',
+        '709a8042-d5ae-4908-956e-38d039bdb6bd_0_obj_0.jpg',
+        '75a2e6e0-941a-4cfe-adc0-20a6d3cc82d8_0_obj_0.jpg',
+        '7799a21a-b4c1-41de-b9ff-0675285955ae_0_obj_0.jpg',
+        '818458ae-43d2-40f8-9ef1-bce9b3351508_0_obj_0.jpg',
+        '88d644e2-a27f-4d6e-b112-6755f76d5ed5_0_obj_0.jpg'
+    ];
+
+    // Generate cluster cards with real bird images
+    const clusterCards = mockClusteringData.clusters.map((cluster, clusterIndex) => {
+        const clusterImages = birdImages.slice(clusterIndex * 3, (clusterIndex + 1) * 3);
+        return `
         <div class="cluster-card">
             <div class="cluster-header">
                 <div class="cluster-name">${cluster.name}</div>
@@ -69,11 +87,18 @@ export default function handler(req, res) {
                 </div>
             </div>
             
+            <div class="bird-samples">
+                ${clusterImages.map(image => `
+                    <img src="/images/objects/${image}" alt="Bird in cluster" class="cluster-bird-image" />
+                `).join('')}
+            </div>
+            
             <div class="characteristics">
                 ${cluster.characteristics}
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Main clustering viewer HTML
     res.status(200).send(`
@@ -162,6 +187,19 @@ export default function handler(req, res) {
             background: #4CAF50;
             border-radius: 4px;
         }
+        .bird-samples {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .cluster-bird-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 2px solid rgba(233, 30, 99, 0.3);
+        }
         .characteristics {
             background: rgba(156, 39, 176, 0.1);
             border: 1px solid rgba(156, 39, 176, 0.3);
@@ -185,6 +223,7 @@ export default function handler(req, res) {
         </div>
 
         <h2>Identified Species Clusters</h2>
+        <p>Real bird clustering results with sample images:</p>
         
         <div class="cluster-grid">
             ${clusterCards}

@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -24,7 +24,7 @@ export default function handler(req, res) {
                 id: "correction_001",
                 objectId: "obj_015",
                 originalPrediction: "Species Cluster 2",
-                userCorrection: "Species Cluster 1", 
+                userCorrection: "Species Cluster 1",
                 confidence: 0.72,
                 timestamp: "2025-01-25T03:30:15.000Z"
             },
@@ -45,7 +45,7 @@ export default function handler(req, res) {
                 reason: "Low confidence prediction"
             },
             {
-                objectId: "obj_012", 
+                objectId: "obj_012",
                 prediction: "Species Cluster 2",
                 confidence: 0.65,
                 reason: "Borderline confidence"

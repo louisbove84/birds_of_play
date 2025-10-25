@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -26,7 +26,7 @@ export default function handler(req, res) {
             }
         },
         {
-            _id: "frame_002", 
+            _id: "frame_002",
             timestamp: "2025-01-25T03:29:38.000Z",
             metadata: {
                 frame_count: 27,
@@ -48,40 +48,28 @@ export default function handler(req, res) {
         return;
     }
 
-    // Generate frame cards HTML
-    const frameCards = mockFrameData.map(frame => `
-        <div class="frame-card">
-            <div class="frame-header">
-                <div class="frame-id">Frame ${frame.metadata.frame_count}</div>
-                <div class="frame-time">${new Date(frame.timestamp).toLocaleTimeString()}</div>
+    // Real motion processing images from test results
+    const motionImages = [
+        '1_pair_0_1_motion_processing.jpg',
+        '2_pair_0_1_motion_processing.jpg', 
+        '3_pair_0_1_motion_processing.jpg',
+        '2_pair_0_1_consolidation.jpg',
+        '3_pair_0_1_consolidation.jpg'
+    ];
+
+    // Generate image gallery HTML
+    const imageGallery = motionImages.map((image, index) => `
+        <div class="image-card">
+            <div class="image-header">
+                <div class="image-title">${image.includes('consolidation') ? 'DBSCAN Consolidation' : 'Motion Processing'}</div>
+                <div class="image-number">Result ${index + 1}</div>
             </div>
-            
-            <div class="motion-info">
-                <div class="info-item">
-                    <div class="info-label">Motion Regions</div>
-                    <div class="info-value">${frame.metadata.motion_regions}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Consolidated</div>
-                    <div class="info-value">${frame.metadata.consolidated_regions_count}</div>
-                </div>
+            <img src="/images/motion/${image}" alt="Motion detection result" class="result-image" />
+            <div class="image-description">
+                ${image.includes('consolidation') ? 
+                    'Shows consolidated motion regions using DBSCAN clustering with overlap-aware distance metrics.' :
+                    'Shows individual motion detection with bounding boxes around detected movement.'}
             </div>
-            
-            ${frame.metadata.consolidated_regions.length > 0 ? `
-                <div class="regions-list">
-                    <h4>DBSCAN Consolidated Regions:</h4>
-                    ${frame.metadata.consolidated_regions.map((region, i) => `
-                        <div class="region-item">
-                            <div class="region-coords">
-                                Region ${i + 1}: (${region.x}, ${region.y}) ${region.width}×${region.height}px
-                            </div>
-                            <div class="region-objects">
-                                Contains ${region.object_count} motion objects
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
         </div>
     `).join('');
 
@@ -121,19 +109,31 @@ export default function handler(req, res) {
         .nav-links a:hover {
             text-decoration: underline;
         }
-        .frame-grid { 
+        .image-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); 
             gap: 20px; 
             margin: 20px 0;
         }
-        .frame-card {
+        .image-card {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 20px;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .frame-header {
+        .result-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .image-description {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+        .image-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -141,11 +141,11 @@ export default function handler(req, res) {
             padding-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .frame-id {
+        .image-title {
             font-weight: bold;
             color: #FF6B35;
         }
-        .frame-time {
+        .image-number {
             font-size: 0.9rem;
             opacity: 0.8;
         }
@@ -209,9 +209,10 @@ export default function handler(req, res) {
         </div>
 
         <h2>Motion Detection Results</h2>
+        <p>Real images from DBSCAN motion detection pipeline test:</p>
         
-        <div class="frame-grid">
-            ${frameCards}
+        <div class="image-grid">
+            ${imageGallery}
         </div>
     </div>
 </body>
