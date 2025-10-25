@@ -236,9 +236,15 @@ app.get('/', (req, res) => {
                 <a href="https://github.com/louisbove84/birds_of_play" class="github-link" target="_blank">
                     📚 View on GitHub
                 </a>
-                <a href="#" class="github-link" onclick="alert('Demo interfaces would be available when backend services are running locally')">
-                    🎮 Live Demo
-                </a>
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #FFD700; margin-bottom: 15px;">🌐 Live Demo Interfaces</h3>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <a href="/api/motion" class="github-link" style="background: #FF6B35;">📹 Motion Detection</a>
+                        <a href="/api/objects" class="github-link" style="background: #4CAF50;">🎯 Object Detection</a>
+                        <a href="/api/clustering" class="github-link" style="background: #9C27B0;">🔬 Bird Clustering</a>
+                        <a href="/api/finetuning" class="github-link" style="background: #FF9800;">🧠 Fine-Tuning</a>
+                    </div>
+                </div>
             </div>
 
             <div style="margin-top: 40px; opacity: 0.8; font-size: 0.9rem;">

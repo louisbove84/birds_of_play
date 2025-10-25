@@ -3,43 +3,69 @@
   "name": "birds-of-play",
   "builds": [
     {
-      "src": "web/landing_page.js",
+      "src": "api/index.js",
       "use": "@vercel/node"
     },
     {
-      "src": "web/simple_viewer.js",
+      "src": "api/motion.js",
       "use": "@vercel/node"
     },
     {
-      "src": "web/region_viewer.js",
+      "src": "api/objects.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/clustering.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/finetuning.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/motion/(.*)",
-      "dest": "/web/simple_viewer.js"
+      "src": "/api/motion",
+      "dest": "/api/motion.js"
     },
     {
-      "src": "/objects/(.*)",
-      "dest": "/web/region_viewer.js"
+      "src": "/api/objects",
+      "dest": "/api/objects.js"
+    },
+    {
+      "src": "/api/clustering",
+      "dest": "/api/clustering.js"
+    },
+    {
+      "src": "/api/finetuning",
+      "dest": "/api/finetuning.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/web/landing_page.js"
+      "dest": "/api/index.js"
     }
   ],
   "env": {
     "NODE_ENV": "production"
   },
   "functions": {
-    "web/landing_page.js": {
+    "api/index.js": {
       "maxDuration": 30
     },
-    "web/simple_viewer.js": {
+    "api/motion.js": {
       "maxDuration": 30
     },
-    "web/region_viewer.js": {
+    "api/objects.js": {
+      "maxDuration": 30
+    },
+    "api/clustering.js": {
+      "maxDuration": 30
+    },
+    "api/finetuning.js": {
       "maxDuration": 30
     }
   }
