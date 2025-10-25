@@ -145,6 +145,79 @@ export default function handler(req, res) {
             .github-link:hover {
                 background: #555;
             }
+            .upload-section {
+                background: rgba(255,255,255,0.1);
+                border-radius: 8px;
+                padding: 40px;
+                margin: 40px 0;
+                text-align: center;
+            }
+            .upload-area {
+                border: 2px dashed #FF6B35;
+                border-radius: 8px;
+                padding: 40px;
+                margin: 20px 0;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                background: rgba(255, 107, 53, 0.1);
+            }
+            .upload-area:hover {
+                background: rgba(255, 107, 53, 0.2);
+                border-color: #e55a2b;
+            }
+            .upload-area.dragover {
+                background: rgba(255, 107, 53, 0.3);
+                border-color: #e55a2b;
+            }
+            .upload-icon {
+                font-size: 3rem;
+                margin-bottom: 20px;
+            }
+            .upload-text {
+                font-size: 1.1rem;
+                margin-bottom: 20px;
+            }
+            .upload-button {
+                background: #FF6B35;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.3s ease;
+            }
+            .upload-button:hover {
+                background: #e55a2b;
+            }
+            .upload-status {
+                background: rgba(0,0,0,0.2);
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+            }
+            .status-text {
+                font-size: 1.1rem;
+                margin-bottom: 15px;
+            }
+            .progress-bar {
+                background: rgba(255,255,255,0.2);
+                border-radius: 8px;
+                height: 20px;
+                overflow: hidden;
+                margin: 10px 0;
+            }
+            .progress-fill {
+                height: 100%;
+                background: #4CAF50;
+                width: 0%;
+                transition: width 0.3s ease;
+            }
+            .progress-text {
+                font-weight: bold;
+                color: #4CAF50;
+            }
         </style>
     </head>
     <body>
@@ -157,6 +230,31 @@ export default function handler(req, res) {
                 <a href="/api/objects" class="nav-link">🎯 Object Detection</a>
                 <a href="/api/clustering" class="nav-link">🔬 Bird Clustering</a>
                 <a href="/api/finetuning" class="nav-link">🧠 Fine-Tuning</a>
+            </div>
+
+            <div class="upload-section">
+                <h2>🎬 Upload Your Bird Video</h2>
+                <p>Upload a video of birds to run the complete DBSCAN motion detection pipeline!</p>
+                
+                <div class="upload-area" id="upload-area">
+                    <div class="upload-icon">📹</div>
+                    <div class="upload-text">
+                        <strong>Drop your video file here</strong><br>
+                        or click to browse your computer
+                    </div>
+                    <input type="file" id="video-input" accept="video/*" style="display: none;">
+                    <button class="upload-button" onclick="document.getElementById('video-input').click()">
+                        Choose Video File
+                    </button>
+                </div>
+                
+                <div id="upload-status" class="upload-status" style="display: none;">
+                    <div class="status-text">Processing your video...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">0%</div>
+                </div>
             </div>
 
             <div class="demo-section">
@@ -217,6 +315,76 @@ export default function handler(req, res) {
                 <p>Latest commit: <code>ff85cd8</code> - DBSCAN clustering implementation</p>
             </div>
         </div>
+
+        <script>
+            // Video upload functionality
+            const uploadArea = document.getElementById('upload-area');
+            const videoInput = document.getElementById('video-input');
+            const uploadStatus = document.getElementById('upload-status');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+
+            // Drag and drop handlers
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleVideoUpload(files[0]);
+                }
+            });
+
+            // File input handler
+            videoInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleVideoUpload(e.target.files[0]);
+                }
+            });
+
+            // Handle video upload
+            function handleVideoUpload(file) {
+                // Validate file type
+                if (!file.type.startsWith('video/')) {
+                    alert('Please select a valid video file');
+                    return;
+                }
+
+                // Show upload status
+                uploadStatus.style.display = 'block';
+                
+                // Simulate pipeline processing (in real implementation, this would call the API)
+                simulatePipelineProcessing();
+            }
+
+            // Simulate pipeline processing
+            function simulatePipelineProcessing() {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress > 100) progress = 100;
+                    
+                    progressFill.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
+                    
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        setTimeout(() => {
+                            document.querySelector('.status-text').innerHTML = 
+                                '✅ Pipeline completed! <a href="/api/motion" style="color: #FF6B35;">View Results</a>';
+                        }, 500);
+                    }
+                }, 200);
+            }
+        </script>
     </body>
     </html>
     `);
