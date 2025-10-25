@@ -1,202 +1,33 @@
 {
   "corrections": [
     {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/4f5113cb-b5b5-45f9-a1c0-b55e250e5ded_6_obj_0.jpg",
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/f26d4f9e-5223-4a70-ac70-2ecd39ad2d25_0_obj_0.jpg",
       "original_prediction": {
         "class_id": 1,
         "class_name": "Species_1",
-        "confidence": 0.7872384190559387
+        "confidence": 0.5271170139312744
       },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:11:20.031Z",
-      "confidence_at_time": 0.7872384190559387
+      "corrected_class_id": 2,
+      "corrected_class_name": "Species_2",
+      "timestamp": "2025-10-25T10:40:38.826Z",
+      "confidence_at_time": 0.5271170139312744
     },
     {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a982bc13-b004-48e7-a8d8-7c62a29995a0_0_obj_0.jpg",
+      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/d0bf7890-8659-4230-affe-1e1e4c94233e_0_obj_0.jpg",
       "original_prediction": {
         "class_id": 1,
         "class_name": "Species_1",
-        "confidence": 0.8676218390464783
+        "confidence": 0.6293890476226807
       },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:11:28.199Z",
-      "confidence_at_time": 0.8676218390464783
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/6adbf916-942f-4a52-8852-72e74333d4f3_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9169367551803589
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:11:36.014Z",
-      "confidence_at_time": 0.9169367551803589
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/8ebdac3a-2faf-46e9-a8b1-810d90331b14_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9436418414115906
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:11:43.415Z",
-      "confidence_at_time": 0.9436418414115906
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/eda68e31-1a53-4cb9-b7e3-cd4fbce137d0_8_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.9543724060058594
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:11:49.632Z",
-      "confidence_at_time": 0.9543724060058594
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/c3d70077-e97a-4493-9fcc-863c376164a0_6_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.9596736431121826
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:11:56.497Z",
-      "confidence_at_time": 0.9596736431121826
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/538cc3c9-1905-4885-90e4-b250716cb663_1_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.9674140810966492
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:12:02.098Z",
-      "confidence_at_time": 0.9674140810966492
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_8_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.9689121842384338
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:12:06.865Z",
-      "confidence_at_time": 0.9689121842384338
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.9709850549697876
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:12:11.348Z",
-      "confidence_at_time": 0.9709850549697876
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_1_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 0,
-        "class_name": "Species_0",
-        "confidence": 0.971465528011322
-      },
-      "corrected_class_id": 0,
-      "corrected_class_name": "Species_0",
-      "timestamp": "2025-09-20T17:12:16.265Z",
-      "confidence_at_time": 0.971465528011322
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/890a853a-a884-4df3-8c64-da9f44487648_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9759637117385864
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:12:22.248Z",
-      "confidence_at_time": 0.9759637117385864
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/8dfd8f58-e52f-47af-a144-b6147fefd03b_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9850290417671204
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:12:30.865Z",
-      "confidence_at_time": 0.9850290417671204
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a7dfb0af-76f3-4aef-8edb-28aa8922d6bb_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9864545464515686
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:12:38.715Z",
-      "confidence_at_time": 0.9864545464515686
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/6d502274-a3c1-4480-ac1b-69107a9163c0_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9876980185508728
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:12:43.132Z",
-      "confidence_at_time": 0.9876980185508728
-    },
-    {
-      "image_path": "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/34bb21a6-6dad-4fba-8655-51146ee6ec1c_0_obj_0.jpg",
-      "original_prediction": {
-        "class_id": 1,
-        "class_name": "Species_1",
-        "confidence": 0.9912920594215393
-      },
-      "corrected_class_id": 1,
-      "corrected_class_name": "Species_1",
-      "timestamp": "2025-09-20T17:12:46.915Z",
-      "confidence_at_time": 0.9912920594215393
+      "corrected_class_id": 2,
+      "corrected_class_name": "Species_2",
+      "timestamp": "2025-10-25T10:41:14.975Z",
+      "confidence_at_time": 0.6293890476226807
     }
   ],
   "processed_images": [
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/6adbf916-942f-4a52-8852-72e74333d4f3_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a982bc13-b004-48e7-a8d8-7c62a29995a0_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/8ebdac3a-2faf-46e9-a8b1-810d90331b14_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/8dfd8f58-e52f-47af-a144-b6147fefd03b_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/34bb21a6-6dad-4fba-8655-51146ee6ec1c_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_1_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/6d502274-a3c1-4480-ac1b-69107a9163c0_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/890a853a-a884-4df3-8c64-da9f44487648_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/4f5113cb-b5b5-45f9-a1c0-b55e250e5ded_6_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/a7dfb0af-76f3-4aef-8edb-28aa8922d6bb_0_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/eda68e31-1a53-4cb9-b7e3-cd4fbce137d0_8_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/cfe0551e-335f-47b1-af82-0e25b18d2d2d_8_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/538cc3c9-1905-4885-90e4-b250716cb663_1_obj_0.jpg",
-    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/c3d70077-e97a-4493-9fcc-863c376164a0_6_obj_0.jpg"
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/f26d4f9e-5223-4a70-ac70-2ecd39ad2d25_0_obj_0.jpg",
+    "/Users/beuxb/Desktop/Projects/birds_of_play/data/objects/d0bf7890-8659-4230-affe-1e1e4c94233e_0_obj_0.jpg"
   ],
-  "last_updated": 1758388366.924321
+  "last_updated": 1761388874.984257
 }

@@ -19,6 +19,7 @@ import sys
 import os
 import time
 import json
+import argparse
 from pathlib import Path
 
 # Add the src directory to Python path for imports
@@ -27,6 +28,9 @@ from config_loader import load_clustering_config
 
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Global variable for custom video path
+custom_video_path = None
 
 def print_banner(title):
     """Print a formatted banner"""
@@ -150,19 +154,26 @@ def run_motion_detection_on_video():
     """Run C++ motion detection on the test video"""
     print_step(3, "Running Motion Detection on Video")
     
-    # Load configuration to get video path
-    try:
-        config = load_clustering_config()
-        video_path = os.path.abspath(config.test_video_path)
-        timeout = config.test_timeout_seconds
-        print(f"📹 Processing video from config: {video_path}")
-        print(f"⏱️  Timeout: {timeout}s")
-    except Exception as e:
-        print(f"⚠️  Warning: Could not load config ({e}), using defaults")
-        video_path = os.path.abspath("test/vid/vid_3.mov")
+    # Use custom video path if provided, otherwise load from config
+    if custom_video_path:
+        video_path = os.path.abspath(custom_video_path)
+        print(f"📹 Processing custom video: {video_path}")
+        print(f"⏱️  Timeout: 300s (default)")
         timeout = 300
-        print(f"📹 Processing video: {video_path}")
-        print(f"⏱️  Timeout: {timeout}s")
+    else:
+        # Load configuration to get video path
+        try:
+            config = load_clustering_config()
+            video_path = os.path.abspath(config.test_video_path)
+            timeout = config.test_timeout_seconds
+            print(f"📹 Processing video from config: {video_path}")
+            print(f"⏱️  Timeout: {timeout}s")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not load config ({e}), using defaults")
+            video_path = os.path.abspath("test/vid/vid_3.mov")
+            timeout = 300
+            print(f"📹 Processing video: {video_path}")
+            print(f"⏱️  Timeout: {timeout}s")
     
     try:
         # Run motion detection with MongoDB integration
@@ -656,7 +667,16 @@ def verify_final_results():
 
 def main():
     """Main test execution"""
+    parser = argparse.ArgumentParser(description='Birds of Play - Full Pipeline Test')
+    parser.add_argument('--video', type=str, help='Path to custom video file to process')
+    parser.add_argument('--skip-video', action='store_true', help='Skip video processing and use existing data')
+    args = parser.parse_args()
+    
     print_banner("Birds of Play - Full Pipeline Test")
+    
+    # Set custom video path if provided
+    global custom_video_path
+    custom_video_path = args.video
     
     start_time = time.time()
     
@@ -682,21 +702,28 @@ def main():
         if not results['prerequisites']:
             return 1
         
-        results['clear_data_images'] = clear_data_images()
-        if not results['clear_data_images']:
-            return 1
-        
-        results['mongodb_clear'] = clear_mongodb()
-        if not results['mongodb_clear']:
-            return 1
-        
-        results['motion_detection'] = run_motion_detection_on_video()
-        if not results['motion_detection']:
-            return 1
-        
-        results['mongodb_verify'] = verify_mongodb_frames()
-        if not results['mongodb_verify']:
-            return 1
+        if args.skip_video:
+            print("🔄 Skipping video processing - using existing data")
+            results['clear_data_images'] = True
+            results['mongodb_clear'] = True
+            results['motion_detection'] = True
+            results['mongodb_verify'] = True
+        else:
+            results['clear_data_images'] = clear_data_images()
+            if not results['clear_data_images']:
+                return 1
+            
+            results['mongodb_clear'] = clear_mongodb()
+            if not results['mongodb_clear']:
+                return 1
+            
+            results['motion_detection'] = run_motion_detection_on_video()
+            if not results['motion_detection']:
+                return 1
+            
+            results['mongodb_verify'] = verify_mongodb_frames()
+            if not results['mongodb_verify']:
+                return 1
         
         results['extract_regions'] = extract_all_regions()
         if not results['extract_regions']:

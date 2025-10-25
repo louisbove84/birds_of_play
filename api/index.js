@@ -218,6 +218,49 @@ export default function handler(req, res) {
                 font-weight: bold;
                 color: #4CAF50;
             }
+            .demo-video-wrapper {
+                width: 100%;
+                max-width: 900px;
+                margin: 20px auto;
+            }
+            .demo-video {
+                width: 100%;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                display: block;
+                background: #000;
+            }
+            .video-legend {
+                display: flex;
+                justify-content: center;
+                gap: 40px;
+                margin-top: 20px;
+                padding: 20px;
+                background: rgba(0,0,0,0.3);
+                border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 14px;
+            }
+            .legend-box {
+                width: 30px;
+                height: 30px;
+                border-radius: 4px;
+                display: inline-block;
+                border: 3px solid;
+            }
+            .gray-box {
+                background: rgba(200, 200, 200, 0.4);
+                border-color: rgb(200, 200, 200);
+            }
+            .red-box {
+                background: rgba(255, 0, 0, 0.4);
+                border-color: rgb(255, 0, 0);
+            }
         </style>
     </head>
     <body>
@@ -230,6 +273,29 @@ export default function handler(req, res) {
                 <a href="/api/objects" class="nav-link">🎯 Object Detection</a>
                 <a href="/api/clustering" class="nav-link">🔬 Bird Clustering</a>
                 <a href="/api/finetuning" class="nav-link">🧠 Fine-Tuning</a>
+            </div>
+
+            <div class="demo-section">
+                <h2>🎥 Real-time Motion Detection Demo</h2>
+                <p>Watch DBSCAN clustering in action with live bounding box visualization</p>
+                
+                <div class="demo-video-wrapper">
+                    <video controls autoplay loop muted class="demo-video">
+                        <source src="/videos/demo.mp4" type="video/mp4">
+                        <source src="/videos/vid_4.mov" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="video-legend">
+                        <div class="legend-item">
+                            <span class="legend-box gray-box"></span>
+                            <span>Individual Motion Detection</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-box red-box"></span>
+                            <span>DBSCAN Consolidated Regions</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="upload-section">

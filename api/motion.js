@@ -51,7 +51,7 @@ export default function handler(req, res) {
     // Real motion processing images from test results
     const motionImages = [
         '1_pair_0_1_motion_processing.jpg',
-        '2_pair_0_1_motion_processing.jpg', 
+        '2_pair_0_1_motion_processing.jpg',
         '3_pair_0_1_motion_processing.jpg',
         '2_pair_0_1_consolidation.jpg',
         '3_pair_0_1_consolidation.jpg'
@@ -66,9 +66,9 @@ export default function handler(req, res) {
             </div>
             <img src="/images/motion/${image}" alt="Motion detection result" class="result-image" />
             <div class="image-description">
-                ${image.includes('consolidation') ? 
-                    'Shows consolidated motion regions using DBSCAN clustering with overlap-aware distance metrics.' :
-                    'Shows individual motion detection with bounding boxes around detected movement.'}
+                ${image.includes('consolidation') ?
+            'Shows consolidated motion regions using DBSCAN clustering with overlap-aware distance metrics.' :
+            'Shows individual motion detection with bounding boxes around detected movement.'}
             </div>
         </div>
     `).join('');

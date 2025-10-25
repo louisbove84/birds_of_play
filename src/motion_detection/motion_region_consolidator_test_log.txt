@@ -1,0 +1,4 @@
+[2025-10-24 12:59:11.011] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-24 12:59:11.013] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/src/motion_detection/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/src/motion_detection/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-24 12:59:11.013] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-24 12:59:11.013] [warning] [motion_region_consolidator_test.cpp:177 TestBody] No motion detected in real bird images - skipping real data test

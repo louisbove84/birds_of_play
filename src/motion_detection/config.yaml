@@ -68,10 +68,10 @@ min_tracking_confidence: 0.75   # Minimum confidence for tracking (INCREASED to 
 # REGION CONSOLIDATION
 # ===============================
 # Consolidation parameters for grouping nearby motion detections - Tuned for birds
-max_distance_threshold: 150.0        # Max distance between objects to group (INCREASED to capture bird flight patterns)
-min_objects_per_region: 10           # Min objects to form a region (BALANCED for meaningful bird movement)
+max_distance_threshold: 0.5          # Max distance as percentage of frame diagonal (0.5 = 50% of diagonal)
+min_objects_per_region: 2            # Min objects to form a region (REDUCED to allow smaller groups)
 overlap_threshold: 0.3               # Min overlap ratio to merge regions (INCREASED for stricter merging)
-grid_cell_size: 120.0                # Cell size for grid-based grouping (REDUCED for finer tracking)
+grid_cell_size: 0.05                 # Cell size as percentage of frame diagonal (0.05 = 5% of diagonal)
 max_frames_without_update: 5         # Max frames before removing region (REDUCED to remove transient noise faster)
 min_region_area: 3000.0              # Min area for consolidated region (BALANCED for bird movement detection)
 max_region_area: 1000000.0           # Max area for consolidated region (640x640 = 409,600)

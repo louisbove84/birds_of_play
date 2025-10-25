@@ -1,0 +1,77 @@
+[2025-10-25 02:58:55.927] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.929] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.929] [warning] [motion_region_consolidator_test.cpp:177 TestBody] No motion detected in real bird images - skipping real data test
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.929] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator_test.cpp:238 TestBody] Testing consolidation with 8 synthetic objects
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 8 objects -> 8 significant objects (removed background noise)
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 2 regions (no size constraints)
+[2025-10-25 02:58:55.929] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 2 regions (no size constraints applied)
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:517 consolidateRegionsStandalone] Saved standalone consolidation visualization to: test_results/motion_region_consolidator/google_test_mode/02_synthetic_consolidation.jpg
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:248 TestBody] Synthetic consolidation results:
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:249 TestBody] Input: 8 objects -> Output: 2 regions
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:255 TestBody] Region 0: 118x94 at (91,93) with 4 objects
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:255 TestBody] Region 1: 113x89 at (1491,793) with 3 objects
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:269 TestBody] Visualization saved to: test_results/motion_region_consolidator/google_test_mode/02_synthetic_consolidation.jpg
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.936] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator_test.cpp:276 TestBody] Testing consolidation with 13 bird-like objects
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 13 objects -> 13 significant objects (removed background noise)
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 1 regions (no size constraints)
+[2025-10-25 02:58:55.936] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 1 regions (no size constraints applied)
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator.cpp:517 consolidateRegionsStandalone] Saved standalone consolidation visualization to: test_results/motion_region_consolidator/google_test_mode/03_bird_like_consolidation.jpg
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator_test.cpp:294 TestBody] Bird-like consolidation results:
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator_test.cpp:295 TestBody] Input: 13 objects -> Output: 1 regions
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator_test.cpp:301 TestBody] Region 0: 93x85 at (329,627) with 4 objects
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator_test.cpp:313 TestBody] Visualization saved to: test_results/motion_region_consolidator/google_test_mode/03_bird_like_consolidation.jpg
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.941] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.941] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.946] [info] [motion_region_consolidator.cpp:517 consolidateRegionsStandalone] Saved standalone consolidation visualization to: test_results/motion_region_consolidator/google_test_mode/06_empty_input.jpg
+[2025-10-25 02:58:55.946] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 1 objects -> 1 significant objects (removed background noise)
+[2025-10-25 02:58:55.946] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 0 regions (no size constraints)
+[2025-10-25 02:58:55.946] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 0 regions (no size constraints applied)
+[2025-10-25 02:58:55.951] [info] [motion_region_consolidator.cpp:517 consolidateRegionsStandalone] Saved standalone consolidation visualization to: test_results/motion_region_consolidator/google_test_mode/07_single_object.jpg
+[2025-10-25 02:58:55.951] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 2 objects -> 2 significant objects (removed background noise)
+[2025-10-25 02:58:55.951] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 1 regions (no size constraints)
+[2025-10-25 02:58:55.951] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 1 regions (no size constraints applied)
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:517 consolidateRegionsStandalone] Saved standalone consolidation visualization to: test_results/motion_region_consolidator/google_test_mode/08_min_objects.jpg
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.955] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 20 objects -> 20 significant objects (removed background noise)
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 0 regions (no size constraints)
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 0 regions (no size constraints applied)
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.955] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.955] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 60 objects -> 60 significant objects (removed background noise)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 0 regions (no size constraints)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 0 regions (no size constraints applied)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.956] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:419 TestBody] Using synthetic data for ConsolidateRegionsValidInput test
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 3 objects -> 3 significant objects (removed background noise)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 1 regions (no size constraints)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 1 regions (no size constraints applied)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:428 TestBody] ConsolidateRegionsValidInput: 3 objects -> 1 regions
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.956] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.956] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 1 objects -> 1 significant objects (removed background noise)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 0 regions (no size constraints)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 0 regions (no size constraints applied)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:13 MotionRegionConsolidator] MotionRegionConsolidator initialized with config
+[2025-10-25 02:58:55.956] [error] [motion_region_consolidator_test.cpp:31 processRealImages] Failed to load test images: /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image.jpg or /Users/beuxb/Desktop/Projects/birds_of_play/../../../src/motion_detection/tests/img/1/test_image2.jpg
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator_test.cpp:109 SetUp] SetUp complete: 0 real TrackedObjects available for testing
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:158 consolidateRegions] Filtered 3 objects -> 3 significant objects (removed background noise)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:333 createConsolidatedRegions] DBSCAN clustering created 1 regions (no size constraints)
+[2025-10-25 02:58:55.956] [info] [motion_region_consolidator.cpp:227 consolidateRegions] DBSCAN clustering completed: 1 regions (no size constraints applied)

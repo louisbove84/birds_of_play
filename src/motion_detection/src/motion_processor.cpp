@@ -1,3 +1,24 @@
+/**
+ * Motion Processor Implementation
+ * ================================
+ * This file handles the initial motion detection pipeline that produces motion boxes
+ * (TrackedObjects) which are then consolidated by motion_region_consolidator.cpp.
+ * 
+ * Pipeline Overview:
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │ Raw Frame → Preprocessed → Motion Detection → Morphology → Motion Boxes │
+ * └─────────────────────────────────────────────────────────────────────────┘
+ * 
+ * Key Concepts:
+ * - Motion Detection: Identifies pixels that changed between frames
+ * - Motion Boxes: Bounding rectangles around contiguous motion regions
+ * - Adaptive vs Permissive: Two modes for contour filtering thresholds
+ * - Morphological Operations: Clean up noise and connect motion regions
+ * 
+ * Output:
+ * - Vector of cv::Rect (motion boxes) that feed into motion_region_consolidator
+ */
+
 #include "motion_processor.hpp"
 #include "logger.hpp"
 #include <yaml-cpp/yaml.h>
@@ -5,54 +26,77 @@
 
 namespace fs = std::filesystem;
 
+/**
+ * Constructor: Initializes Motion Processor with Configuration
+ * ============================================================
+ * Sets default values for all parameters, then loads from config file.
+ * 
+ * Key Parameter Categories:
+ * 1. Color Processing: How to convert input frames (grayscale/rgb)
+ * 2. Preprocessing: Contrast enhancement and noise reduction
+ * 3. Motion Detection: Frame differencing vs background subtraction
+ * 4. Morphology: Operations to clean up motion masks
+ * 5. Contour Detection: Filters to identify valid motion regions
+ * 
+ * @param configPath - Path to YAML configuration file
+ */
 MotionProcessor::MotionProcessor(const std::string& configPath) 
     : firstFrame(true),
       maxThreshold(255),
       
       // INPUT COLOR PROCESSING
+      // "grayscale": Standard motion detection (faster, recommended)
+      // "rgb": Color-based detection (slower, experimental)
       processingMode("grayscale"),
       
       // IMAGE PREPROCESSING
+      // Contrast enhancement: Helps in low-light or varying conditions
       contrastEnhancement(false),
-      blurType("gaussian"),
-      claheClipLimit(2.0),
-      claheTileSize(8),
-      gaussianBlurSize(5),
-      medianBlurSize(5),
-      bilateralD(15),
-      bilateralSigmaColor(75.0),
-      bilateralSigmaSpace(75.0),
+      blurType("gaussian"),  // Options: "gaussian", "median", "bilateral"
+      claheClipLimit(2.0),   // CLAHE contrast limit (higher = more enhancement)
+      claheTileSize(8),      // CLAHE tile size (smaller = more local adaptation)
+      gaussianBlurSize(5),   // Gaussian kernel size (odd number, larger = more blur)
+      medianBlurSize(5),     // Median filter size (odd number)
+      bilateralD(15),        // Bilateral filter diameter
+      bilateralSigmaColor(75.0),  // Bilateral color space sigma
+      bilateralSigmaSpace(75.0),  // Bilateral coordinate space sigma
       
       // MOTION DETECTION METHODS
-      backgroundSubtraction(false),
+      // Frame differencing (always on) + optional background subtraction
+      backgroundSubtraction(false),  // Enable for slow-moving objects
       
       // MORPHOLOGICAL OPERATIONS
-      morphology(true),
-      morphKernelSize(5),
-      morphClose(true),
-      morphOpen(true),
-      dilation(true),
-      erosion(false),
+      // Clean up motion masks by filling holes and removing noise
+      morphology(true),       // Enable/disable all morphology
+      morphKernelSize(5),     // Kernel size for all operations (larger = more aggressive)
+      morphClose(true),       // Fill holes in motion regions
+      morphOpen(true),        // Remove small noise blobs
+      dilation(true),         // Expand motion regions
+      erosion(false),         // Shrink motion regions (usually off)
       
       // CONTOUR PROCESSING
-      convexHull(true),
-      contourApproximation(true),
-      contourFiltering(true),
-      contourEpsilonFactor(0.03),
-      contourDetectionMode("adaptive"),
+      // Analyze shapes to filter out false detections
+      convexHull(true),            // Use convex hull for shape analysis
+      contourApproximation(true),  // Simplify contour shapes
+      contourFiltering(true),      // Apply quality filters
+      contourEpsilonFactor(0.03),  // How much to simplify contours (0.01-0.05)
+      contourDetectionMode("adaptive"),  // "adaptive" or "permissive"
       
-      // Permissive mode defaults (will be overridden by config)
-      permissiveMinArea(50),
-      permissiveMinSolidity(0.1),
-      permissiveMaxAspectRatio(10.0),
+      // PERMISSIVE MODE DEFAULTS
+      // Used when contourDetectionMode = "permissive"
+      // Very loose thresholds to catch all potential motion
+      permissiveMinArea(50),           // Minimum pixels (50 = very small)
+      permissiveMinSolidity(0.1),      // Shape solidity (0.1 = very loose)
+      permissiveMaxAspectRatio(10.0),  // Width/height ratio (10.0 = very elongated allowed)
       
-      // Adaptive calculation cache
-      adaptiveUpdateInterval(150),  // recalculate every 150 frames (5 seconds at 30fps)
-      lastAdaptiveUpdate(0),
+      // ADAPTIVE MODE CACHING
+      // Adaptive mode recalculates thresholds periodically based on detected contours
+      adaptiveUpdateInterval(150),  // Recalculate every 150 frames (5 sec @ 30fps)
+      lastAdaptiveUpdate(0),        // Frame number of last update
       cachedAdaptiveMinArea(minContourArea),
       cachedAdaptiveMinSolidity(minContourSolidity),
       cachedAdaptiveMaxAspectRatio(maxContourAspectRatio) {
-    loadConfig(configPath);
+    loadConfig(configPath);  // Override defaults with config file values
 }
 
 // ============================================================================
@@ -465,48 +509,83 @@ cv::Mat MotionProcessor::applyMorphologicalOps(const cv::Mat& thresh) {
     return processed;
 }
 
+/**
+ * Extract and Filter Contours from Motion Mask
+ * ============================================
+ * This is the critical function that converts a binary motion mask into
+ * discrete motion boxes (bounding rectangles).
+ * 
+ * Processing Flow:
+ * 1. Find all contours in the motion mask
+ * 2. Filter by area (remove tiny regions)
+ * 3. Simplify contour shapes (optional)
+ * 4. Analyze shape quality using convex hull
+ * 5. Filter by solidity (how solid vs scattered)
+ * 6. Filter by aspect ratio (remove elongated shapes)
+ * 7. Return bounding boxes of accepted contours
+ * 
+ * Modes:
+ * - Adaptive: Dynamically calculates thresholds from scene statistics
+ * - Permissive: Uses fixed, loose thresholds to catch everything
+ * 
+ * @param processed - Binary motion mask (white = motion, black = no motion)
+ * @return Vector of bounding rectangles (motion boxes) → feeds consolidator
+ */
 std::vector<cv::Rect> MotionProcessor::extractContours(const cv::Mat& processed) {
+    // Step 1: Find Contours
+    // RETR_EXTERNAL = only outer contours (ignore holes)
+    // CHAIN_APPROX_SIMPLE = compress contour points (store endpoints only)
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(processed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
-    std::vector<cv::Rect> newBounds;
+    std::vector<cv::Rect> newBounds;  // Output: motion boxes
     static int frameCount = 0;
     frameCount++;
     
-    // Debug visualization (only if enabled)
+    // Debug visualization (only if enabled in config)
     cv::Mat debugViz;
     if (visualizationEnabled) {
         cv::cvtColor(processed, debugViz, cv::COLOR_GRAY2BGR);
     }
     
-    // Debug counters
-    int totalContours = contours.size();
-    int areaFiltered = 0;
-    int solidityFiltered = 0;
-    int aspectRatioFiltered = 0;
-    int finalAccepted = 0;
+    // Tracking statistics for troubleshooting
+    int totalContours = contours.size();       // Total found
+    int areaFiltered = 0;                      // Rejected: too small
+    int solidityFiltered = 0;                  // Rejected: too scattered
+    int aspectRatioFiltered = 0;               // Rejected: too elongated
+    int finalAccepted = 0;                     // Accepted count
     
-    // Initialize with permissive values as fallback
+    // Step 2: Determine Filtering Thresholds
+    // Start with permissive defaults (will be updated based on mode)
     double adaptiveMinArea = permissiveMinArea;
     double adaptiveMinSolidity = permissiveMinSolidity;
     double adaptiveMaxAspectRatio = permissiveMaxAspectRatio;
     
+    // ADAPTIVE MODE: Learn thresholds from scene
+    // Recalculates thresholds every N frames based on detected contour statistics
+    // Helps adapt to different scenes (close vs far, many vs few birds, etc.)
     if (contourDetectionMode == "adaptive") {
-        // Only recalculate adaptive values periodically
+        // Only recalculate periodically (expensive operation)
+        // Default: every 150 frames = 5 seconds at 30fps
         if (frameCount - lastAdaptiveUpdate >= adaptiveUpdateInterval) {
+            // Calculate new thresholds from current contour distribution
             cachedAdaptiveMinArea = calculateAdaptiveMinArea(contours);
             cachedAdaptiveMinSolidity = calculateAdaptiveMinSolidity(contours);
             cachedAdaptiveMaxAspectRatio = calculateAdaptiveMaxAspectRatio(contours);
             lastAdaptiveUpdate = frameCount;
             LOG_INFO("Updated adaptive values at frame {}", frameCount);
         }
+        // Use cached values for this frame
         adaptiveMinArea = cachedAdaptiveMinArea;
         adaptiveMinSolidity = cachedAdaptiveMinSolidity;
         adaptiveMaxAspectRatio = cachedAdaptiveMaxAspectRatio;
-    } else if (contourDetectionMode == "permissive") {
-        adaptiveMinArea = permissiveMinArea;
-        adaptiveMinSolidity = permissiveMinSolidity;
-        adaptiveMaxAspectRatio = permissiveMaxAspectRatio;
+    } 
+    // PERMISSIVE MODE: Use fixed, loose thresholds
+    // Catches everything possible, lets consolidator do the heavy filtering
+    else if (contourDetectionMode == "permissive") {
+        adaptiveMinArea = permissiveMinArea;              // 50 pixels (very small)
+        adaptiveMinSolidity = permissiveMinSolidity;      // 0.1 (very loose shape)
+        adaptiveMaxAspectRatio = permissiveMaxAspectRatio; // 10.0 (very elongated OK)
     }
     
     if (frameCount % 30 == 0 || totalContours > 0) {
@@ -641,11 +720,39 @@ std::vector<cv::Rect> MotionProcessor::extractContours(const cv::Mat& processed)
 // ============================================================================
 // ADAPTIVE CONTOUR DETECTION METHODS
 // ============================================================================
+// These functions analyze the current frame's contours to determine optimal
+// filtering thresholds. They help the system adapt to different scenes:
+// - Close-up scenes: Birds are large, use higher area thresholds
+// - Far-away scenes: Birds are small, use lower area thresholds
+// - Cluttered scenes: Many objects, use stricter shape filters
+// - Simple scenes: Few objects, can be more permissive
 
+/**
+ * Calculate Adaptive Minimum Area Threshold
+ * =========================================
+ * Analyzes the size distribution of detected contours to determine
+ * what size objects are "real" vs "noise" in the current scene.
+ * 
+ * Strategy:
+ * - Collect all contour areas
+ * - Sort them by size
+ * - Use 10th percentile as minimum threshold
+ * - This filters out the smallest 10% (likely noise)
+ * 
+ * Example:
+ * If detected areas are: [20, 30, 45, 50, 200, 250, 300, 500, 800]
+ * 10th percentile ≈ 45 pixels
+ * So anything < 45 pixels is rejected as noise
+ * 
+ * Bounds: 50 - 1000 pixels (safety limits)
+ * 
+ * @param contours - All contours detected in current frame
+ * @return Adaptive minimum area threshold in pixels
+ */
 double MotionProcessor::calculateAdaptiveMinArea(const std::vector<std::vector<cv::Point>>& contours) {
     if (contours.empty()) return permissiveMinArea;
     
-    // Calculate areas of all contours
+    // Step 1: Calculate area of each contour
     std::vector<double> areas;
     for (const auto& contour : contours) {
         double area = cv::contourArea(contour);
@@ -654,31 +761,66 @@ double MotionProcessor::calculateAdaptiveMinArea(const std::vector<std::vector<c
     
     if (areas.empty()) return minContourArea;
     
-    // Sort areas and use 10th percentile as minimum (filters out tiny noise)
+    // Step 2: Sort areas from smallest to largest
     std::sort(areas.begin(), areas.end());
+    
+    // Step 3: Use 10th percentile as minimum
+    // This means we reject the smallest 10% as noise
     size_t percentileIndex = static_cast<size_t>(areas.size() * 0.1);
     double adaptiveMin = areas[percentileIndex];
     
-    // Ensure reasonable bounds (between 50 and 1000)
+    // Step 4: Apply safety bounds
+    // Never go below 50 (too noisy) or above 1000 (miss small birds)
     adaptiveMin = std::max(50.0, std::min(1000.0, adaptiveMin));
+    
+    LOG_DEBUG("Adaptive min area: {:.0f} pixels (from {} contours)", adaptiveMin, areas.size());
     
     return adaptiveMin;
 }
 
+/**
+ * Calculate Adaptive Minimum Solidity Threshold
+ * =============================================
+ * Determines how "solid" a shape needs to be to qualify as a real object.
+ * Solidity = contour area / convex hull area
+ * 
+ * Solidity Examples:
+ * - 1.0 = Perfect solid shape (circle, square)
+ * - 0.8 = Mostly solid with small irregularities (typical bird)
+ * - 0.5 = Very irregular, scattered shape (tree branches swaying)
+ * - 0.2 = Extremely scattered (reflections, shadows)
+ * 
+ * Strategy:
+ * - Calculate solidity for all reasonable-sized contours
+ * - Use 25th percentile as minimum threshold
+ * - This allows the least solid 25% but rejects very scattered shapes
+ * 
+ * Why 25th percentile?
+ * - More permissive than area (birds can have irregular shapes)
+ * - Still filters out obvious non-objects
+ * 
+ * Bounds: 0.2 - 0.8 (safety limits)
+ * 
+ * @param contours - All contours detected in current frame
+ * @return Adaptive minimum solidity threshold (0.0 - 1.0)
+ */
 double MotionProcessor::calculateAdaptiveMinSolidity(const std::vector<std::vector<cv::Point>>& contours) {
     if (contours.empty()) return permissiveMinSolidity;
     
-    // Calculate solidity of all reasonable-sized contours
+    // Step 1: Calculate solidity for each reasonable-sized contour
+    // Skip tiny contours (<100px) as they give unreliable solidity values
     std::vector<double> solidities;
     for (const auto& contour : contours) {
         double area = cv::contourArea(contour);
-        if (area < 100) continue; // Skip tiny contours
+        if (area < 100) continue; // Skip tiny noise
         
+        // Calculate convex hull (smallest convex shape containing contour)
         std::vector<cv::Point> hull;
         cv::convexHull(contour, hull);
         double hullArea = cv::contourArea(hull);
         
         if (hullArea > 0) {
+            // Solidity = how much of the hull is filled by the contour
             double solidity = area / hullArea;
             solidities.push_back(solidity);
         }
@@ -686,28 +828,64 @@ double MotionProcessor::calculateAdaptiveMinSolidity(const std::vector<std::vect
     
     if (solidities.empty()) return minContourSolidity;
     
-    // Use 25th percentile as minimum (allows some irregular shapes)
+    // Step 2: Sort solidities from lowest to highest
     std::sort(solidities.begin(), solidities.end());
+    
+    // Step 3: Use 25th percentile as minimum
+    // Allows irregularly-shaped birds while filtering scattered noise
     size_t percentileIndex = static_cast<size_t>(solidities.size() * 0.25);
     double adaptiveMin = solidities[percentileIndex];
     
-    // Ensure reasonable bounds (between 0.2 and 0.8)
+    // Step 4: Apply safety bounds
+    // Never go below 0.2 (too scattered) or above 0.8 (miss irregular birds)
     adaptiveMin = std::max(0.2, std::min(0.8, adaptiveMin));
+    
+    LOG_DEBUG("Adaptive min solidity: {:.2f} (from {} contours)", adaptiveMin, solidities.size());
     
     return adaptiveMin;
 }
 
+/**
+ * Calculate Adaptive Maximum Aspect Ratio Threshold
+ * =================================================
+ * Determines how elongated a shape can be before it's rejected.
+ * Aspect Ratio = width / height
+ * 
+ * Aspect Ratio Examples:
+ * - 1.0 = Perfect square
+ * - 2.0 = Twice as wide as tall (typical bird in flight)
+ * - 5.0 = Very elongated (possible bird gliding)
+ * - 10.0+ = Extremely elongated (likely shadow, wire, artifact)
+ * 
+ * Strategy:
+ * - Calculate aspect ratio for all reasonable-sized contours
+ * - Use 90th percentile as maximum threshold
+ * - This allows most shapes (90%) but filters extreme outliers
+ * 
+ * Why 90th percentile?
+ * - Permissive enough to allow various bird poses
+ * - Strict enough to filter obvious non-birds (wires, shadows)
+ * 
+ * Bounds: 2.0 - 15.0 (safety limits)
+ * 
+ * @param contours - All contours detected in current frame
+ * @return Adaptive maximum aspect ratio threshold
+ */
 double MotionProcessor::calculateAdaptiveMaxAspectRatio(const std::vector<std::vector<cv::Point>>& contours) {
     if (contours.empty()) return permissiveMaxAspectRatio;
     
-    // Calculate aspect ratios of all reasonable-sized contours
+    // Step 1: Calculate aspect ratio for each reasonable-sized contour
+    // Skip tiny contours (<100px) as they give unreliable ratios
     std::vector<double> aspectRatios;
     for (const auto& contour : contours) {
         double area = cv::contourArea(contour);
-        if (area < 100) continue; // Skip tiny contours
+        if (area < 100) continue; // Skip tiny noise
         
+        // Get bounding rectangle
         cv::Rect bounds = cv::boundingRect(contour);
         if (bounds.width > 0 && bounds.height > 0) {
+            // Aspect ratio = width / height
+            // Note: Always >= 1.0 in our case (we could flip for consistency)
             double aspectRatio = static_cast<double>(bounds.width) / bounds.height;
             aspectRatios.push_back(aspectRatio);
         }
@@ -715,13 +893,19 @@ double MotionProcessor::calculateAdaptiveMaxAspectRatio(const std::vector<std::v
     
     if (aspectRatios.empty()) return maxContourAspectRatio;
     
-    // Use 90th percentile as maximum (allows most shapes but filters extreme outliers)
+    // Step 2: Sort aspect ratios from lowest to highest
     std::sort(aspectRatios.begin(), aspectRatios.end());
+    
+    // Step 3: Use 90th percentile as maximum
+    // This keeps 90% of shapes and only filters extreme outliers
     size_t percentileIndex = static_cast<size_t>(aspectRatios.size() * 0.9);
     double adaptiveMax = aspectRatios[percentileIndex];
     
-    // Ensure reasonable bounds (between 2.0 and 15.0)
+    // Step 4: Apply safety bounds
+    // Never go below 2.0 (too strict) or above 15.0 (allows obvious artifacts)
     adaptiveMax = std::max(2.0, std::min(15.0, adaptiveMax));
+    
+    LOG_DEBUG("Adaptive max aspect ratio: {:.1f} (from {} contours)", adaptiveMax, aspectRatios.size());
     
     return adaptiveMax;
 }
