@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+    
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -14,14 +14,7 @@ export default function handler(req, res) {
         res.status(200).json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
-            version: '1.0.0',
-            features: [
-                'DBSCAN Motion Clustering',
-                'Overlap-Aware Distance Metrics',
-                'YOLO11 Integration',
-                'ML Pipeline',
-                'Real-time Processing'
-            ]
+            version: '1.0.1'
         });
         return;
     }
@@ -38,13 +31,6 @@ export default function handler(req, res) {
                 birdSpeciesClusters: 4,
                 modelAccuracy: 0.80,
                 executionTime: '337.8 seconds'
-            },
-            dbscanConfig: {
-                eps: 50.0,
-                minPts: 2,
-                overlapWeight: 0.7,
-                edgeWeight: 0.3,
-                maxEdgeDistance: 100.0
             }
         });
         return;
@@ -60,11 +46,9 @@ export default function handler(req, res) {
         <title>🦅 Birds of Play - DBSCAN Motion Detection</title>
         <style>
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background: #1a1a1a;
                 color: white;
             }
             .container {
@@ -72,40 +56,51 @@ export default function handler(req, res) {
                 margin: 0 auto;
                 text-align: center;
             }
-            .header {
-                margin-bottom: 40px;
-            }
-            .header h1 {
+            h1 {
+                color: #FF6B35;
                 font-size: 3rem;
-                margin: 0;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                margin-bottom: 20px;
             }
-            .header p {
+            .subtitle {
                 font-size: 1.2rem;
-                margin: 10px 0;
+                margin-bottom: 40px;
                 opacity: 0.9;
+            }
+            .nav-links {
+                margin: 30px 0;
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                flex-wrap: wrap;
+            }
+            .nav-link {
+                background: #FF6B35;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: bold;
+                transition: background 0.3s ease;
+            }
+            .nav-link:hover {
+                background: #e55a2b;
             }
             .features {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                 gap: 30px;
                 margin: 40px 0;
+                text-align: left;
             }
             .feature-card {
                 background: rgba(255,255,255,0.1);
-                backdrop-filter: blur(10px);
-                border-radius: 15px;
+                border-radius: 8px;
                 padding: 30px;
                 border: 1px solid rgba(255,255,255,0.2);
-                transition: transform 0.3s ease;
-            }
-            .feature-card:hover {
-                transform: translateY(-5px);
             }
             .feature-card h3 {
-                font-size: 1.5rem;
-                margin-bottom: 15px;
                 color: #FFD700;
+                margin-bottom: 15px;
             }
             .feature-card p {
                 line-height: 1.6;
@@ -113,11 +108,9 @@ export default function handler(req, res) {
             }
             .demo-section {
                 background: rgba(255,255,255,0.1);
-                backdrop-filter: blur(10px);
-                border-radius: 15px;
+                border-radius: 8px;
                 padding: 40px;
                 margin: 40px 0;
-                border: 1px solid rgba(255,255,255,0.2);
             }
             .demo-section h2 {
                 color: #FFD700;
@@ -131,7 +124,7 @@ export default function handler(req, res) {
             }
             .result-card {
                 background: rgba(0,0,0,0.2);
-                border-radius: 10px;
+                border-radius: 8px;
                 padding: 20px;
                 border: 1px solid rgba(255,255,255,0.1);
             }
@@ -139,26 +132,12 @@ export default function handler(req, res) {
                 color: #4CAF50;
                 margin-bottom: 10px;
             }
-            .tech-stack {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 15px;
-                margin: 30px 0;
-            }
-            .tech-badge {
-                background: rgba(255,255,255,0.2);
-                padding: 8px 16px;
-                border-radius: 20px;
-                font-size: 0.9rem;
-                border: 1px solid rgba(255,255,255,0.3);
-            }
             .github-link {
                 display: inline-block;
                 background: #333;
                 color: white;
                 padding: 12px 24px;
-                border-radius: 25px;
+                border-radius: 8px;
                 text-decoration: none;
                 margin: 20px 10px;
                 transition: background 0.3s ease;
@@ -166,32 +145,22 @@ export default function handler(req, res) {
             .github-link:hover {
                 background: #555;
             }
-            .status-indicator {
-                display: inline-block;
-                width: 12px;
-                height: 12px;
-                background: #4CAF50;
-                border-radius: 50%;
-                margin-right: 8px;
-                animation: pulse 2s infinite;
-            }
-            @keyframes pulse {
-                0% { opacity: 1; }
-                50% { opacity: 0.5; }
-                100% { opacity: 1; }
-            }
         </style>
     </head>
     <body>
         <div class="container">
-            <div class="header">
-                <h1>🦅 Birds of Play</h1>
-                <p>Advanced Motion Detection with DBSCAN Clustering</p>
-                <p><span class="status-indicator"></span>Successfully deployed with Vercel</p>
+            <h1>🦅 Birds of Play</h1>
+            <p class="subtitle">Advanced Motion Detection with DBSCAN Clustering</p>
+
+            <div class="nav-links">
+                <a href="/api/motion" class="nav-link">📹 Motion Detection</a>
+                <a href="/api/objects" class="nav-link">🎯 Object Detection</a>
+                <a href="/api/clustering" class="nav-link">🔬 Bird Clustering</a>
+                <a href="/api/finetuning" class="nav-link">🧠 Fine-Tuning</a>
             </div>
 
             <div class="demo-section">
-                <h2>🎉 Latest Pipeline Test Results</h2>
+                <h2>Latest Pipeline Test Results</h2>
                 <p>Full pipeline test completed successfully with DBSCAN implementation!</p>
                 
                 <div class="demo-results">
@@ -237,35 +206,10 @@ export default function handler(req, res) {
                 </div>
             </div>
 
-            <div class="demo-section">
-                <h2>🛠️ Technology Stack</h2>
-                <div class="tech-stack">
-                    <span class="tech-badge">C++17/20</span>
-                    <span class="tech-badge">OpenCV</span>
-                    <span class="tech-badge">DBSCAN</span>
-                    <span class="tech-badge">YOLO11</span>
-                    <span class="tech-badge">MongoDB</span>
-                    <span class="tech-badge">Node.js</span>
-                    <span class="tech-badge">Python</span>
-                    <span class="tech-badge">PyTorch</span>
-                    <span class="tech-badge">ResNet</span>
-                    <span class="tech-badge">Vercel</span>
-                </div>
-            </div>
-
             <div style="margin-top: 40px;">
                 <a href="https://github.com/louisbove84/birds_of_play" class="github-link" target="_blank">
                     📚 View on GitHub
                 </a>
-                <div style="margin: 20px 0;">
-                    <h3 style="color: #FFD700; margin-bottom: 15px;">🌐 Live Demo Interfaces</h3>
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <a href="/api/motion" class="github-link" style="background: #FF6B35;">📹 Motion Detection</a>
-                        <a href="/api/objects" class="github-link" style="background: #4CAF50;">🎯 Object Detection</a>
-                        <a href="/api/clustering" class="github-link" style="background: #9C27B0;">🔬 Bird Clustering</a>
-                        <a href="/api/finetuning" class="github-link" style="background: #FF9800;">🧠 Fine-Tuning</a>
-                    </div>
-                </div>
             </div>
 
             <div style="margin-top: 40px; opacity: 0.8; font-size: 0.9rem;">
