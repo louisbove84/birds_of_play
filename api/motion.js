@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -26,7 +26,7 @@ export default function handler(req, res) {
             }
         },
         {
-            _id: "frame_002", 
+            _id: "frame_002",
             timestamp: "2025-01-25T03:29:38.000Z",
             metadata: {
                 frame_count: 27,

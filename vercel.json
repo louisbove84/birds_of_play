@@ -1,35 +1,4 @@
 {
-  "version": 2,
-  "name": "birds-of-play",
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/motion",
-      "dest": "/api/motion.js"
-    },
-    {
-      "src": "/api/objects", 
-      "dest": "/api/objects.js"
-    },
-    {
-      "src": "/api/clustering",
-      "dest": "/api/clustering.js"
-    },
-    {
-      "src": "/api/finetuning",
-      "dest": "/api/finetuning.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
-    }
-  ]
+    "version": 2,
+    "name": "birds-of-play"
 }

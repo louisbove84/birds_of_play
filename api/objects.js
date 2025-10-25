@@ -4,7 +4,7 @@ export default function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -22,7 +22,7 @@ export default function handler(req, res) {
             timestamp: "2025-01-25T03:29:37.000Z"
         },
         {
-            _id: "det_002", 
+            _id: "det_002",
             region_id: "region_002",
             detection_id: "frame_27_region_0_det_0",
             confidence: 0.92,
@@ -32,7 +32,7 @@ export default function handler(req, res) {
         },
         {
             _id: "det_003",
-            region_id: "region_003", 
+            region_id: "region_003",
             detection_id: "frame_28_region_0_det_0",
             confidence: 0.78,
             class_name: "bird",
