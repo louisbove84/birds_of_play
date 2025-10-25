@@ -280,11 +280,7 @@ export default function handler(req, res) {
                 <p>Watch DBSCAN clustering in action with live bounding box visualization</p>
                 
                 <div class="demo-video-wrapper">
-                    <video controls autoplay loop muted class="demo-video">
-                        <source src="/videos/demo.mp4" type="video/mp4">
-                        <source src="/videos/vid_4.mov" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
+                    <img src="/images/demo.gif" alt="DBSCAN Motion Detection Demo" class="demo-video">
                     <div class="video-legend">
                         <div class="legend-item">
                             <span class="legend-box gray-box"></span>
