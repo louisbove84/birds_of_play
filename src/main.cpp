@@ -176,6 +176,21 @@ int main(int argc, char** argv) {
     int frameCount = 0;
     auto lastSaveTime = std::chrono::steady_clock::now();
     const auto saveInterval = std::chrono::seconds(1);  // Save every 1 second
+    
+    // Video recording setup for demo visualization
+    cv::VideoWriter videoWriter;
+    bool recordingStarted = false;  // Track if we've ever started recording
+    bool recordingActive = false;    // Track if currently writing frames
+    bool recordingComplete = false;
+    int maxRecordingFrames = 450;  // 15 seconds at 30fps (shorter for quick demo)
+    int recordedFrames = 0;
+    std::string outputVideoPath = "public/videos/demo.mp4";
+    
+    // Ensure output directory exists
+    fs::path outputDir = fs::path(outputVideoPath).parent_path();
+    if (!outputDir.empty()) {
+        fs::create_directories(outputDir);
+    }
 
     while (key != 'q' && key != 27) {  // Loop until 'q' or ESC is pressed
         cap >> frame;
@@ -206,6 +221,30 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Initialize video writer on first frame with motion (only once per session)
+        if (!recordingStarted && !consolidatedRegions.empty()) {
+            // Get video properties
+            double fps = cap.get(cv::CAP_PROP_FPS);
+            if (fps <= 0) fps = 30.0;  // Default to 30fps if not available
+            
+            cv::Size frameSize = frame.size();
+            
+            // Initialize video writer (H.264 codec for web compatibility)
+            int fourcc = cv::VideoWriter::fourcc('a', 'v', 'c', '1');  // H.264 codec
+            videoWriter.open(outputVideoPath, fourcc, fps, frameSize, true);
+            
+            if (videoWriter.isOpened()) {
+                recordingStarted = true;
+                recordingActive = true;
+                LOG_INFO("📹 Started recording demo video: {} ({}x{} @ {} fps)", 
+                         outputVideoPath, frameSize.width, frameSize.height, fps);
+                std::cout << "\n🔴 Recording demo video: " << outputVideoPath << std::endl;
+                std::cout << "   Will capture up to " << (maxRecordingFrames / fps) << " seconds" << std::endl;
+            } else {
+                LOG_ERROR("Failed to open video writer for {}", outputVideoPath);
+            }
+        }
+        
         // Create live display frame
         cv::Mat displayFrame = frame.clone();
 
@@ -233,6 +272,33 @@ int main(int argc, char** argv) {
             cv::putText(displayFrame, regionInfo,
                         cv::Point(region.boundingBox.x, region.boundingBox.y - 30),
                         cv::FONT_HERSHEY_SIMPLEX, 0.7, regionColor, 2);
+        }
+        
+        // Add recording indicator and write frames if actively recording
+        if (recordingActive) {
+            std::string recordingText = "REC [" + std::to_string(recordedFrames) + "/" + 
+                                       std::to_string(maxRecordingFrames) + "]";
+            cv::putText(displayFrame, recordingText, cv::Point(10, 30),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
+            
+            // Write frame to video
+            videoWriter.write(displayFrame);
+            recordedFrames++;
+            
+            // Stop recording after max frames
+            if (recordedFrames >= maxRecordingFrames) {
+                videoWriter.release();
+                recordingActive = false;
+                recordingComplete = true;
+                LOG_INFO("✅ Demo video recording completed: {} ({} frames)", 
+                         outputVideoPath, recordedFrames);
+                std::cout << "\n✅ Demo video saved: " << outputVideoPath << std::endl;
+                std::cout << "   " << recordedFrames << " frames recorded" << std::endl;
+                std::cout << "   🎬 Recording complete! Press 'q' to exit or continue watching..." << std::endl;
+                
+                // Auto-exit after recording is complete
+                key = 'q';
+            }
         }
 
         // Create MongoDB frame (clean frame with individual motion detections and consolidated
@@ -349,13 +415,13 @@ int main(int argc, char** argv) {
             lastSaveTime = currentTime;
         }
 
-        // Add status overlay
+        // Add status overlay (position depends on recording status)
+        int statusY = recordingActive ? 60 : 30;  // Move down if recording indicator is present
         std::string status =
             "Frame: " + std::to_string(frameCount) +
             " | Motions: " + std::to_string(processingResult.detectedBounds.size()) +
-            " | Regions: " + std::to_string(consolidatedRegions.size()) +
-            " | Save: " + (saveOnlyConsolidatedRegions ? "Consolidated Only" : "All Motion");
-        cv::putText(displayFrame, status, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7,
+            " | Regions: " + std::to_string(consolidatedRegions.size());
+        cv::putText(displayFrame, status, cv::Point(10, statusY), cv::FONT_HERSHEY_SIMPLEX, 0.7,
                     cv::Scalar(255, 255, 255), 2);
 
         // Add legend
@@ -382,9 +448,21 @@ int main(int argc, char** argv) {
     // Cleanup
     cap.release();
     cv::destroyAllWindows();
+    
+    // Finalize video recording if still open
+    if (videoWriter.isOpened()) {
+        videoWriter.release();
+        LOG_INFO("✅ Demo video recording finalized: {} ({} frames)", 
+                 outputVideoPath, recordedFrames);
+        std::cout << "\n✅ Demo video saved: " << outputVideoPath << std::endl;
+        std::cout << "   " << recordedFrames << " frames recorded" << std::endl;
+    }
 
     std::cout << "\n👋 Birds of Play Motion Detection Demo ended." << std::endl;
     std::cout << "📊 Processed " << frameCount << " frames total." << std::endl;
+    if (recordedFrames > 0) {
+        std::cout << "🎥 Recorded " << recordedFrames << " frames to demo video" << std::endl;
+    }
     LOG_INFO("Application ended after processing {} frames", frameCount);
 
     return 0;
