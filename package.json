@@ -1,31 +1,31 @@
 {
-  "name": "birds-of-play-vercel",
-  "version": "1.0.0",
-  "description": "Birds of Play - DBSCAN Motion Detection System deployed on Vercel",
-  "main": "api/index.js",
-  "type": "module",
-  "scripts": {
-    "build": "echo 'Build completed'",
-    "dev": "vercel dev",
-    "start": "vercel dev"
-  },
+    "name": "birds-of-play-vercel",
+    "version": "1.0.0",
+    "description": "Birds of Play - DBSCAN Motion Detection System deployed on Vercel",
+    "main": "api/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "echo 'Build completed'",
+        "dev": "vercel dev",
+        "start": "vercel dev"
+    },
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   },
-  "keywords": [
-    "birds",
-    "motion-detection",
-    "dbscan",
-    "computer-vision",
-    "machine-learning",
-    "yolo",
-    "opencv",
-    "clustering"
-  ],
-  "author": "Birds of Play Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/louisbove84/birds_of_play.git"
-  }
+    "keywords": [
+        "birds",
+        "motion-detection",
+        "dbscan",
+        "computer-vision",
+        "machine-learning",
+        "yolo",
+        "opencv",
+        "clustering"
+    ],
+    "author": "Birds of Play Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/louisbove84/birds_of_play.git"
+    }
 }
