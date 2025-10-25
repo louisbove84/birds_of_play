@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "name": "birds-of-play",
+  "builds": [
+    {
+      "src": "web/landing_page.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "web/simple_viewer.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "web/region_viewer.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/motion/(.*)",
+      "dest": "/web/simple_viewer.js"
+    },
+    {
+      "src": "/objects/(.*)",
+      "dest": "/web/region_viewer.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/web/landing_page.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "web/landing_page.js": {
+      "maxDuration": 30
+    },
+    "web/simple_viewer.js": {
+      "maxDuration": 30
+    },
+    "web/region_viewer.js": {
+      "maxDuration": 30
+    }
+  }
+}
