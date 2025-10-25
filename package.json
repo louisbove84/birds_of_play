@@ -1,6 +1,6 @@
 {
     "name": "birds-of-play-vercel",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Birds of Play - DBSCAN Motion Detection System deployed on Vercel",
     "main": "api/index.js",
     "type": "module",
