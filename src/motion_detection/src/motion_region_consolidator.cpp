@@ -1,10 +1,13 @@
 #include "motion_region_consolidator.hpp"
-#include "logger.hpp"
+
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <limits>
 #include <map>
 #include <vector>
-#include <filesystem>
+
+#include "logger.hpp"
 
 namespace fs = std::filesystem;
 
@@ -13,138 +16,231 @@ MotionRegionConsolidator::MotionRegionConsolidator(const ConsolidationConfig& co
     LOG_INFO("MotionRegionConsolidator initialized with config");
 }
 
-std::vector<std::vector<int>> MotionRegionConsolidator::groupByProximityPairwise(
+std::vector<std::vector<int>> MotionRegionConsolidator::dbscanClustering(
     const std::vector<TrackedObject>& objects) {
-    std::vector<std::vector<int>> groups;
     const size_t n = objects.size();
-    std::vector<bool> assigned(n, false);
+    std::vector<int> labels(n, -1);  // -1 = unvisited, -2 = noise, >= 0 = cluster ID
+    std::vector<std::vector<int>> clusters;
+    int clusterId = 0;
+
+    LOG_DEBUG("Starting DBSCAN clustering for {} objects with eps={}, minPts={}", n, config_.eps,
+              config_.minPts);
 
     for (size_t i = 0; i < n; ++i) {
-        if (assigned[i]) continue;
-        
-        std::vector<int> group = {static_cast<int>(i)};
-        assigned[i] = true;
-        
-        for (size_t j = i + 1; j < n; ++j) {
-            if (assigned[j]) continue;
-            
-            double distance = calculateSpatialDistance(objects[i], objects[j]);
-            if (distance <= config_.maxDistanceThreshold) {
-                group.push_back(static_cast<int>(j));
-                assigned[j] = true;
-            }
-        }
-        
-        if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-            groups.push_back(group);
-        }
-    }
-    
-    LOG_DEBUG("Used pairwise proximity grouping (O(n²)) for {} objects, created {} groups", n, groups.size());
-    return groups;
-}
+        if (labels[i] != -1) continue;  // Already processed
 
-std::vector<std::vector<int>> MotionRegionConsolidator::groupByProximityGrid(
-    const std::vector<TrackedObject>& objects) {
-    std::vector<std::vector<int>> groups;
-    const size_t n = objects.size();
-    std::map<std::pair<int, int>, std::vector<int>> grid;
-    double cellSize = config_.gridCellSize;
-    
-    // Assign objects to grid cells
-    for (size_t i = 0; i < n; ++i) {
-        cv::Point center = objects[i].getCenter();
-        int row = static_cast<int>(center.y / cellSize);
-        int col = static_cast<int>(center.x / cellSize);
-        grid[{row, col}].push_back(static_cast<int>(i));
-    }
-    
-    std::vector<bool> assigned(n, false);
-    
-    // Process each cell and its neighbors
-    for (const auto& cell : grid) {
-        const auto& cellIndices = cell.second;
-        for (int i : cellIndices) {
-            if (assigned[i]) continue;
-            
-            std::vector<int> group = {i};
-            assigned[i] = true;
-            
-            // Check objects in the same and neighboring cells
-            for (int dr = -1; dr <= 1; ++dr) {
-                for (int dc = -1; dc <= 1; ++dc) {
-                    auto neighborCell = grid.find({cell.first.first + dr, cell.first.second + dc});
-                    if (neighborCell == grid.end()) continue;
-                    
-                    for (int j : neighborCell->second) {
-                        if (assigned[j] || i == j) continue;
-                        
-                        double distance = calculateSpatialDistance(objects[i], objects[j]);
-                        if (distance <= config_.maxDistanceThreshold) {
-                            group.push_back(j);
-                            assigned[j] = true;
+        // Find all neighbors within eps distance
+        std::vector<int> neighbors = rangeQuery(objects, static_cast<int>(i), config_.eps);
+
+        if (neighbors.size() < static_cast<size_t>(config_.minPts)) {
+            labels[i] = -2;  // Mark as noise
+            continue;
+        }
+
+        // Start a new cluster
+        std::vector<int> cluster;
+        labels[i] = clusterId;
+        cluster.push_back(static_cast<int>(i));
+
+        // Process all neighbors
+        for (size_t j = 0; j < neighbors.size(); ++j) {
+            int neighborIdx = neighbors[j];
+
+            if (labels[neighborIdx] == -2) {
+                // Change noise to border point
+                labels[neighborIdx] = clusterId;
+                cluster.push_back(neighborIdx);
+            } else if (labels[neighborIdx] == -1) {
+                // Unvisited point
+                labels[neighborIdx] = clusterId;
+                cluster.push_back(neighborIdx);
+
+                // Find neighbors of this neighbor
+                std::vector<int> neighborNeighbors = rangeQuery(objects, neighborIdx, config_.eps);
+                if (neighborNeighbors.size() >= static_cast<size_t>(config_.minPts)) {
+                    // Add new neighbors to the list for processing
+                    for (int newNeighbor : neighborNeighbors) {
+                        if (std::find(neighbors.begin(), neighbors.end(), newNeighbor) ==
+                            neighbors.end()) {
+                            neighbors.push_back(newNeighbor);
                         }
                     }
                 }
             }
-            
-            if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-                groups.push_back(group);
+        }
+
+        clusters.push_back(cluster);
+        clusterId++;
+    }
+
+    LOG_DEBUG("DBSCAN clustering completed: {} clusters found", clusters.size());
+
+    // Log cluster information
+    for (size_t i = 0; i < clusters.size(); ++i) {
+        LOG_DEBUG("Cluster {}: {} objects", i, clusters[i].size());
+    }
+
+    return clusters;
+}
+
+std::vector<int> MotionRegionConsolidator::rangeQuery(const std::vector<TrackedObject>& objects,
+                                                      int pointIdx, double eps) {
+    std::vector<int> neighbors;
+
+    for (size_t i = 0; i < objects.size(); ++i) {
+        if (static_cast<int>(i) == pointIdx) continue;
+
+        double distance = calculateOverlapAwareDistance(objects[pointIdx], objects[i]);
+        if (distance <= eps) {
+            neighbors.push_back(static_cast<int>(i));
+        }
+    }
+
+    return neighbors;
+}
+
+// Now implement the overlap-aware distance calculation methods
+double MotionRegionConsolidator::calculateOverlapAwareDistance(const TrackedObject& obj1,
+                                                               const TrackedObject& obj2) const {
+    const cv::Rect& rect1 = obj1.currentBounds;
+    const cv::Rect& rect2 = obj2.currentBounds;
+
+    // Calculate overlap component (lower is better for overlapping boxes)
+    double overlapComponent = calculateOverlapComponent(rect1, rect2);
+
+    // Calculate edge distance component (distance between closest edges)
+    double edgeComponent = calculateEdgeDistance(rect1, rect2);
+
+    // Combine components using weights
+    double combinedDistance =
+        (config_.overlapWeight * overlapComponent) + (config_.edgeWeight * edgeComponent);
+
+    LOG_DEBUG("Distance between objects {} and {}: overlap={:.2f}, edge={:.2f}, combined={:.2f}",
+              obj1.id, obj2.id, overlapComponent, edgeComponent, combinedDistance);
+
+    return combinedDistance;
+}
+
+double MotionRegionConsolidator::calculateOverlapComponent(const cv::Rect& rect1,
+                                                           const cv::Rect& rect2) const {
+    // Calculate intersection
+    cv::Rect intersection = rect1 & rect2;
+
+    if (intersection.area() == 0) {
+        // No overlap - return high distance
+        return config_.maxEdgeDistance;
+    }
+
+    // Calculate overlap ratio relative to smaller rectangle
+    int area1 = rect1.area();
+    int area2 = rect2.area();
+    int minArea = std::min(area1, area2);
+
+    if (minArea == 0) {
+        return config_.maxEdgeDistance;
+    }
+
+    double overlapRatio = static_cast<double>(intersection.area()) / minArea;
+
+    // Convert overlap ratio to distance (higher overlap = lower distance)
+    // For perfect overlap (ratio = 1.0), distance = 0
+    // For no overlap (ratio = 0.0), distance = maxEdgeDistance
+    double overlapDistance = config_.maxEdgeDistance * (1.0 - overlapRatio);
+
+    return overlapDistance;
+}
+
+double MotionRegionConsolidator::calculateEdgeDistance(const cv::Rect& rect1,
+                                                       const cv::Rect& rect2) const {
+    // Calculate minimum distance between rectangle edges
+
+    // Get rectangle boundaries
+    int left1 = rect1.x;
+    int right1 = rect1.x + rect1.width;
+    int top1 = rect1.y;
+    int bottom1 = rect1.y + rect1.height;
+
+    int left2 = rect2.x;
+    int right2 = rect2.x + rect2.width;
+    int top2 = rect2.y;
+    int bottom2 = rect2.y + rect2.height;
+
+    // Check if rectangles overlap
+    if (!(right1 < left2 || right2 < left1 || bottom1 < top2 || bottom2 < top1)) {
+        // Rectangles overlap - edge distance is 0
+        return 0.0;
+    }
+
+    // Calculate minimum distance between edges
+    double minDistance = std::numeric_limits<double>::max();
+
+    // Horizontal distances
+    if (right1 < left2) {
+        // rect1 is to the left of rect2
+        minDistance = std::min(minDistance, static_cast<double>(left2 - right1));
+    } else if (right2 < left1) {
+        // rect2 is to the left of rect1
+        minDistance = std::min(minDistance, static_cast<double>(left1 - right2));
+    }
+
+    // Vertical distances
+    if (bottom1 < top2) {
+        // rect1 is above rect2
+        minDistance = std::min(minDistance, static_cast<double>(top2 - bottom1));
+    } else if (bottom2 < top1) {
+        // rect2 is above rect1
+        minDistance = std::min(minDistance, static_cast<double>(top1 - bottom2));
+    }
+
+    // If rectangles are diagonally separated, calculate corner-to-corner distance
+    if (minDistance == std::numeric_limits<double>::max()) {
+        // Calculate distances between all corner combinations
+        std::vector<cv::Point> corners1 = {cv::Point(left1, top1), cv::Point(right1, top1),
+                                           cv::Point(left1, bottom1), cv::Point(right1, bottom1)};
+        std::vector<cv::Point> corners2 = {cv::Point(left2, top2), cv::Point(right2, top2),
+                                           cv::Point(left2, bottom2), cv::Point(right2, bottom2)};
+
+        for (const auto& corner1 : corners1) {
+            for (const auto& corner2 : corners2) {
+                double dx = corner1.x - corner2.x;
+                double dy = corner1.y - corner2.y;
+                double distance = std::sqrt(dx * dx + dy * dy);
+                minDistance = std::min(minDistance, distance);
             }
         }
     }
-    
-    LOG_DEBUG("Used grid-based proximity grouping for {} objects, created {} groups with cell size {}", 
-              n, groups.size(), cellSize);
-    return groups;
-}
 
-std::vector<std::vector<int>> MotionRegionConsolidator::groupObjectsByProximity(
-    const std::vector<TrackedObject>& objects) {
-    const size_t n = objects.size();
-    
-    // Use pairwise O(n²) for small n (<50) to avoid grid overhead
-    if (n < 50) {
-        return groupByProximityPairwise(objects);
-    }
-    // Use grid-based approach for larger n
-    return groupByProximityGrid(objects);
+    // Cap the distance at maxEdgeDistance
+    return std::min(minDistance, config_.maxEdgeDistance);
 }
 
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
     const std::vector<TrackedObject>& trackedObjects) {
-    
     frameCounter_++;
-    
+
     if (trackedObjects.empty()) {
         removeStaleRegions();
         return consolidatedRegions_;
     }
-    
-    LOG_DEBUG("Consolidating {} tracked objects", trackedObjects.size());
-    
-    // Step 1: Group objects by spatial proximity only
-    auto proximityGroups = groupObjectsByProximity(trackedObjects);
-    
-    // Step 2: Use proximity groups directly
-    std::vector<std::vector<int>> finalGroups;
-    for (const auto& group : proximityGroups) {
-        if (group.size() >= static_cast<size_t>(config_.minObjectsPerRegion)) {
-            finalGroups.push_back(group);
-        }
-    }
-    
-    // Step 3: Create consolidated regions from groups
-    auto newRegions = createConsolidatedRegions(trackedObjects, finalGroups);
-    
-    // Step 4: Update existing regions and merge if necessary
+
+    LOG_DEBUG("Consolidating {} tracked objects using DBSCAN", trackedObjects.size());
+
+    // Step 1: Apply DBSCAN clustering to group objects
+    auto clusters = dbscanClustering(trackedObjects);
+
+    // Step 2: Create consolidated regions from clusters (no size filtering)
+    auto newRegions = createConsolidatedRegions(trackedObjects, clusters);
+
+    // Step 3: Update existing regions
     updateExistingRegions(trackedObjects);
-    
-    // Step 5: Merge overlapping regions
+
+    // Step 4: Merge overlapping regions if needed
     for (const auto& newRegion : newRegions) {
         bool merged = false;
         for (auto& existingRegion : consolidatedRegions_) {
-            if (areRegionsOverlapping(newRegion, existingRegion)) {
+            // Use simple overlap check for merging
+            cv::Rect intersection = newRegion.boundingBox & existingRegion.boundingBox;
+            if (intersection.area() > 0) {
                 existingRegion = mergeRegions(existingRegion, newRegion);
                 merged = true;
                 break;
@@ -154,119 +250,55 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegions(
             consolidatedRegions_.push_back(newRegion);
         }
     }
-    
-    // Step 6: Remove stale regions
+
+    // Step 5: Remove stale regions
     removeStaleRegions();
-    
-    // Step 7: Apply splitting to final merged regions to ensure optimal sizes
-    LOG_INFO("Before final splitting: {} regions", consolidatedRegions_.size());
-    consolidatedRegions_ = splitLargeRegions(consolidatedRegions_);
-    LOG_INFO("After final splitting: {} regions", consolidatedRegions_.size());
-    
-    // Step 8: Remove overlapping regions, prioritizing those closer to ideal size
-    LOG_INFO("Before overlap removal: {} regions", consolidatedRegions_.size());
-    consolidatedRegions_ = removeOverlappingRegions(consolidatedRegions_);
-    LOG_INFO("After overlap removal: {} regions", consolidatedRegions_.size());
-    
-    LOG_DEBUG("Created {} consolidated regions", consolidatedRegions_.size());
-    
-    // Debug: Log region sizes
+
+    LOG_INFO("DBSCAN consolidation completed: {} regions created", consolidatedRegions_.size());
+
+    // Debug: Log region information
     for (size_t i = 0; i < consolidatedRegions_.size(); ++i) {
         const auto& region = consolidatedRegions_[i];
-        LOG_DEBUG("Final region {}: {}x{} at ({},{})", i, 
-                 region.boundingBox.width, region.boundingBox.height,
-                 region.boundingBox.x, region.boundingBox.y);
+        LOG_DEBUG("Region {}: {}x{} at ({},{}) with {} objects", i, region.boundingBox.width,
+                  region.boundingBox.height, region.boundingBox.x, region.boundingBox.y,
+                  region.trackedObjectIds.size());
     }
-    
+
     return consolidatedRegions_;
 }
 
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::createConsolidatedRegions(
-    const std::vector<TrackedObject>& objects,
-    const std::vector<std::vector<int>>& groups) {
-    
+    const std::vector<TrackedObject>& objects, const std::vector<std::vector<int>>& clusters) {
     std::vector<ConsolidatedRegion> regions;
-    
-    for (const auto& group : groups) {
-        if (group.empty()) continue;
-        
-        cv::Rect bbox = calculateBoundingBox(objects, group);
-        
-        // Expand bounding box for better YOLO detection
+
+    for (const auto& cluster : clusters) {
+        if (cluster.empty()) continue;
+
+        // Calculate bounding box that encompasses all objects in the cluster
+        cv::Rect bbox = calculateBoundingBox(objects, cluster);
+
+        // Apply minimal expansion only
         bbox = expandBoundingBox(bbox, config_.regionExpansionFactor, config_.frameSize);
-        
-        // Adjust to ideal model region size, making regions more square for better YOLO detection
-        double aspectRatio = static_cast<double>(bbox.width) / bbox.height;
-        int idealSize = config_.idealModelRegionSize;
-        int newWidth, newHeight;
-        
-        // Create more square regions for better YOLO detection
-        if (aspectRatio >= 1.5) {
-            // Very wide region - make it square
-            newWidth = idealSize;
-            newHeight = idealSize;
-        } else if (aspectRatio <= 0.67) {
-            // Very tall region - make it square  
-            newWidth = idealSize;
-            newHeight = idealSize;
-        } else {
-            // Moderate aspect ratio - preserve but limit size
-            if (aspectRatio >= 1.0) {
-                newWidth = idealSize;
-                newHeight = static_cast<int>(idealSize / aspectRatio);
-            } else {
-                newHeight = idealSize;
-                newWidth = static_cast<int>(idealSize * aspectRatio);
-            }
-        }
-        
-        // Center the adjusted box
-        int expandX = (newWidth - bbox.width) / 2;
-        int expandY = (newHeight - bbox.height) / 2;
-        bbox.x -= expandX;
-        bbox.y -= expandY;
-        bbox.width = newWidth;
-        bbox.height = newHeight;
-        
+
         // Clamp to frame boundaries
         bbox.x = std::max(0, std::min(bbox.x, config_.frameSize.width - bbox.width));
         bbox.y = std::max(0, std::min(bbox.y, config_.frameSize.height - bbox.height));
-        
-        // Ensure region meets minimum size for YOLO11 - expand if needed, never discard
-        int minSize = config_.idealModelRegionSize / 2; // 50% of ideal size (320x320)
-        if (bbox.width < minSize || bbox.height < minSize) {
-            // Expand small region to minimum size while keeping center point
-            cv::Point center(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
-            bbox.x = center.x - minSize / 2;
-            bbox.y = center.y - minSize / 2;
-            bbox.width = minSize;
-            bbox.height = minSize;
-            
-            // Clamp to frame boundaries after expansion
-            bbox.x = std::max(0, std::min(bbox.x, config_.frameSize.width - bbox.width));
-            bbox.y = std::max(0, std::min(bbox.y, config_.frameSize.height - bbox.height));
-            
-            LOG_DEBUG("Expanded small region to minimum size: {}x{} at ({},{}) with {} objects",
-                     bbox.width, bbox.height, bbox.x, bbox.y, group.size());
-        }
-        
-        regions.emplace_back(bbox, group);
-        LOG_DEBUG("Created consolidated region: {}x{} at ({},{}) with {} objects (aspect ratio: {:.2f})",
-                 bbox.width, bbox.height, bbox.x, bbox.y, group.size(), aspectRatio);
+        bbox.width = std::min(bbox.width, config_.frameSize.width - bbox.x);
+        bbox.height = std::min(bbox.height, config_.frameSize.height - bbox.y);
+
+        regions.emplace_back(bbox, cluster);
+        LOG_DEBUG("Created consolidated region: {}x{} at ({},{}) with {} objects", bbox.width,
+                  bbox.height, bbox.x, bbox.y, cluster.size());
     }
-    
-    // Split large regions into ideal-sized regions for better YOLO11 performance
-    LOG_INFO("Before splitting: {} regions", regions.size());
-    std::vector<ConsolidatedRegion> optimizedRegions = splitLargeRegions(regions);
-    LOG_INFO("After splitting: {} regions", optimizedRegions.size());
-    
-    return optimizedRegions;
+
+    LOG_INFO("Created {} consolidated regions from {} clusters", regions.size(), clusters.size());
+    return regions;
 }
 
 void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedObject>& objects) {
     for (auto& region : consolidatedRegions_) {
         region.framesSinceLastUpdate++;
-        
+
         // Try to update region with current objects
         std::vector<int> updatedIds;
         for (int id : region.trackedObjectIds) {
@@ -276,11 +308,11 @@ void MotionRegionConsolidator::updateExistingRegions(const std::vector<TrackedOb
                 updatedIds.push_back(id);
             }
         }
-        
+
         if (!updatedIds.empty()) {
             region.trackedObjectIds = updatedIds;
             region.framesSinceLastUpdate = 0;
-            
+
             // Recalculate bounding box
             region.boundingBox = calculateBoundingBox(objects, updatedIds);
         }
@@ -296,78 +328,47 @@ void MotionRegionConsolidator::removeStaleRegions() {
         consolidatedRegions_.end());
 }
 
-ConsolidatedRegion MotionRegionConsolidator::mergeRegions(
-    const ConsolidatedRegion& region1, const ConsolidatedRegion& region2) {
-    
+ConsolidatedRegion MotionRegionConsolidator::mergeRegions(const ConsolidatedRegion& region1,
+                                                          const ConsolidatedRegion& region2) {
     // Merge bounding boxes
     cv::Rect mergedBox = region1.boundingBox | region2.boundingBox;
-    
+
     // Merge object IDs
     std::vector<int> mergedIds = region1.trackedObjectIds;
-    mergedIds.insert(mergedIds.end(), region2.trackedObjectIds.begin(), 
-                    region2.trackedObjectIds.end());
-    
+    mergedIds.insert(mergedIds.end(), region2.trackedObjectIds.begin(),
+                     region2.trackedObjectIds.end());
+
     ConsolidatedRegion merged(mergedBox, mergedIds);
-    merged.framesSinceLastUpdate = std::min(region1.framesSinceLastUpdate, 
-                                           region2.framesSinceLastUpdate);
-    
+    merged.framesSinceLastUpdate =
+        std::min(region1.framesSinceLastUpdate, region2.framesSinceLastUpdate);
+
     return merged;
 }
 
-double MotionRegionConsolidator::calculateSpatialDistance(
-    const TrackedObject& obj1, const TrackedObject& obj2) const {
-    
-    cv::Point center1 = obj1.getCenter();
-    cv::Point center2 = obj2.getCenter();
-    
-    double dx = center1.x - center2.x;
-    double dy = center1.y - center2.y;
-    
-    return std::sqrt(dx * dx + dy * dy);
-}
-
-bool MotionRegionConsolidator::areRegionsOverlapping(
-    const ConsolidatedRegion& region1, const ConsolidatedRegion& region2) const {
-    
-    cv::Rect intersection = region1.boundingBox & region2.boundingBox;
-    if (intersection.area() == 0) {
-        return false;
-    }
-    
-    double overlapRatio1 = static_cast<double>(intersection.area()) / region1.boundingBox.area();
-    double overlapRatio2 = static_cast<double>(intersection.area()) / region2.boundingBox.area();
-    
-    return std::max(overlapRatio1, overlapRatio2) >= config_.overlapThreshold;
-}
-
-cv::Rect MotionRegionConsolidator::calculateBoundingBox(
-    const std::vector<TrackedObject>& objects, const std::vector<int>& indices) const {
-    
+cv::Rect MotionRegionConsolidator::calculateBoundingBox(const std::vector<TrackedObject>& objects,
+                                                        const std::vector<int>& indices) const {
     if (indices.empty()) {
         return cv::Rect();
     }
-    
+
     cv::Rect combinedBox = objects[indices[0]].currentBounds;
     for (size_t i = 1; i < indices.size(); ++i) {
         combinedBox |= objects[indices[i]].currentBounds;
     }
-    
+
     return combinedBox;
 }
 
-cv::Rect MotionRegionConsolidator::expandBoundingBox(
-    const cv::Rect& bbox, double expansionFactor, const cv::Size& frameSize) {
-    
+cv::Rect MotionRegionConsolidator::expandBoundingBox(const cv::Rect& bbox, double expansionFactor,
+                                                     const cv::Size& frameSize) {
     int expandX = static_cast<int>((bbox.width * (expansionFactor - 1.0)) / 2.0);
     int expandY = static_cast<int>((bbox.height * (expansionFactor - 1.0)) / 2.0);
-    
+
     cv::Rect expanded(
-        std::max(0, bbox.x - expandX),
-        std::max(0, bbox.y - expandY),
+        std::max(0, bbox.x - expandX), std::max(0, bbox.y - expandY),
         std::min(frameSize.width - std::max(0, bbox.x - expandX), bbox.width + 2 * expandX),
-        std::min(frameSize.height - std::max(0, bbox.y - expandY), bbox.height + 2 * expandY)
-    );
-    
+        std::min(frameSize.height - std::max(0, bbox.y - expandY), bbox.height + 2 * expandY));
+
     return expanded;
 }
 
@@ -381,17 +382,15 @@ void MotionRegionConsolidator::updateConfig(const ConsolidationConfig& config) {
 // ============================================================================
 
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegionsWithVisualization(
-    const std::vector<TrackedObject>& trackedObjects,
-    const cv::Mat& inputImage,
+    const std::vector<TrackedObject>& trackedObjects, const cv::Mat& inputImage,
     const std::string& outputImagePath) {
-    
     // Perform normal consolidation
     std::vector<ConsolidatedRegion> regions = consolidateRegions(trackedObjects);
-    
+
     // Create visualization if input image is provided
     if (!inputImage.empty()) {
         cv::Mat visualization = createVisualization(trackedObjects, regions, inputImage);
-        
+
         // Save visualization if output path is provided
         if (!outputImagePath.empty()) {
             if (cv::imwrite(outputImagePath, visualization)) {
@@ -401,296 +400,125 @@ std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegionsWith
             }
         }
     }
-    
+
     return regions;
 }
 
 std::vector<ConsolidatedRegion> MotionRegionConsolidator::consolidateRegionsStandalone(
-    const std::vector<TrackedObject>& trackedObjects,
-    const std::string& outputImagePath) {
-    
+    const std::vector<TrackedObject>& trackedObjects, const std::string& outputImagePath) {
     // Perform normal consolidation
     std::vector<ConsolidatedRegion> regions = consolidateRegions(trackedObjects);
-    
+
     // Create a synthetic visualization image if no input image provided
     cv::Mat syntheticImage = cv::Mat::zeros(cv::Size(1920, 1080), CV_8UC3);
-    
+
     // Draw a background grid to show the frame
     for (int i = 0; i < syntheticImage.cols; i += 100) {
-        cv::line(syntheticImage, cv::Point(i, 0), cv::Point(i, syntheticImage.rows), 
-                cv::Scalar(50, 50, 50), 1);
+        cv::line(syntheticImage, cv::Point(i, 0), cv::Point(i, syntheticImage.rows),
+                 cv::Scalar(50, 50, 50), 1);
     }
     for (int i = 0; i < syntheticImage.rows; i += 100) {
-        cv::line(syntheticImage, cv::Point(0, i), cv::Point(syntheticImage.cols, i), 
-                cv::Scalar(50, 50, 50), 1);
+        cv::line(syntheticImage, cv::Point(0, i), cv::Point(syntheticImage.cols, i),
+                 cv::Scalar(50, 50, 50), 1);
     }
-    
+
     // Create visualization with synthetic image
     cv::Mat visualization = createVisualization(trackedObjects, regions, syntheticImage);
-    
+
     // Save visualization if output path is provided
     if (!outputImagePath.empty()) {
         // Ensure directory exists
         fs::path path(outputImagePath);
         fs::create_directories(path.parent_path());
-        
+
         if (cv::imwrite(outputImagePath, visualization)) {
             LOG_INFO("Saved standalone consolidation visualization to: {}", outputImagePath);
         } else {
             LOG_ERROR("Failed to save standalone visualization to: {}", outputImagePath);
         }
     }
-    
+
     return regions;
 }
 
 cv::Mat MotionRegionConsolidator::createVisualization(
     const std::vector<TrackedObject>& trackedObjects,
-    const std::vector<ConsolidatedRegion>& regions,
-    const cv::Mat& inputImage) const {
-    
+    const std::vector<ConsolidatedRegion>& regions, const cv::Mat& inputImage) const {
     // Clone input image for visualization
     cv::Mat visualization = inputImage.clone();
-    
+
     // Draw motion boxes first (underneath consolidated regions)
     drawMotionBoxes(visualization, trackedObjects);
-    
+
     // Draw consolidated regions on top
     drawConsolidatedRegions(visualization, regions);
-    
+
     // Add legend/info
     int legendY = 30;
-    cv::putText(visualization, "Motion Boxes: Green", cv::Point(20, legendY), 
-               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
-    cv::putText(visualization, "Consolidated Regions: Red", cv::Point(20, legendY + 30), 
-               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 255), 2);
-    cv::putText(visualization, "Objects: " + std::to_string(trackedObjects.size()) + 
-               " -> Regions: " + std::to_string(regions.size()), 
-               cv::Point(20, legendY + 60), 
-               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
-    
+    cv::putText(visualization, "Motion Boxes: Green", cv::Point(20, legendY),
+                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+    cv::putText(visualization, "Consolidated Regions: Red", cv::Point(20, legendY + 30),
+                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 255), 2);
+    cv::putText(visualization,
+                "Objects: " + std::to_string(trackedObjects.size()) +
+                    " -> Regions: " + std::to_string(regions.size()),
+                cv::Point(20, legendY + 60), cv::FONT_HERSHEY_SIMPLEX, 0.7,
+                cv::Scalar(255, 255, 255), 2);
+
     return visualization;
 }
 
-void MotionRegionConsolidator::drawMotionBoxes(cv::Mat& image, 
-                                              const std::vector<TrackedObject>& trackedObjects) const {
-    
+void MotionRegionConsolidator::drawMotionBoxes(
+    cv::Mat& image, const std::vector<TrackedObject>& trackedObjects) const {
     for (const auto& obj : trackedObjects) {
         // Draw motion box in green
         cv::rectangle(image, obj.currentBounds, cv::Scalar(0, 255, 0), 2);
-        
+
         // Add object ID label
         std::string label = "M" + std::to_string(obj.id);
         cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
         cv::Point textOrigin(obj.currentBounds.x, obj.currentBounds.y - 5);
-        
+
         // Background for text
-        cv::rectangle(image, 
-                     cv::Point(textOrigin.x, textOrigin.y - textSize.height),
-                     cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
-                     cv::Scalar(0, 255, 0), -1);
-        
+        cv::rectangle(image, cv::Point(textOrigin.x, textOrigin.y - textSize.height),
+                      cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
+                      cv::Scalar(0, 255, 0), -1);
+
         // Text
-        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.5, 
-                   cv::Scalar(0, 0, 0), 1);
+        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0),
+                    1);
     }
 }
 
-void MotionRegionConsolidator::drawConsolidatedRegions(cv::Mat& image, 
-                                                      const std::vector<ConsolidatedRegion>& regions) const {
-    
+void MotionRegionConsolidator::drawConsolidatedRegions(
+    cv::Mat& image, const std::vector<ConsolidatedRegion>& regions) const {
     for (size_t i = 0; i < regions.size(); ++i) {
         const auto& region = regions[i];
-        
+
         // Draw consolidated region in red with thicker line
         cv::rectangle(image, region.boundingBox, cv::Scalar(0, 0, 255), 4);
-        
+
         // Add region info label
-        std::string label = "R" + std::to_string(i) + " (" + 
-                           std::to_string(region.trackedObjectIds.size()) + " objs)";
+        std::string label = "R" + std::to_string(i) + " (" +
+                            std::to_string(region.trackedObjectIds.size()) + " objs)";
         cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.7, 2, nullptr);
         cv::Point textOrigin(region.boundingBox.x, region.boundingBox.y - 10);
-        
+
         // Background for text
-        cv::rectangle(image, 
-                     cv::Point(textOrigin.x, textOrigin.y - textSize.height - 5),
-                     cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
-                     cv::Scalar(0, 0, 255), -1);
-        
+        cv::rectangle(image, cv::Point(textOrigin.x, textOrigin.y - textSize.height - 5),
+                      cv::Point(textOrigin.x + textSize.width, textOrigin.y + 5),
+                      cv::Scalar(0, 0, 255), -1);
+
         // Text
-        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.7, 
-                   cv::Scalar(255, 255, 255), 2);
-        
+        cv::putText(image, label, textOrigin, cv::FONT_HERSHEY_SIMPLEX, 0.7,
+                    cv::Scalar(255, 255, 255), 2);
+
         // Add size info
-        std::string sizeInfo = std::to_string(region.boundingBox.width) + "x" + 
-                              std::to_string(region.boundingBox.height);
-        cv::putText(image, sizeInfo, 
-                   cv::Point(region.boundingBox.x, region.boundingBox.y + region.boundingBox.height - 10),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
+        std::string sizeInfo = std::to_string(region.boundingBox.width) + "x" +
+                               std::to_string(region.boundingBox.height);
+        cv::putText(
+            image, sizeInfo,
+            cv::Point(region.boundingBox.x, region.boundingBox.y + region.boundingBox.height - 10),
+            cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
     }
 }
-
-// ============================================================================
-// REGION OPTIMIZATION METHODS
-// ============================================================================
-
-std::vector<ConsolidatedRegion> MotionRegionConsolidator::splitLargeRegions(
-    const std::vector<ConsolidatedRegion>& regions) {
-    
-    std::vector<ConsolidatedRegion> optimizedRegions;
-    int idealSize = config_.idealModelRegionSize;
-    int tolerancePercent = config_.sizeTolerancePercent;
-    
-    // Calculate tolerance range (e.g., 30% tolerance means 448-832 for 640 ideal size)
-    int minSize = idealSize * (100 - tolerancePercent) / 100;
-    int maxSize = idealSize * (100 + tolerancePercent) / 100;
-    
-    for (const auto& region : regions) {
-        int width = region.boundingBox.width;
-        int height = region.boundingBox.height;
-        
-        // Check if region is outside tolerance range and needs splitting
-        if (width > maxSize || height > maxSize) {
-            LOG_INFO("Splitting large region: {}x{} into ideal-sized regions", width, height);
-            
-            // Calculate how many splits we need
-            int splitsX = (width + idealSize - 1) / idealSize;  // Ceiling division
-            int splitsY = (height + idealSize - 1) / idealSize;  // Ceiling division
-            
-            // Create grid of sub-regions
-            for (int y = 0; y < splitsY; ++y) {
-                for (int x = 0; x < splitsX; ++x) {
-                    // Calculate sub-region bounds
-                    int subX = region.boundingBox.x + (x * idealSize);
-                    int subY = region.boundingBox.y + (y * idealSize);
-                    int subWidth = std::min(idealSize, region.boundingBox.x + region.boundingBox.width - subX);
-                    int subHeight = std::min(idealSize, region.boundingBox.y + region.boundingBox.height - subY);
-                    
-                    // Create sub-region (all sub-regions are kept, never discarded)
-                    cv::Rect subBbox(subX, subY, subWidth, subHeight);
-                    
-                    // Create new consolidated region with same object IDs
-                    // (we'll distribute the objects across sub-regions)
-                    ConsolidatedRegion subRegion(subBbox, region.trackedObjectIds);
-                    subRegion.framesSinceLastUpdate = region.framesSinceLastUpdate;
-                    
-                    optimizedRegions.push_back(subRegion);
-                    
-                    LOG_INFO("  Created sub-region: {}x{} at ({},{})", 
-                             subWidth, subHeight, subX, subY);
-                }
-            }
-        } else {
-            // Region is within tolerance range, keep as-is
-            optimizedRegions.push_back(region);
-            LOG_INFO("Kept region as-is: {}x{} (within {}% tolerance of ideal {}x{})", 
-                     width, height, tolerancePercent, idealSize, idealSize);
-        }
-    }
-    
-    LOG_INFO("Region optimization: {} -> {} regions", regions.size(), optimizedRegions.size());
-    return optimizedRegions;
-}
-
-std::vector<ConsolidatedRegion> MotionRegionConsolidator::removeOverlappingRegions(
-    const std::vector<ConsolidatedRegion>& regions) {
-    
-    if (regions.empty()) {
-        return regions;
-    }
-    
-    std::vector<ConsolidatedRegion> filteredRegions;
-    int idealSize = config_.idealModelRegionSize;
-    int tolerancePercent = config_.sizeTolerancePercent;
-    
-    // Calculate tolerance range for ideal size
-    int minIdealSize = idealSize * (100 - tolerancePercent) / 100;
-    int maxIdealSize = idealSize * (100 + tolerancePercent) / 100;
-    
-    LOG_INFO("Removing overlapping regions from {} regions (ideal size: {}±{}%)", 
-             regions.size(), idealSize, tolerancePercent);
-    
-    for (size_t i = 0; i < regions.size(); ++i) {
-        const auto& currentRegion = regions[i];
-        bool shouldKeep = true;
-        
-        // Check for overlaps with already filtered regions
-        for (const auto& filteredRegion : filteredRegions) {
-            if (areRegionsOverlapping(currentRegion, filteredRegion)) {
-                // Calculate how close each region is to ideal size
-                int currentWidth = currentRegion.boundingBox.width;
-                int currentHeight = currentRegion.boundingBox.height;
-                int filteredWidth = filteredRegion.boundingBox.width;
-                int filteredHeight = filteredRegion.boundingBox.height;
-                
-                // Calculate size deviation from ideal (lower is better)
-                int currentDeviation = std::abs(currentWidth - idealSize) + std::abs(currentHeight - idealSize);
-                int filteredDeviation = std::abs(filteredWidth - idealSize) + std::abs(filteredHeight - idealSize);
-                
-                // Check if current region is within ideal tolerance range
-                bool currentIsIdeal = (currentWidth >= minIdealSize && currentWidth <= maxIdealSize) &&
-                                     (currentHeight >= minIdealSize && currentHeight <= maxIdealSize);
-                bool filteredIsIdeal = (filteredWidth >= minIdealSize && filteredWidth <= maxIdealSize) &&
-                                      (filteredHeight >= minIdealSize && filteredHeight <= maxIdealSize);
-                
-                // Decision logic:
-                // 1. If one is ideal and other isn't, keep the ideal one
-                // 2. If both are ideal or both aren't ideal, keep the one closer to ideal size
-                // 3. If tied, keep the one with more objects
-                if (currentIsIdeal && !filteredIsIdeal) {
-                    // Current is ideal, filtered is not - remove filtered and keep current
-                    shouldKeep = true;
-                    // Remove the filtered region (we'll handle this by rebuilding the list)
-                    LOG_DEBUG("Overlap detected: keeping ideal region {}x{} over non-ideal {}x{}", 
-                             currentWidth, currentHeight, filteredWidth, filteredHeight);
-                } else if (!currentIsIdeal && filteredIsIdeal) {
-                    // Filtered is ideal, current is not - keep filtered, discard current
-                    shouldKeep = false;
-                    LOG_DEBUG("Overlap detected: keeping ideal region {}x{} over non-ideal {}x{}", 
-                             filteredWidth, filteredHeight, currentWidth, currentHeight);
-                    break;
-                } else {
-                    // Both are ideal or both aren't ideal - compare deviation from ideal
-                    if (currentDeviation < filteredDeviation) {
-                        // Current is closer to ideal - keep current, remove filtered
-                        shouldKeep = true;
-                        LOG_DEBUG("Overlap detected: keeping region {}x{} (deviation: {}) over {}x{} (deviation: {})", 
-                                 currentWidth, currentHeight, currentDeviation, 
-                                 filteredWidth, filteredHeight, filteredDeviation);
-                    } else if (currentDeviation > filteredDeviation) {
-                        // Filtered is closer to ideal - keep filtered, discard current
-                        shouldKeep = false;
-                        LOG_DEBUG("Overlap detected: keeping region {}x{} (deviation: {}) over {}x{} (deviation: {})", 
-                                 filteredWidth, filteredHeight, filteredDeviation,
-                                 currentWidth, currentHeight, currentDeviation);
-                        break;
-                    } else {
-                        // Tied on deviation - keep the one with more objects
-                        if (currentRegion.trackedObjectIds.size() > filteredRegion.trackedObjectIds.size()) {
-                            shouldKeep = true;
-                            LOG_DEBUG("Overlap detected: keeping region {}x{} with {} objects over {}x{} with {} objects", 
-                                     currentWidth, currentHeight, currentRegion.trackedObjectIds.size(),
-                                     filteredWidth, filteredHeight, filteredRegion.trackedObjectIds.size());
-                        } else {
-                            shouldKeep = false;
-                            LOG_DEBUG("Overlap detected: keeping region {}x{} with {} objects over {}x{} with {} objects", 
-                                     filteredWidth, filteredHeight, filteredRegion.trackedObjectIds.size(),
-                                     currentWidth, currentHeight, currentRegion.trackedObjectIds.size());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (shouldKeep) {
-            filteredRegions.push_back(currentRegion);
-        }
-    }
-    
-    LOG_INFO("Overlap removal: {} -> {} regions (removed {} overlapping regions)", 
-             regions.size(), filteredRegions.size(), regions.size() - filteredRegions.size());
-    
-    return filteredRegions;
-}
-
