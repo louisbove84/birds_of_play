@@ -5,7 +5,8 @@
     "main": "api/index.js",
     "type": "module",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "vercel-build": "echo 'Serverless functions ready'"
   },
     "engines": {
         "node": "22.x"
