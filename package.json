@@ -4,12 +4,12 @@
     "description": "Birds of Play - DBSCAN Motion Detection System deployed on Vercel",
     "main": "api/index.js",
     "type": "module",
-  "scripts": {
-    "dev": "vercel dev",
-    "vercel-build": "echo 'Serverless functions ready'"
-  },
+    "scripts": {
+        "dev": "vercel dev",
+        "vercel-build": "echo 'Serverless functions ready'"
+    },
     "engines": {
-        "node": "22.x"
+        "node": "18.x"
     },
     "keywords": [
         "birds",
