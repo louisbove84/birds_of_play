@@ -1,35 +1,18 @@
 {
   "version": 2,
   "name": "birds-of-play",
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/motion.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/objects.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/clustering.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/finetuning.js",
-      "use": "@vercel/node"
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs18.x"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/motion",
       "dest": "/api/motion.js"
     },
     {
-      "src": "/api/objects",
+      "src": "/api/objects", 
       "dest": "/api/objects.js"
     },
     {
@@ -48,25 +31,5 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    },
-    "api/motion.js": {
-      "maxDuration": 30
-    },
-    "api/objects.js": {
-      "maxDuration": 30
-    },
-    "api/clustering.js": {
-      "maxDuration": 30
-    },
-    "api/finetuning.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }

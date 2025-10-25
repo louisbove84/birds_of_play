@@ -16,7 +16,7 @@ const mockFineTuningData = {
             id: "correction_001",
             objectId: "obj_015",
             originalPrediction: "Species Cluster 2",
-            userCorrection: "Species Cluster 1", 
+            userCorrection: "Species Cluster 1",
             confidence: 0.72,
             timestamp: "2025-01-25T03:30:15.000Z"
         },
@@ -38,7 +38,7 @@ const mockFineTuningData = {
             reason: "Low confidence prediction"
         },
         {
-            objectId: "obj_012", 
+            objectId: "obj_012",
             prediction: "Species Cluster 2",
             confidence: 0.65,
             needsReview: true,

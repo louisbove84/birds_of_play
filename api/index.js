@@ -1,17 +1,57 @@
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
+// Main landing page for Birds of Play - Vercel Serverless Function
+export default function handler(req, res) {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-const app = express();
+    if (req.url === '/api/health') {
+        res.status(200).json({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            version: '1.0.0',
+            features: [
+                'DBSCAN Motion Clustering',
+                'Overlap-Aware Distance Metrics',
+                'YOLO11 Integration',
+                'ML Pipeline',
+                'Real-time Processing'
+            ]
+        });
+        return;
+    }
 
-// Enable CORS for all routes
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'web', 'public')));
+    if (req.url === '/api/pipeline-status') {
+        res.status(200).json({
+            status: 'success',
+            lastRun: '2025-01-25T03:29:37.000Z',
+            results: {
+                framesProcessed: 65,
+                motionRegionsDetected: 65,
+                consolidatedRegions: 65,
+                yoloDetections: 25,
+                birdSpeciesClusters: 4,
+                modelAccuracy: 0.80,
+                executionTime: '337.8 seconds'
+            },
+            dbscanConfig: {
+                eps: 50.0,
+                minPts: 2,
+                overlapWeight: 0.7,
+                edgeWeight: 0.3,
+                maxEdgeDistance: 100.0
+            }
+        });
+        return;
+    }
 
-// Main landing page route
-app.get('/', (req, res) => {
-    res.send(`
+    // Main landing page HTML
+    res.status(200).send(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -195,14 +235,6 @@ app.get('/', (req, res) => {
                     <h3>🔄 Full Pipeline Integration</h3>
                     <p>Seamlessly integrated with MongoDB storage, YOLO11 detection, machine learning clustering, and web visualization interfaces.</p>
                 </div>
-                <div class="feature-card">
-                    <h3>📱 Real-time Visualization</h3>
-                    <p>Live web interfaces for viewing motion detection results, object detection overlays, bird clustering analysis, and fine-tuning interfaces.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>⚡ High Performance</h3>
-                    <p>Optimized C++ implementation with Python bindings. Efficient processing of video streams with real-time motion detection and consolidation.</p>
-                </div>
             </div>
 
             <div class="demo-section">
@@ -219,17 +251,6 @@ app.get('/', (req, res) => {
                     <span class="tech-badge">ResNet</span>
                     <span class="tech-badge">Vercel</span>
                 </div>
-            </div>
-
-            <div class="demo-section">
-                <h2>📈 Key Improvements</h2>
-                <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
-                    <li><strong>Better Clustering:</strong> DBSCAN handles overlapping motion objects more effectively than previous proximity-based methods</li>
-                    <li><strong>Overlap-Aware Distance:</strong> Custom distance metric considers both bounding box overlap and edge proximity</li>
-                    <li><strong>No Size Limits:</strong> Removed artificial region size constraints for more natural clustering</li>
-                    <li><strong>Production Ready:</strong> Full pipeline tested and verified with real video data</li>
-                    <li><strong>Scalable Architecture:</strong> Modular design supports easy extension and modification</li>
-                </ul>
             </div>
 
             <div style="margin-top: 40px;">
@@ -255,46 +276,4 @@ app.get('/', (req, res) => {
     </body>
     </html>
     `);
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        features: [
-            'DBSCAN Motion Clustering',
-            'Overlap-Aware Distance Metrics',
-            'YOLO11 Integration',
-            'ML Pipeline',
-            'Real-time Processing'
-        ]
-    });
-});
-
-// API endpoint for pipeline status
-app.get('/api/pipeline-status', (req, res) => {
-    res.json({
-        status: 'success',
-        lastRun: '2025-01-25T03:29:37.000Z',
-        results: {
-            framesProcessed: 65,
-            motionRegionsDetected: 65,
-            consolidatedRegions: 65,
-            yoloDetections: 25,
-            birdSpeciesClusters: 4,
-            modelAccuracy: 0.80,
-            executionTime: '337.8 seconds'
-        },
-        dbscanConfig: {
-            eps: 50.0,
-            minPts: 2,
-            overlapWeight: 0.7,
-            edgeWeight: 0.3,
-            maxEdgeDistance: 100.0
-        }
-    });
-});
-
-module.exports = app;
+}

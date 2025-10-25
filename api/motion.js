@@ -1,43 +1,69 @@
-// Motion Detection Viewer (Port 3000 equivalent)
-const express = require('express');
-const app = express();
-
-// For demo purposes, we'll show static data since MongoDB won't be available on Vercel
-const mockFrameData = [
-    {
-        _id: "frame_001",
-        timestamp: "2025-01-25T03:29:37.000Z",
-        metadata: {
-            frame_count: 26,
-            motion_detected: true,
-            motion_regions: 3,
-            consolidated_regions_count: 1,
-            consolidated_regions: [{
-                x: 349, y: 796, width: 244, height: 259, object_count: 17
-            }]
-        }
-    },
-    {
-        _id: "frame_002",
-        timestamp: "2025-01-25T03:29:38.000Z",
-        metadata: {
-            frame_count: 27,
-            motion_detected: true,
-            motion_regions: 2,
-            consolidated_regions_count: 1,
-            consolidated_regions: [{
-                x: 400, y: 600, width: 180, height: 200, object_count: 12
-            }]
-        }
+// Motion Detection Viewer - Vercel Serverless Function
+export default function handler(req, res) {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
     }
-];
 
-app.get('/', (req, res) => {
-    res.send(`
+    // Mock frame data from our pipeline test
+    const mockFrameData = [
+        {
+            _id: "frame_001",
+            timestamp: "2025-01-25T03:29:37.000Z",
+            metadata: {
+                frame_count: 26,
+                motion_detected: true,
+                motion_regions: 3,
+                consolidated_regions_count: 1,
+                consolidated_regions: [{
+                    x: 349, y: 796, width: 244, height: 259, object_count: 17
+                }]
+            }
+        },
+        {
+            _id: "frame_002", 
+            timestamp: "2025-01-25T03:29:38.000Z",
+            metadata: {
+                frame_count: 27,
+                motion_detected: true,
+                motion_regions: 2,
+                consolidated_regions_count: 1,
+                consolidated_regions: [{
+                    x: 400, y: 600, width: 180, height: 200, object_count: 12
+                }]
+            }
+        }
+    ];
+
+    if (req.url === '/api/frames') {
+        res.status(200).json({
+            status: 'success',
+            frames: mockFrameData,
+            totalFrames: 65,
+            framesWithMotion: 65,
+            consolidatedRegions: 74,
+            dbscanConfig: {
+                eps: 50.0,
+                minPts: 2,
+                overlapWeight: 0.7,
+                edgeWeight: 0.3
+            }
+        });
+        return;
+    }
+
+    // Main motion detection viewer HTML
+    res.status(200).send(`
 <!DOCTYPE html>
 <html>
 <head>
     <title>🦅 Birds of Play - Motion Detection Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -323,22 +349,4 @@ app.get('/', (req, res) => {
 </body>
 </html>
     `);
-});
-
-app.get('/api/frames', (req, res) => {
-    res.json({
-        status: 'success',
-        frames: mockFrameData,
-        totalFrames: 65,
-        framesWithMotion: 65,
-        consolidatedRegions: 74,
-        dbscanConfig: {
-            eps: 50.0,
-            minPts: 2,
-            overlapWeight: 0.7,
-            edgeWeight: 0.3
-        }
-    });
-});
-
-module.exports = app;
+}
