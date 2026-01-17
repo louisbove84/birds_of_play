@@ -7,6 +7,10 @@
       "config": {
         "excludeFiles": "{src/**,test/**,test_results/**,web/**}"
       }
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
