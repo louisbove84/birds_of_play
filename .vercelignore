@@ -1,0 +1,8 @@
+src/**
+test/**
+test_results/**
+images/**
+web/**
+**/*.md
+**/*.mov
+**/*.mp4
