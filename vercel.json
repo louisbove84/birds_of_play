@@ -5,11 +5,14 @@
       "src": "api/*.js",
       "use": "@vercel/node",
       "config": {
-        "excludeFiles": "{public/**,src/**,test/**,test_results/**,images/**,web/**,**/*.jpg,**/*.jpeg,**/*.png,**/*.gif,**/*.mp4,**/*.mov}"
+        "excludeFiles": "{src/**,test/**,test_results/**,web/**}"
       }
     }
   ],
   "routes": [
+    {
+      "handle": "filesystem"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/$1.js"
