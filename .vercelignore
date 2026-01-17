@@ -4,3 +4,7 @@ test_results/**
 web/**
 pyproject.toml
 uv.lock
+.gitignore
+package.json
+package-lock.json
+**/*.py
