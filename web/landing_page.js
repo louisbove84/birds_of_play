@@ -277,26 +277,34 @@ app.get('/', (req, res) => {
         }
         
         .nav-links {
-            position: fixed;
-            top: 20px;
-            right: 20px;
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
+            justify-content: center;
+            margin: 0 0 30px;
         }
         
         .nav-link {
-            background: rgba(255, 255, 255, 0.1);
+            background: linear-gradient(45deg, #FF6B35, #F7931E);
             color: white;
-            padding: 10px 15px;
-            border-radius: 20px;
+            padding: 10px 16px;
+            border-radius: 999px;
             text-decoration: none;
             font-size: 0.9rem;
-            transition: all 0.3s ease;
+            font-weight: bold;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 6px 14px rgba(255, 107, 53, 0.25);
         }
         
         .nav-link:hover {
-            background: rgba(255, 255, 255, 0.2);
             transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(255, 107, 53, 0.4);
+        }
+        
+        .nav-link-active {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 18px rgba(255, 107, 53, 0.55);
+            cursor: default;
+            pointer-events: none;
         }
         
         .file-info {
@@ -331,10 +339,11 @@ app.get('/', (req, res) => {
 </head>
 <body>
     <nav class="nav-links">
-        <a href="http://localhost:3000" class="nav-link" target="_blank">📹 Motion</a>
-        <a href="http://localhost:3001" class="nav-link" target="_blank">🎯 Objects</a>
-        <a href="http://localhost:3002" class="nav-link" target="_blank">🔬 Clustering</a>
-        <a href="http://localhost:3003" class="nav-link" target="_blank">🧠 Fine-Tuning</a>
+        <a href="http://localhost:3004" class="nav-link nav-link-active" aria-current="page">🏠 Home</a>
+        <a href="http://localhost:3000" class="nav-link">📹 Motion Detection</a>
+        <a href="http://localhost:3001" class="nav-link">🎯 Object Detection</a>
+        <a href="http://localhost:3002/dashboard" class="nav-link">🔬 Bird Clustering</a>
+        <a href="http://localhost:3003" class="nav-link">🧠 Fine-Tuning</a>
     </nav>
 
     <div class="container">

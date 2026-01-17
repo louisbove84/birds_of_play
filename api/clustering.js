@@ -120,21 +120,31 @@ export default function handler(req, res) {
             text-align: center;
         }
         .nav-links {
-            margin-top: 1rem;
-            font-size: 0.9em;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            display: inline-block;
-            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
         }
-        .nav-links a {
-            color: #FF6B35;
+        .nav-link {
+            background: linear-gradient(45deg, #FF6B35, #F7931E);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 999px;
             text-decoration: none;
-            margin: 0 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 6px 14px rgba(255, 107, 53, 0.25);
         }
-        .nav-links a:hover {
-            text-decoration: underline;
+        .nav-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(255, 107, 53, 0.4);
+        }
+        .nav-link-active {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 18px rgba(255, 107, 53, 0.55);
+            cursor: default;
+            pointer-events: none;
         }
         .cluster-grid { 
             display: grid; 
@@ -215,11 +225,11 @@ export default function handler(req, res) {
         <h1>🔬 Bird Clustering Analysis</h1>
         
         <div class="nav-links">
-            <a href="/">🏠 Home</a>
-            <a href="/api/motion">📹 Motion Detection</a>
-            <a href="/api/objects">🎯 Object Detection</a>
-            <a href="/api/clustering">🔬 Bird Clustering</a>
-            <a href="/api/finetuning">🧠 Fine-Tuning</a>
+            <a href="/" class="nav-link">🏠 Home</a>
+            <a href="/api/motion" class="nav-link">📹 Motion Detection</a>
+            <a href="/api/objects" class="nav-link">🎯 Object Detection</a>
+            <a href="/api/clustering" class="nav-link nav-link-active" aria-current="page">🔬 Bird Clustering</a>
+            <a href="/api/finetuning" class="nav-link">🧠 Fine-Tuning</a>
         </div>
 
         <h2>Identified Species Clusters</h2>

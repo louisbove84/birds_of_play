@@ -41,45 +41,31 @@ app.get('/', (req, res) => {
         .container { max-width: 1200px; margin: 0 auto; }
         h1 { color: #FF6B35; text-align: center; }
         .nav-links {
-            margin-top: 1rem;
-            font-size: 0.9em;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            display: inline-block;
-            text-align: center;
-            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
         }
         .nav-link {
-            color: #00FF00;
+            background: linear-gradient(45deg, #FF6B35, #F7931E);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 999px;
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            border: 2px solid #00FF00;
-            background-color: rgba(0, 255, 0, 0.1);
+            font-size: 0.9rem;
             font-weight: bold;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 6px 14px rgba(255, 107, 53, 0.25);
         }
         .nav-link:hover {
-            background-color: rgba(0, 255, 0, 0.3);
-            text-decoration: underline;
-            border-color: #00FF00;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0, 255, 0, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(255, 107, 53, 0.4);
         }
-        .nav-separator {
-            margin: 0 1rem;
-            color: #666;
-            font-weight: bold;
-        }
-        .nav-current {
-            color: #FF6B35;
-            font-weight: bold;
-            background: rgba(255, 107, 53, 0.1);
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 107, 53, 0.3);
+        .nav-link-active {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 18px rgba(255, 107, 53, 0.55);
+            cursor: default;
+            pointer-events: none;
         }
         .region-grid { 
             display: grid; 
@@ -177,34 +163,7 @@ app.get('/', (req, res) => {
             text-align: center;
             font-style: italic;
         }
-        .nav-links {
-            text-align: center;
-            margin: 20px 0;
-            padding: 10px;
-            background: #333;
-            border-radius: 8px;
-        }
-        .nav-link {
-            color: #4CAF50;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            font-weight: bold;
-        }
-        .nav-link:hover {
-            background: #4CAF50;
-            color: #1a1a1a;
-        }
-        .nav-current {
-            color: #FF6B35;
-            font-weight: bold;
-            padding: 8px 16px;
-        }
-        .nav-separator {
-            color: #666;
-            margin: 0 10px;
-        }
+        
     </style>
 </head>
 <body>
@@ -213,19 +172,11 @@ app.get('/', (req, res) => {
         <p style="text-align: center; color: #ccc;">Individual detected objects cropped from consolidated motion regions</p>
         
         <nav class="nav-links">
-            <a href="http://localhost:3000" class="nav-link" target="_self">
-                📹 Motion Detection Frames
-            </a>
-            <span class="nav-separator">|</span>
-            <span class="nav-current">🎯 Object Detections</span>
-            <span class="nav-separator">|</span>
-            <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
-                🔬 Bird Clustering
-            </a>
-            <span class="nav-separator">|</span>
-            <a href="http://localhost:3003" class="nav-link" target="_self">
-                🧠 Fine-Tuning
-            </a>
+            <a href="http://localhost:3004" class="nav-link">🏠 Home</a>
+            <a href="http://localhost:3000" class="nav-link">📹 Motion Detection</a>
+            <a href="http://localhost:3001" class="nav-link nav-link-active" aria-current="page">🎯 Object Detection</a>
+            <a href="http://localhost:3002/dashboard" class="nav-link">🔬 Bird Clustering</a>
+            <a href="http://localhost:3003" class="nav-link">🧠 Fine-Tuning</a>
         </nav>
         
         <div class="controls" style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">

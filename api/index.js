@@ -69,21 +69,29 @@ export default function handler(req, res) {
             .nav-links {
                 margin: 30px 0;
                 display: flex;
-                justify-content: center;
-                gap: 20px;
                 flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
             }
             .nav-link {
-                background: #FF6B35;
+                background: linear-gradient(45deg, #FF6B35, #F7931E);
                 color: white;
-                padding: 12px 24px;
-                border-radius: 8px;
+                padding: 10px 16px;
+                border-radius: 999px;
                 text-decoration: none;
+                font-size: 0.9rem;
                 font-weight: bold;
-                transition: background 0.3s ease;
+                transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+                box-shadow: 0 6px 14px rgba(255, 107, 53, 0.25);
             }
             .nav-link:hover {
-                background: #e55a2b;
+                transform: translateY(-2px);
+                box-shadow: 0 8px 16px rgba(255, 107, 53, 0.4);
+            }
+            .nav-link-active {
+                box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 18px rgba(255, 107, 53, 0.55);
+                cursor: default;
+                pointer-events: none;
             }
             .features {
                 display: grid;
@@ -269,6 +277,7 @@ export default function handler(req, res) {
             <p class="subtitle">Advanced Motion Detection with DBSCAN Clustering</p>
 
             <div class="nav-links">
+                <a href="/" class="nav-link nav-link-active" aria-current="page">🏠 Home</a>
                 <a href="/api/motion" class="nav-link">📹 Motion Detection</a>
                 <a href="/api/objects" class="nav-link">🎯 Object Detection</a>
                 <a href="/api/clustering" class="nav-link">🔬 Bird Clustering</a>

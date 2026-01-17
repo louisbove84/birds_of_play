@@ -105,32 +105,31 @@ app.get('/', (req, res) => {
         }
         .stats { text-align: center; margin-bottom: 20px; color: #4CAF50; }
         .nav-links {
-            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
             margin: 20px 0;
-            padding: 10px;
-            background: #333;
-            border-radius: 8px;
         }
         .nav-link {
-            color: #4CAF50;
+            background: linear-gradient(45deg, #FF6B35, #F7931E);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 999px;
             text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: all 0.3s ease;
+            font-size: 0.9rem;
             font-weight: bold;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 6px 14px rgba(255, 107, 53, 0.25);
         }
         .nav-link:hover {
-            background: #4CAF50;
-            color: #1a1a1a;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(255, 107, 53, 0.4);
         }
-        .nav-current {
-            color: #FF6B35;
-            font-weight: bold;
-            padding: 8px 16px;
-        }
-        .nav-separator {
-            color: #666;
-            margin: 0 10px;
+        .nav-link-active {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 18px rgba(255, 107, 53, 0.55);
+            cursor: default;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -140,19 +139,11 @@ app.get('/', (req, res) => {
         <p style="text-align: center; color: #ccc;">Consolidated motion regions with original thumbnails</p>
         
         <nav class="nav-links">
-            <span class="nav-current">📹 Motion Detection Frames</span>
-            <span class="nav-separator">|</span>
-            <a href="http://localhost:3001" class="nav-link" target="_self">
-                🎯 Object Detections
-            </a>
-            <span class="nav-separator">|</span>
-            <a href="http://localhost:3002/dashboard" class="nav-link" target="_self">
-                🔬 Bird Clustering
-            </a>
-            <span class="nav-separator">|</span>
-            <a href="http://localhost:3003" class="nav-link" target="_self">
-                🧠 Fine-Tuning
-            </a>
+            <a href="http://localhost:3004" class="nav-link">🏠 Home</a>
+            <a href="http://localhost:3000" class="nav-link nav-link-active" aria-current="page">📹 Motion Detection</a>
+            <a href="http://localhost:3001" class="nav-link">🎯 Object Detection</a>
+            <a href="http://localhost:3002/dashboard" class="nav-link">🔬 Bird Clustering</a>
+            <a href="http://localhost:3003" class="nav-link">🧠 Fine-Tuning</a>
         </nav>
         
         <div class="stats" id="stats">Loading...</div>
