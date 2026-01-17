@@ -58,16 +58,16 @@ export default function handler(req, res) {
             }
             h1 {
                 color: #FF6B35;
-                font-size: 3rem;
-                margin-bottom: 20px;
+                font-size: 2.4rem;
+                margin-bottom: 10px;
             }
             .subtitle {
-                font-size: 1.2rem;
-                margin-bottom: 40px;
+                font-size: 1rem;
+                margin-bottom: 20px;
                 opacity: 0.9;
             }
             .nav-links {
-                margin: 30px 0;
+                margin: 16px 0 20px;
                 display: flex;
                 flex-wrap: wrap;
                 gap: 10px;
@@ -117,12 +117,17 @@ export default function handler(req, res) {
             .demo-section {
                 background: rgba(255,255,255,0.1);
                 border-radius: 8px;
-                padding: 40px;
-                margin: 40px 0;
+                padding: 24px;
+                margin: 20px 0;
             }
             .demo-section h2 {
                 color: #FFD700;
-                margin-bottom: 20px;
+                margin-bottom: 10px;
+            }
+            .demo-section p {
+                margin-top: 0;
+                margin-bottom: 12px;
+                font-size: 0.95rem;
             }
             .demo-results {
                 display: grid;
@@ -156,15 +161,15 @@ export default function handler(req, res) {
             .upload-section {
                 background: rgba(255,255,255,0.1);
                 border-radius: 8px;
-                padding: 40px;
-                margin: 40px 0;
+                padding: 24px;
+                margin: 20px 0;
                 text-align: center;
             }
             .upload-area {
                 border: 2px dashed #FF6B35;
                 border-radius: 8px;
-                padding: 40px;
-                margin: 20px 0;
+                padding: 24px;
+                margin: 16px 0;
                 cursor: pointer;
                 transition: all 0.3s ease;
                 background: rgba(255, 107, 53, 0.1);
@@ -178,12 +183,12 @@ export default function handler(req, res) {
                 border-color: #e55a2b;
             }
             .upload-icon {
-                font-size: 3rem;
-                margin-bottom: 20px;
+                font-size: 2.2rem;
+                margin-bottom: 12px;
             }
             .upload-text {
-                font-size: 1.1rem;
-                margin-bottom: 20px;
+                font-size: 0.95rem;
+                margin-bottom: 12px;
             }
             .upload-button {
                 background: #FF6B35;
@@ -228,11 +233,13 @@ export default function handler(req, res) {
             }
             .demo-video-wrapper {
                 width: 100%;
-                max-width: 900px;
-                margin: 20px auto;
+                max-width: 760px;
+                margin: 12px auto;
             }
             .demo-video {
                 width: 100%;
+                max-height: 45vh;
+                object-fit: contain;
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 display: block;
@@ -241,9 +248,9 @@ export default function handler(req, res) {
             .video-legend {
                 display: flex;
                 justify-content: center;
-                gap: 40px;
-                margin-top: 20px;
-                padding: 20px;
+                gap: 24px;
+                margin-top: 12px;
+                padding: 12px;
                 background: rgba(0,0,0,0.3);
                 border-radius: 8px;
                 border: 1px solid rgba(255,255,255,0.1);
@@ -252,7 +259,7 @@ export default function handler(req, res) {
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             .legend-box {
                 width: 30px;
