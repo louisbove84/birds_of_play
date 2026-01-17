@@ -1,10 +1,6 @@
 src/**
 test/**
 test_results/**
-images/**
 web/**
-**/*.md
-**/*.mov
-**/*.mp4
 pyproject.toml
 uv.lock
