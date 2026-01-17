@@ -1,20 +1,7 @@
 {
   "functions": {
     "api/*.js": {
-      "excludeFiles": [
-        "public/**",
-        "src/**",
-        "test/**",
-        "test_results/**",
-        "images/**",
-        "web/**",
-        "**/*.jpg",
-        "**/*.jpeg",
-        "**/*.png",
-        "**/*.gif",
-        "**/*.mp4",
-        "**/*.mov"
-      ]
+      "excludeFiles": "{public/**,src/**,test/**,test_results/**,images/**,web/**,**/*.jpg,**/*.jpeg,**/*.png,**/*.gif,**/*.mp4,**/*.mov}"
     }
   }
 }
