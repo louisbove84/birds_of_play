@@ -363,25 +363,6 @@ export default function handler(req, res) {
                 </div>
             </div>
 
-            <div class="features">
-                <div class="feature-card">
-                    <h3>🔍 DBSCAN Clustering</h3>
-                    <p>Advanced clustering algorithm that groups motion objects based on overlap-aware distance metrics. Perfect for handling overlapping bounding boxes like small birds inside larger motion regions.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📊 No Size Constraints</h3>
-                    <p>Regions are created purely based on spatial clustering without artificial size limitations. This allows for more natural grouping of motion objects.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🎯 Smart Distance Calculation</h3>
-                    <p>Combines bounding box overlap ratio with edge-to-edge distance for intelligent motion object grouping. Weighted combination ensures optimal clustering results.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🔄 Full Pipeline Integration</h3>
-                    <p>Seamlessly integrated with MongoDB storage, YOLO11 detection, machine learning clustering, and web visualization interfaces.</p>
-                </div>
-            </div>
-
             <div style="margin-top: 40px;">
                 <a href="https://github.com/louisbove84/birds_of_play" class="github-link" target="_blank">
                     📚 View on GitHub
