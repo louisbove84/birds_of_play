@@ -1,5 +1,14 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "excludeFiles": "{public/**,src/**,test/**,test_results/**,images/**,web/**,**/*.jpg,**/*.jpeg,**/*.png,**/*.gif,**/*.mp4,**/*.mov}"
+      }
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
@@ -13,10 +22,5 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
-  ],
-  "functions": {
-    "api/*.js": {
-      "excludeFiles": "{public/**,src/**,test/**,test_results/**,images/**,web/**,**/*.jpg,**/*.jpeg,**/*.png,**/*.gif,**/*.mp4,**/*.mov}"
-    }
-  }
+  ]
 }
